@@ -1,14 +1,25 @@
 import { useEffect } from 'react'
 import { Tldraw, track, useEditor } from 'tldraw'
+import { TLShape, Tldraw } from 'tldraw'
+
 import 'tldraw/tldraw.css'
 import './custom-ui.css'
 
-// There's a guide at the bottom of this file!
+// aquired via "copy as JSON", which is an option when debug
+// mode is on
+import _startShape from './assets/init_snapshot.json'
+const startShapes = _startShape.shapes as Array<TLShape>
 
 // [1]
 export default function CustomUiExample() {
   return (
-    <Tldraw inferDarkMode persistenceKey='gpi_v2' >
+    <Tldraw
+      inferDarkMode
+      persistenceKey='gpi_v2'
+      onMount={(editor) => {
+        editor.updateInstanceState({ isFocusMode: true })
+        editor.createShapes(startShapes)
+      }}>
       <CustomUi />
     </Tldraw>
   )
