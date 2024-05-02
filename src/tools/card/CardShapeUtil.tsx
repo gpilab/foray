@@ -8,7 +8,7 @@ import {
   resizeBox,
 } from 'tldraw'
 import 'katex/dist/katex.min.css';
-import { BlockMath, InlineMath } from 'react-katex';
+import { BlockMath } from 'react-katex';
 import { cardShapeMigrations } from './card-shape-migrations'
 import { cardShapeProps } from './card-shape-props'
 import { ICardShape } from './card-shape-types'
@@ -48,7 +48,7 @@ export class CardShapeUtil extends ShapeUtil<ICardShape> {
 
   // [6]
   component(shape: ICardShape) {
-    const bounds = this.editor.getShapeGeometry(shape).bounds
+    //const bounds = this.editor.getShapeGeometry(shape).bounds
     const theme = getDefaultColorTheme({ isDarkMode: this.editor.user.getIsDarkMode() })
 
     //[a]

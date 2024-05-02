@@ -1,21 +1,8 @@
-import { BaseBoxShapeTool, TLClickEvent, TLPointerEvent, TLTickEvent } from 'tldraw'
+import { BaseBoxShapeTool } from 'tldraw'
 export class CardShapeTool extends BaseBoxShapeTool {
   static override id = 'card'
   static override initial = 'idle'
   override shapeType = 'card'
-
-  override onDoubleClick: TLClickEvent = (_info) => {
-    // you can handle events in handlers like this one;
-    // check the BaseBoxShapeTool source as an example
-    console.log("Card double click!!")
-  }
-  override onRightClick: TLPointerEvent = () => {
-    console.log("Card right click!!")
-  }
-  override onMiddleClick: TLPointerEvent = () => {
-    console.log("Card middle click!!")
-  }
-
 }
 
 /*
