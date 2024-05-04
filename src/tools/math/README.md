@@ -33,7 +33,7 @@ editor.selection == shape.id
 Visual
 - [x] rendered equation
 - [x] resize handles
-- [-] bounds are determined dynamically, and accurately surround the equation
+- [x] bounds are determined dynamically, and accurately surround the equation
 
 Behavior
 - [x] Can be drag and dropped

@@ -70,13 +70,10 @@ export const MyComponentInFront = track(function MyComponent() {
   const pageCoordinates = editor.pageToViewport(selectionRotatedPageBounds.point)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-
     if (!mShape) return null
 
     const new_text = e.currentTarget.value
     if (text === new_text) return null
-
-    console.log(e.target)
 
     editor.updateShapes([
       {
@@ -98,8 +95,7 @@ export const MyComponentInFront = track(function MyComponent() {
         top: Math.max(32, pageCoordinates.y - (font_height + 20)),
         left: Math.max(32, pageCoordinates.x - 20),
       }}
-      onPointerDown={stopEventPropagation}
-    >
+      onPointerDown={stopEventPropagation}>
       <input id='math-text-input'
         value={mShape.props.text}
         style={{
@@ -118,18 +114,14 @@ export const MyComponentInFront = track(function MyComponent() {
   )
 })
 
+export const customAssetURLs: TLUiAssetUrlOverrides = {
+  icons: {
+    'pi-symbol': 'pi-symbol.svg',
+  }
+}
+
 export const uiOverrides: TLUiOverrides = {
   tools(editor, tools) {
-    // Create a tool item in the ui's context.
-    // tools.card = {
-    //   id: 'card',
-    //   icon: 'color',
-    //   label: 'Card',
-    //   kbd: 'c',
-    //   onSelect: () => {
-    //     editor.setCurrentTool('card')
-    //   },
-    // }
     tools.mathText = {
       id: 'math-text',
       icon: 'pi-symbol',
@@ -141,11 +133,6 @@ export const uiOverrides: TLUiOverrides = {
     }
     return tools
   },
-}
-export const customAssetURLs: TLUiAssetUrlOverrides = {
-  icons: {
-    'pi-symbol': 'pi-symbol.svg',
-  }
 }
 
 export const components: TLComponents = {
@@ -192,8 +179,6 @@ export const components: TLComponents = {
     const tools = useTools()
     return (
       <DefaultKeyboardShortcutsDialog {...props}>
-        {//<TldrawUiMenuItem {...tools['card']} />
-        }
         <TldrawUiMenuItem {...tools['mathText']} />
         <DefaultKeyboardShortcutsDialogContent />
       </DefaultKeyboardShortcutsDialog>

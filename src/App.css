@@ -1,1 +1,6 @@
-
+/** fixes rendered equations from getting offset */
+.katex-display {
+  display: block;
+  margin: 0 !important;
+  text-align: center
+}

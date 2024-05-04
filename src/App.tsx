@@ -5,6 +5,7 @@ import { MathTextShapeUtil } from './tools/math/MathShapeUtil'
 import { MathShapeTool } from './tools/math/MathShapeTool'
 
 import 'tldraw/tldraw.css'
+import './App.css'
 
 export default function CustomUiExample() {
   return (
@@ -22,7 +23,6 @@ export default function CustomUiExample() {
     //editor.createShapes((_startShape.shapes as Array<TLShape>))
     //}}
     >
-      {/**<CustomUi /> */}
     </Tldraw >
   )
 }

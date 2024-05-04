@@ -8,10 +8,11 @@ import {
   LABEL_FONT_SIZES,
   DefaultSizeStyle,
   HTMLContainer,
-  TLOnBeforeCreateHandler
+  TLOnBeforeCreateHandler,
 } from 'tldraw';
 import 'katex/dist/katex.min.css';
 import { BlockMath } from 'react-katex';
+import { createRef, useEffect } from 'react';
 
 
 
@@ -30,8 +31,6 @@ export type MathTextShapeProps = ShapePropsType<typeof mathTextShapeProps>
 
 export type MathTextShape = TLBaseShape<'math-text', MathTextShapeProps>
 
-// const sizeCache = new WeakMapCache<MathTextShape['props'], { height: number; width: number }>()
-
 export class MathTextShapeUtil extends ShapeUtil<MathTextShape> {
   static override type = 'math-text' as const
   static override props = mathTextShapeProps
@@ -39,8 +38,6 @@ export class MathTextShapeUtil extends ShapeUtil<MathTextShape> {
 
   override isAspectRatioLocked = (_shape: MathTextShape) => false
   override canResize = (_shape: MathTextShape) => true
-
-  //determines if arrows can bind to shape
   override canBind = (_shape: MathTextShape) => true
   override canEdit = (_shape: MathTextShape) => true
 
@@ -56,53 +53,20 @@ export class MathTextShapeUtil extends ShapeUtil<MathTextShape> {
   }
 
   getGeometry(shape: MathTextShape) {
-    const width = shape.props.w
-    const height = shape.props.h
-
-    //const { width, height } = getTextSize(this.editor, shape.props)
     return new Rectangle2d({
-      width: width,
-      height: height,
+      width: shape.props.w,
+      height: shape.props.h,
       // should hitbox be edges only, or filled to include center
       isFilled: true,
       // make shape editable with a single click if it is already selected
-      // Only works well with TextLabel labels
       // causes problems if enabled when the shape is editable
       isLabel: true,
     })
   }
 
-
   indicator(shape: MathTextShape) {
-    const width = shape.props.w
-    const height = shape.props.h
-    return <rect width={width} height={height} />
+    return <rect width={shape.props.w} height={shape.props.h} />
   }
-  // TODO calculate shape size dynamically
-  // getMinDimensions(shape: MathTextShape) {
-  //   return sizeCache.get(shape.props, (props) => this.getTextSize(this.editor, props))
-  // }
-  //
-  // getTextSize(editor: Editor, props: MathTextShape['props']) {
-  //   const { text, sizeStyle: font_size, w: w } = props
-  //
-  //   const minWidth = Math.max(16, w)
-  //   const fontSize = LABEL_FONT_SIZES[font_size]
-  //
-  //   const cw = Math.floor(Math.max(minWidth, w))
-  //
-  //   const result = editor.textMeasure.measureText(text, {
-  //     ...TEXT_PROPS,
-  //     fontFamily: FONT_FAMILIES["mono"],
-  //     fontSize: fontSize,
-  //     maxWidth: cw,
-  //   })
-  //
-  //   return {
-  //     width: Math.max(minWidth, result.w),
-  //     height: Math.max(fontSize, result.h),
-  //   }
-  // }
 
   override onResize: TLOnResizeHandler<MathTextShape> = (shape, info) => {
     const next = resizeBox(shape, info)
@@ -119,61 +83,70 @@ export class MathTextShapeUtil extends ShapeUtil<MathTextShape> {
     return next
   }
 
+  override onBeforeCreate: TLOnBeforeCreateHandler<MathTextShape> = () => {
+    this.focusTextBox(true)
+  }
+
   focusTextBox(selectAllText: boolean) {
     const input = window.document.getElementById("math-text-input") as HTMLInputElement
     if (input == null) return
 
     input.focus()
-
     if (selectAllText) {
       input.select()
     }
   }
 
-  override onBeforeCreate: TLOnBeforeCreateHandler<MathTextShape> = () => {
-    this.focusTextBox(true)
-  }
 
   component(shape: MathTextShape) {
     const {
-      props: { text, color, sizeStyle: font_size, scale }
+      props: { text, color, sizeStyle: font_size, scale, w, h }
     } = shape
-
     const theme = getDefaultColorTheme({ isDarkMode: this.editor.user.getIsDarkMode() })
+    //use this to determine what the rendered equation size is once it is rendered
+    const mathTextRef = createRef<HTMLDivElement>()
 
-    // const isSelected = id === this.editor.getOnlySelectedShapeId()
-    // const isEditing = id === this.editor.getEditingShapeId()
-    //const { width, height } = getTextSize(this.editor, shape.props)
+    useEffect(() => {
+      if (!mathTextRef.current) return
 
+      const renderedWidth = mathTextRef.current.offsetWidth
+      const renderedHeight = mathTextRef.current.offsetHeight
+
+      if (renderedWidth != w || renderedHeight != h) {
+        this.editor.updateShape<MathTextShape>({
+          id: shape.id,
+          type: 'math-text',
+          props: {
+            w: (mathTextRef.current.offsetWidth ?? 200) * scale,
+            h: (mathTextRef.current.offsetHeight ?? 200) * scale
+          },
+        })
+      }
+    })
 
     return (<HTMLContainer style={{
       color: theme[color].solid,
       fontSize: LABEL_FONT_SIZES[font_size],
       transform: `scale(${scale})`,
-      transformOrigin: 'top center',
-      width: shape.props.w,
-      height: shape.props.h,
     }}
     >
       <div
+        ref={mathTextRef}
         style={{
           pointerEvents: 'all',
+          width: 'fit-content',
+          height: 'fit-content',
         }}
         onDoubleClick={() => {
-          console.log("double click!")
           this.focusTextBox(true)
-        }
-        }
+        }}
         onClick={() => {
-          console.log("single click!")
           this.focusTextBox(false)
-        }
-        }
+        }}
       >
         <BlockMath math={text} ></BlockMath>
       </div>
     </ HTMLContainer >)
-
   }
 }
 
