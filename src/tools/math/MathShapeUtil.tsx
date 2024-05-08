@@ -9,10 +9,12 @@ import {
   DefaultSizeStyle,
   HTMLContainer,
   TLOnBeforeCreateHandler,
+  useEditor,
 } from 'tldraw';
 import 'katex/dist/katex.min.css';
 import { BlockMath } from 'react-katex';
 import { createRef, useEffect } from 'react';
+import { MyComponent } from './MathSrcInputBox';
 
 
 
@@ -84,18 +86,9 @@ export class MathTextShapeUtil extends ShapeUtil<MathTextShape> {
   }
 
   override onBeforeCreate: TLOnBeforeCreateHandler<MathTextShape> = () => {
-    this.focusTextBox(true)
+    //this.focusTextBox(true)
   }
 
-  focusTextBox(selectAllText: boolean) {
-    const input = window.document.getElementById("math-text-input") as HTMLInputElement
-    if (input == null) return
-
-    input.focus()
-    if (selectAllText) {
-      input.select()
-    }
-  }
 
 
   component(shape: MathTextShape) {
@@ -103,8 +96,12 @@ export class MathTextShapeUtil extends ShapeUtil<MathTextShape> {
       props: { text, color, sizeStyle: font_size, scale, w, h }
     } = shape
     const theme = getDefaultColorTheme({ isDarkMode: this.editor.user.getIsDarkMode() })
+    const editor = useEditor()
+    const isEditing = editor.getEditingShapeId() == shape.id
+
     //use this to determine what the rendered equation size is once it is rendered
     const mathTextRef = createRef<HTMLDivElement>()
+    const inputRef = createRef<HTMLInputElement>()
 
     useEffect(() => {
       if (!mathTextRef.current) return
@@ -124,28 +121,41 @@ export class MathTextShapeUtil extends ShapeUtil<MathTextShape> {
       }
     })
 
-    return (<HTMLContainer style={{
-      color: theme[color].solid,
-      fontSize: LABEL_FONT_SIZES[font_size],
-      transform: `scale(${scale})`,
-    }}
-    >
-      <div
-        ref={mathTextRef}
-        style={{
-          pointerEvents: 'all',
-          width: 'fit-content',
-          height: 'fit-content',
-        }}
-        onDoubleClick={() => {
-          this.focusTextBox(true)
-        }}
-        onClick={() => {
-          this.focusTextBox(false)
-        }}
+    function focusTextBox(selectAllText: boolean) {
+      const input = window.document.getElementById("math-text-input") as HTMLInputElement
+      if (input == null) return
+
+      input.focus()
+      if (selectAllText) {
+        input.select()
+      }
+    }
+
+    return (<HTMLContainer>
+      {isEditing ? <MyComponent id={shape.id} type={shape.type} text={text} inputRef={inputRef} /> : null}
+      <HTMLContainer style={{
+        color: theme[color].solid,
+        fontSize: LABEL_FONT_SIZES[font_size],
+        transform: `scale(${scale})`,
+      }}
       >
-        <BlockMath math={text} ></BlockMath>
-      </div>
+        <div
+          ref={mathTextRef}
+          style={{
+            pointerEvents: 'all',
+            width: 'fit-content',
+            height: 'fit-content',
+          }}
+          onDoubleClick={() => {
+            focusTextBox(true)
+          }}
+          onClick={() => {
+            focusTextBox(false)
+          }}
+        >
+          <BlockMath math={text} ></BlockMath>
+        </div>
+      </ HTMLContainer >
     </ HTMLContainer >)
   }
 }

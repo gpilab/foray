@@ -1,4 +1,4 @@
-import { TLShape, Tldraw } from 'tldraw'
+import { Tldraw } from 'tldraw'
 import { uiOverrides, customAssetURLs } from './tools/ui-overrides'
 import { components } from './tools/ui-overrides'
 import { MathTextShapeUtil } from './tools/math/MathShapeUtil'
@@ -19,11 +19,11 @@ export default function CustomUiExample() {
 
       inferDarkMode
       persistenceKey='gpi_v2'
-      onMount={(editor) => {
-        //editor.updateInstanceState({ isFocusMode: true })
-        editor.setCurrentTool('hand')
-        editor.createShapes((_startShape.shapes as Array<TLShape>))
-      }}
+    // onMount={(editor) => {
+    //editor.updateInstanceState({ isFocusMode: true })
+    //editor.setCurrentTool('hand')
+    //editor.createShapes((_startShape.shapes as Array<TLShape>))
+    // }
     >
     </Tldraw >
   )

@@ -82,10 +82,10 @@ Color
 - [?] on syntax errors, src text is shown in red
 - [?] show specific syntax error messages to aid user debugging
 
-## Implementation
+## Implementation Details
 
-- [ ] text input as a component associated with the shape
-    - currently a global component is being moved around to appear next to each shape
-    - this works fine, but is messy. It increases state sharing, and is clunky to react to state changes
+- [x] text input as a component associated with the shape
+    - previously, a global component was being moved around to appear next to each shape
+    - this worked fine, but is messy. It increases state sharing, and is clunky to react to state changes
 
 
