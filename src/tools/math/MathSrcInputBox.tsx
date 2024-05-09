@@ -1,32 +1,32 @@
 import { LABEL_FONT_SIZES, TLShapeId, getDefaultColorTheme, stopEventPropagation, useEditor } from "tldraw"
 import { MathTextShape } from "./MathShapeUtil"
-import { RefObject } from "react"
+import { Ref } from "react"
 
-export const MyComponent = function MyComponent({
+export const MathSrcInputBox = function MathSrcInputBox({
   id,
   text,
   type,
+  isEditing,
   inputRef
 }: {
   id: TLShapeId
   text: string
   type: "math-text"
-  inputRef: RefObject<HTMLInputElement>
+  isEditing: boolean
+  inputRef: Ref<HTMLInputElement>
 }) {
+  if (!isEditing) return null
   const editor = useEditor()
-  const shape = editor.getShape(id)
+  const shape = editor.getShape<MathTextShape>(id)
 
-  if (shape == null || shape.type != 'math-text') return null
+  if (!shape) return null
 
   const theme = getDefaultColorTheme({ isDarkMode: editor.user.getIsDarkMode() })
 
-  const mShape = shape as MathTextShape
-  const color = mShape.props.color
+  const color = shape.props.color
   const font_height = LABEL_FONT_SIZES['m']
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!mShape) return null
-
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const new_text = e.currentTarget.value
     if (text === new_text) return null
 
@@ -42,6 +42,14 @@ export const MyComponent = function MyComponent({
     (e.target as HTMLInputElement).select()
     stopEventPropagation(e)
   }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key == "Enter") {
+      editor.setCurrentTool('select.idle')
+      stopEventPropagation(e)
+    }
+  }
+
   return (
     <div
       style={{
@@ -55,8 +63,8 @@ export const MyComponent = function MyComponent({
       }}
       onPointerDown={stopEventPropagation}>
       <input id='math-text-input'
+        value={shape.props.text}
         ref={inputRef}
-        value={mShape.props.text}
         style={{
           height: 'auto',
           //width: 'fitContent',
@@ -67,8 +75,9 @@ export const MyComponent = function MyComponent({
           border: 'none',
 
         }}
+        onKeyDown={handleKeyDown}
         onChange={handleChange}
-        onDoubleClick={(e) => handleClick(e)}
+        onDoubleClick={handleClick}
       />
     </div >
   )

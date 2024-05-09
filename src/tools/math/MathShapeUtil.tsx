@@ -15,7 +15,7 @@ import {
 import 'katex/dist/katex.min.css';
 import { BlockMath } from 'react-katex';
 import { createRef, useEffect } from 'react';
-import { MyComponent } from './MathSrcInputBox';
+import { MathSrcInputBox } from './MathSrcInputBox';
 
 
 
@@ -39,16 +39,16 @@ export class MathTextShapeUtil extends ShapeUtil<MathTextShape> {
   static override props = mathTextShapeProps
   // TODO handle migration
 
-  override isAspectRatioLocked = (_shape: MathTextShape) => false
+  override isAspectRatioLocked = (_shape: MathTextShape) => true
   override canResize = (_shape: MathTextShape) => true
   override canBind = (_shape: MathTextShape) => true
   override canEdit = (_shape: MathTextShape) => true
 
-  initialText = "a^2+b^2 = c^2"
+  static initialText = "a^2+b^2 = c^2"
 
   getDefaultProps(): MathTextShape['props'] {
     return {
-      text: this.initialText,
+      text: MathTextShapeUtil.initialText,
       size_style: "m",
       w: 140,
       h: 60,
@@ -120,25 +120,33 @@ export class MathTextShapeUtil extends ShapeUtil<MathTextShape> {
     const {
       props: { text, color, size_style, scale, w, h }
     } = shape
+
     const theme = getDefaultColorTheme({ isDarkMode: this.editor.user.getIsDarkMode() })
+
     const editor = useEditor()
     const isEditing = editor.getEditingShapeId() == shape.id
 
-    //use this to determine what the rendered equation size is once it is rendered
+    //used to determine what the rendered equation size is after it is rendered
     const mathTextRef = createRef<HTMLDivElement>()
+
     const inputRef = createRef<HTMLInputElement>()
 
-    //first render only
+    // set focus appropriately
     useEffect(() => {
+      focusInput()
+    }, [editor, isEditing])
+
+    function focusInput(selectAll: boolean = false) {
       if (isEditing) {
-        if (text == this.initialText) {
-          // highlight 
-          focusTextBox(true)
-        } else {
-          focusTextBox(false)
+        const input = inputRef.current
+        if (input == null) return
+
+        input.focus()
+        if (text == MathTextShapeUtil.initialText || selectAll) {
+          input.select()
         }
       }
-    }, [])
+    }
 
     //check for updated size
     useEffect(() => {
@@ -159,18 +167,9 @@ export class MathTextShapeUtil extends ShapeUtil<MathTextShape> {
       }
     }, [text, scale, size_style, w, h])
 
-    function focusTextBox(selectAllText: boolean) {
-      const input = inputRef.current
-      if (input == null) return
-
-      input.focus()
-      if (selectAllText) {
-        input.select()
-      }
-    }
-
     return (<HTMLContainer>
-      {isEditing ? <MyComponent id={shape.id} type={shape.type} text={text} inputRef={inputRef} /> : null}
+      <MathSrcInputBox id={shape.id} type={shape.type} text={text} isEditing={isEditing} inputRef={inputRef} />
+
       <HTMLContainer style={{
         color: theme[color].solid,
         fontSize: LABEL_FONT_SIZES[size_style],
@@ -184,12 +183,8 @@ export class MathTextShapeUtil extends ShapeUtil<MathTextShape> {
             width: 'fit-content',
             height: 'fit-content',
           }}
-          onDoubleClick={() => {
-            focusTextBox(true)
-          }}
-          onClick={() => {
-            focusTextBox(false)
-          }}
+          onClick={() => focusInput(false)}
+          onDoubleClick={() => focusInput(true)}
         >
           <BlockMath math={text} ></BlockMath>
         </div>
