@@ -52,18 +52,19 @@ Visual
 
 Behavior
 - [x] text input is focused
-- [ ] Can be drag and dropped when render equation is dragged
-    - Compare how built in shapes handle this
 - [x] Double click on src text selects all
 - [x] Double click on shape selects all 
-- [ ] On new shape creation, Editing mode should be entered
-    - [ ] All text should be selected
-    - [ ] On shape duplication, shape should just be selected
+- [x] On new shape creation, Editing mode should be entered
+    - [x] All text should be selected
+    - [x] On shape duplication, shape should just be selected
 - [x] Clicking on other editable shape immediately jumps to insert mode
     - [x] Double Click selects all text
 - [ ] "Enter" exits edit mode and goes to select mode
 
 
+- [?] Can be drag and dropped when render equation is dragged
+    - Compare how built in shapes handle this
+    - Frame object doesn't do this, so maybe it's not really necessary
 - [?] Multi line edits?
     - [?] new line = rendered line break?
 
@@ -72,8 +73,10 @@ Color
 - [x] Color of equation
     - [x] also changes src text color
 - [x] size categories, match textShape size
-
+- [?] text alignemnt (left, center, right). Right now, width is fixed to the minimum size. 
+    - This would make using alignment options like "distribute horizontally" work better. right now it just pushes the text all the way to the right.
 - [?] custom hand written rendering style?
+
 
 ## Misc Features
 - [?] export to svg
