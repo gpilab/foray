@@ -1,30 +1,91 @@
-type CustomType = {
-  a: string
-  b: boolean
-}
-
 /** `(Label: Type)` pairs for all possible data types that can be passed through ports
  * `Label`s are used as generic strings for creating types
  */
-export interface PortDataTypes {
-  number: number
-  vec: number[]
-  string: string
-  customType: CustomType
+interface PortDataTypes {
+  "string": string
+  "number": number
+  "numberArray": number[]
+  "boolean": boolean
 }
-
-export type PortDataTypesTuple = [
-  number,
-  number[],
-  string,
-  CustomType,
-]
-
 
 // An actual instance of data that can be on a port 
 // The keys of PortDataType are removed, leaving just a union of the data type
 // not currently needed
-type PortDataInstance = PortDataTypes[keyof PortDataTypes]
+//TODO should this be readonly? It would be preferrable if node computations were required to be pure
+type Values<Type> = Type[keyof Type]
+type Labels<Type> = keyof Type
+
+type NodeInOutTypes<T> = Values<T>
+type NodeInOutLabels<T> = Labels<T>
+
+export type ComputeInput<T> = { [key: string]: T }
+export type ComputeOutput<T> = { [key: string]: T }
+export type InputRecord<T> = Record<string, Labels<T>>
+
+
+interface allCompute<TL, TV, UL, UV> {
+  inputRecord: { TL[number]: TV }
+outputRecord: { [key: UL]: UV }
+compute: (input: { [key: TL]: TV }) => { [key: UL]: UV }
+}
+
+const add = ({ a, b }: { a: "number", b: "number" }) => {
+  return { sum: a + b }
+}
+
+type IR = { a: number, b: number }
+type OR = { sum: number }
+type IRV = Values<IR>
+type IRL = Labels<IR>
+type IRC = { a: "number", b: "number" }
+type ORC = { sum: "number" }
+
+const test: allCompute<IRC, ORC> = {
+  inputRecord: { a: "number", b: "number" },
+  outputRecord: { sum: "number" },
+  compute: add
+
+}
+
+
+//type InOutLabels = keyof PortDataTypes
+
+function getTypeLabel<T>(type: T): string {
+  return typeof type
+}
+
+
+type Compute<IR extends Record<string>, ComputeInput, Output extends ComputeOutput> = (input: Input) => Output
+
+
+export type NodeTemplate<Input extends ComputeInput, Output extends ComputeOutput> = {
+  label: string
+  compute: Compute<Input, Output>
+  inputs: InputRecord
+  outputs: InputRecord
+}
+
+
+export function createNodeTemplate
+  <IR extends InputRecord, Input extends ComputeInput, Output extends ComputeOutput>
+  (f: (i: Input) => Output, inputs: InputRecord, outputs: InputRecord, label: string): NodeTemplate<Input, Output> {
+  if (label === undefined) {
+    label = f.name
+  }
+  inputs
+  //const string = f.arguments
+  console.log(getTypeLabel(f))
+  console.log(f)
+  //console.log(f.arguments)
+  console.log(f.prototype)
+  return {
+    label: label,
+    inputs: inputs,
+    outputs: outputs,
+    compute: f
+  }
+}
+
 
 /** Common values that input and output ports share
  */
@@ -70,108 +131,41 @@ export function isCompatiblePort
 }
 
 
+const add_in_a = createInput("a", "number")
+const add_in_b = createInput("b", "number")
+//const add_out_sum = createOutput("sum", "number")
+
+const const_num = createOutput("const1", "number")
+
+add_in_a.heldValue = 1
+add_in_b.heldValue = 2
+
+console.log(isCompatiblePort(const_num, add_in_a))
 
 
-export interface BaseNode {
-  label: string
-  // inputPorts: Parameters<T>
-  // outputPorts: ReturnType<T>
-  compute: nodeCompute
+
+
+const add_input2: Record<string, keyof PortDataTypes> = {
+  a: "number",
+  b: "number"
+}
+const add_output2: Record<string, keyof PortDataTypes> = {
+  sum: "number",
 }
 
-function multiply(...l: number[]) {
-  return l.reduce((p, c) => (p * c))
-}
-console.log(multiply(1, 2, 3))
-
-//type addable = number | number[] | string
-
-// type myType = string | number | number[]
-// type myCompute<T extends myType, U extends myType> = (...a: T[]) => U
-//
-// const a: myCompute<number, number> = (a: number, b: number) => {
-//   return a + b
-// }
-//
-// type myCompute2 = (...a: (string | number)[]) => string | number
-//
-// const a2: myCompute2 = (a: number, b: number) => {
-//   return a + b
-// }
-
-
-type NodeInOut = string | number | number[] | boolean
-
-type ComputeInput = {} | { [key: string]: NodeInOut }
-type ComputeOutput = NodeInOut | { [key: string]: NodeInOut }
-
-type Compute<Input extends ComputeInput, Output extends ComputeOutput> = (input: Input) => Output
-
-type add_input = {
-  a: number,
-  b: number
+const a3 = ({ a, b }: { a: number, b: number }) => {
+  return { sum: a + b }
 }
 
-type NodeTemplate<Input extends ComputeInput, Output extends ComputeOutput> = {
-  label: string
-  compute: Compute<Input, Output>
+function aligns<Ti, To, U, V>(f: (input: Ti) => To, i: U, o: V) {
+  return { f: f, i: i, o: o }
 }
+aligns(a3, add_input2, add_output2)
 
-function createNode<Input extends ComputeInput, Output extends NodeInOut>(label: string, f: (i: Input) => Output): NodeTemplate<Input, Output> {
-  return {
-    label: label,
-    compute: f
-  }
-}
-
-
-const a3 = ({ a, b }: add_input) => {
-  return a + b
-}
+// const add_node: NodeTemplate<add_input, number> = { label: "add", compute: a3 }
+// console.log(add_node)
+const add_node2 = createNodeTemplate(a3, add_input2, add_output2, "add")
+console.log(add_node2)
 
 
-const add_node: NodeTemplate<add_input, number> = { label: "add", compute: a3 }
-
-const not = createNode("not", (a: boolean) => { return !a })
-
-
-const a4 = () => {
-  return false
-}
-
-const falseNode: NodeTemplate<Parameters<typeof a4>, ReturnType<typeof a4>> = { label: "false", compute: a4 }
-const falseNode2 = createNode("false", a4)
-
-
-
-
-
-// old implementation
-export interface addNode extends BaseNode {
-  compute: typeof a3
-}
-
-const addInA = createInput("a", "number")
-addInA.heldValue = 7
-const addInB = createInput("b", "number")
-addInB.heldValue = 4
-const addOutSum = createOutput("sum", "number")
-
-const addNodeInstance: addNode<[inputPort<"number">, inputPort<"number">], [outputPort<"number">]> = {
-  label: "add",
-  inputPorts: [addInA, addInB],
-  outputPorts: [addOutSum],
-  compute: (inputs: [inputPort<"number">, inputPort<"number">]) => {
-    console.log(inputs)
-    const a = inputs[0].heldValue
-    const b = inputs[1].heldValue
-    if (a == undefined || b == undefined) {
-      throw Error("inputs are still undefined")
-    }
-    addOutSum.heldValue = a + b
-    return [addOutSum]
-  }
-}
-
-console.log(addNodeInstance.compute([addInA, addInB]))
 
