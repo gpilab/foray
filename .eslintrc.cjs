@@ -29,4 +29,13 @@ module.exports = {
       version: "detect",
     },
   },
+  "overrides": [
+    {
+      "files": ["tests/**/*"],
+      "plugins": ["jest"],
+      "env": {
+        "jest/globals": true
+      }
+    }
+  ]
 }

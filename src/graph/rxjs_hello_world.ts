@@ -1,29 +1,31 @@
 import { Observable, ReplaySubject, combineLatest } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { map, tap } from 'rxjs/operators';
 
 
 
 // Define a generic Node class with typed inputs based on the transformation function
-class Node<TFunction extends (...args: any[]) => any> {
-  public inputSubjects: ReplaySubject<any>[];
-  public output$: Observable<ReturnType<TFunction>>;
-  private transformationFunction: TFunction;
+export class Node<TFunction extends (...args: any[]) => any> {
+  public inputStreams: ReplaySubject<any>[];
+  public outputStream$: Observable<ReturnType<TFunction>>;
+  private computeInputToOutput: TFunction;
+  public currentValue: ReturnType<TFunction> | undefined
 
-  constructor(transformationFunction: TFunction) {
-    this.transformationFunction = transformationFunction;
-    const numInputs = transformationFunction.length;
-    this.inputSubjects = Array.from({ length: numInputs }, () => new ReplaySubject<any>(1));
+  constructor(computeInputToOutput: TFunction) {
+    this.computeInputToOutput = computeInputToOutput;
+    const numInputs = computeInputToOutput.length;
+    this.inputStreams = Array.from({ length: numInputs }, () => new ReplaySubject<any>(1));
 
-    this.output$ = combineLatest(this.inputSubjects).pipe(
+    this.outputStream$ = combineLatest(this.inputStreams).pipe(
       map(inputs => {
-        const value = this.transformationFunction(...inputs as Parameters<TFunction>);
-        console.log(`Processing (${inputs}) through ${transformationFunction}....${value}`);
+        const value = this.computeInputToOutput(...inputs as Parameters<TFunction>);
+        console.log(`Processing (${inputs}) through ${computeInputToOutput}....${value}`);
         return value;
-      }));
+      }), tap((output) => this.currentValue = output));
+    this.currentValue = undefined
   }
 }
 
-class Graph {
+export class Graph {
   private nodeAdjacencies: Map<Node<any>, Node<any>[]> = new Map();
 
   addNode(node: Node<any>, connections: { targetNode: Node<any>, targetInputIndex: number }[] = []) {
@@ -48,8 +50,8 @@ class Graph {
     sourceNodeAdjacencies.push(targetNode);
 
     // Subscribe the output of the source node to the input of the target node
-    sourceNode.output$.subscribe(output => {
-      targetNode.inputSubjects[targetInputIndex].next(output);
+    sourceNode.outputStream$.subscribe(output => {
+      targetNode.inputStreams[targetInputIndex].next(output);
     });
   }
 }
@@ -61,7 +63,7 @@ const doubleNode = new Node((x: number) => x * 2);
 const addNode = new Node((x, y) => x + y);
 const subtractNode = new Node((x, y) => x - y);
 // Subscribe to outputs to see the typed results
-subtractNode.output$.subscribe(result => console.log("Result from subtractNode:", result));
+subtractNode.outputStream$.subscribe(result => console.log("Result from subtractNode:", result));
 
 graph.addNode(constantNode);
 graph.addNode(doubleNode);
@@ -77,7 +79,8 @@ graph.connectNodes(addNode, subtractNode, 1);
 
 
 
-constantNode.inputSubjects[0].next(5)
+constantNode.inputStreams[0].next(5)
+
 
 // const sin: Observable<number> = timer(0, 10) // Emit values every 100 ms
 //   .pipe(
