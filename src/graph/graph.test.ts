@@ -7,7 +7,7 @@ const waitForPopulation = async (delay: number) => {
 describe('Node functionality', () => {
 
   it("should not populate output stream if no input is given", async () => {
-    const constantNode = new Node((x: number) => x, { x: "number" }, "number");
+    const constantNode = new Node((x: number) => x, [["x", "number"]], "number");
     const outSub = jest.fn()
     constantNode.outputStream$.subscribe(outSub) //listen to output to see if it's called
 
@@ -17,7 +17,7 @@ describe('Node functionality', () => {
   });
 
   it("should populate output stream if input is given", () => {
-    const constantNode = new Node((x: number) => x, { x: "number" }, "number");
+    const constantNode = new Node((x: number) => x, [["x", "number"]], "number");
     const start_value = 7
     const outSub = jest.fn((v) => {
       expect(v).toEqual(start_value)
@@ -31,7 +31,7 @@ describe('Node functionality', () => {
   });
 
   it("should populate output stream equal to the number times input is supplied", () => {
-    const constantNode = new Node((x: number) => x, { x: "number" }, "number");
+    const constantNode = new Node((x: number) => x, [["x", "number"]], "number");
     const values = [7, 9, 11]
     const input$ = constantNode.inputStreams.get("x")!
     const output$ = constantNode.outputStream$
@@ -50,7 +50,7 @@ describe('Node functionality', () => {
     expect(outSub).toHaveNthReturnedWith(3, values[2])
   })
   it("node w/ multiple inputs should not fire if all inputs are not supplied", () => {
-    const sumNode = new Node((x: number, y: number) => x + y, { x: "number", y: "number" }, "number");
+    const sumNode = new Node((x: number, y: number) => x + y, [["x", "number"], ["y", "number"]], "number");
     const input1$ = sumNode.inputStreams.get("x")!
     const output$ = sumNode.outputStream$
     const outSub = jest.fn((v) => v)
@@ -64,7 +64,7 @@ describe('Node functionality', () => {
   })
 
   it("multiple inputs should fire when all inputs are supplied, or changed", () => {
-    const sumNode = new Node((x: number, y: number) => x + y, { x: "number", y: "number" }, "number");
+    const sumNode = new Node((x: number, y: number) => x + y, [["x", "number"], ["y", "number"]], "number");
     const input1$ = sumNode.inputStreams.get("x")!
     const input2$ = sumNode.inputStreams.get("y")!
     const output$ = sumNode.outputStream$
@@ -97,7 +97,7 @@ describe('Node functionality', () => {
 
   })
   it("nodes can have different data types", () => {
-    const repeatNode = new Node((c: string, n: number) => c.repeat(n), { c: "string", n: "number" }, "string");
+    const repeatNode = new Node((c: string, n: number) => c.repeat(n), [["c", "string"], ["n", "number"]], "string");
     const input1$ = repeatNode.inputStreams.get("c")!
     const input2$ = repeatNode.inputStreams.get("n")!
     const output$ = repeatNode.outputStream$
@@ -115,10 +115,11 @@ describe('Node functionality', () => {
 describe('Graph functionality', () => {
   it('should process multiple connected nodes correctly', () => {
     const graph = new Graph();
-    const constantNode1 = new Node((x: number) => x, { x: "number" }, "number");
-    const constantNode2 = new Node((x: number) => x, { x: "number" }, "number");
-    const doubleNode = new Node((x: number) => x * 2, { x: "number" }, "number");
-    const sumNode = new Node((x: number, y: number) => x + y, { x: "number", y: "number" }, "number");
+    const constantNode = new Node((x: number) => x, [["x", "number"]], "number");
+    const sumNode = new Node((x: number, y: number) => x + y, [["x", "number"], ["y", "number"]], "number");
+    const constantNode1 = constantNode
+    const constantNode2 = constantNode
+    const doubleNode = new Node((x: number) => x * 2, [["x", "number"]], "number");
     const outSub = jest.fn((v) => v)
     const output$ = sumNode.outputStream$
     output$.subscribe(outSub);
@@ -156,8 +157,8 @@ describe('Graph functionality', () => {
 
   it('should handle node connection order correctly', () => {
     const graph = new Graph();
-    const incrementNode = new Node((x: number) => x + 1, { x: "number" } as const, "number");
-    const squareNode = new Node((x: number) => x * x, { x: "number" } as const, "number");
+    const incrementNode = new Node((x: number) => x + 1, [["x", "number"]], "number");
+    const squareNode = new Node((x: number) => x * x, [["x", "number"]], "number");
     ;
     const outSub = jest.fn((v) => v)
     const output$ = squareNode.outputStream$
@@ -178,8 +179,8 @@ describe('Graph functionality', () => {
 
   it("should throw error if connection types don't match", () => {
     const graph = new Graph();
-    const incrementNode = new Node((x: number) => x + 1, { x: "number" } as const, "number");
-    const doubleStringNode = new Node((x: string) => x + x, { x: "string" } as const, "string");
+    const incrementNode = new Node((x: number) => x + 1, [["x", "number"]], "number");
+    const doubleStringNode = new Node((x: string) => x + x, [["x", "string"]], "string");
     const outSub = jest.fn((v) => v)
     const output$ = doubleStringNode.outputStream$
     output$.subscribe(outSub);
@@ -199,12 +200,12 @@ describe('Graph functionality', () => {
 
   });
   it("should give the correct number of connections", () => {
+    const constantNode = new Node((x: number) => x, [["x", "number"]], "number");
     const graph = new Graph();
-    const constantNode = new Node((x: number) => x, { x: "number" }, "number");
-    const incrementNode = new Node((x: number) => x + 1, { x: "number" } as const, "number");
-    const squareNode = new Node((x: number) => x * x, { x: "number" } as const, "number");
-    const sumNode1 = new Node((x: number, y: number) => x + y, { x: "number", y: "number" }, "number");
-    const sumNode2 = new Node((x: number, y: number) => x + y, { x: "number", y: "number" }, "number");
+    const squareNode = new Node((x: number) => x * x, [["x", "number"]], "number");
+    const incrementNode = new Node((x: number) => x + 1, [["x", "number"]], "number");
+    const sumNode1 = new Node((x: number, y: number) => x + y, [["x", "number"], ["y", "number"]], "number");
+    const sumNode2 = new Node((x: number, y: number) => x + y, [["x", "number"], ["y", "number"]], "number");
     const outSub = jest.fn((v) => v)
     const output$ = sumNode2.outputStream$
     output$.subscribe(outSub);
