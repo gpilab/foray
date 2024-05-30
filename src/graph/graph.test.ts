@@ -97,6 +97,11 @@ describe('Node functionality', () => {
 
   })
   it("nodes can have different data types", () => {
+    //@ts-expect-error
+    const repeatNodeInError = new Node((c: string, n: number) => c.repeat(n), [["c", "number"], ["n", "string"]], "string");
+    //@ts-expect-error
+    const repeatNodeOutError = new Node((c: string, n: number) => c.repeat(n), [["c", "string"], ["n", "number"]], "number");
+
     const repeatNode = new Node((c: string, n: number) => c.repeat(n), [["c", "string"], ["n", "number"]], "string");
     const input1$ = repeatNode.inputStreams.get("c")!
     const input2$ = repeatNode.inputStreams.get("n")!
@@ -115,10 +120,9 @@ describe('Node functionality', () => {
 describe('Graph functionality', () => {
   it('should process multiple connected nodes correctly', () => {
     const graph = new Graph();
-    const constantNode = new Node((x: number) => x, [["x", "number"]], "number");
     const sumNode = new Node((x: number, y: number) => x + y, [["x", "number"], ["y", "number"]], "number");
-    const constantNode1 = constantNode
-    const constantNode2 = constantNode
+    const constantNode1 = new Node((x: number) => x, [["x", "number"]], "number");
+    const constantNode2 = new Node((x: number) => x, [["x", "number"]], "number");
     const doubleNode = new Node((x: number) => x * 2, [["x", "number"]], "number");
     const outSub = jest.fn((v) => v)
     const output$ = sumNode.outputStream$

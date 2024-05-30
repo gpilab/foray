@@ -2,92 +2,65 @@ import { Observable, ReplaySubject, combineLatest } from 'rxjs';
 import { map, tap } from 'rxjs/operators';
 
 
-interface PortDataTypes {
+interface ValidPortTypes {
   "string": string
   "number": number
   "numberArray": number[]
   "boolean": boolean
 }
 
-// type DataTypeLabel = keyof PortDataTypes
-type DataType = PortDataTypes[keyof PortDataTypes]
+/** union of all valid  PortType */
+type PortTypeKeys = keyof ValidPortTypes
 
-// type NodeDef<T extends [string, Labels<PortDataTypes>][], Output extends keyof PortDataTypes> = {//, K extends keyof T = keyof T> = {
-//   compute: (...args: { [k in keyof T]: PortDataTypes[T[k][1]] }) => PortDataTypes[Output]
-//   inputs: { [k in keyof T]: T[k] }
-//   outputType: Output
-// }
-//
-// function createNode<T extends [string, Labels<PortDataTypes>][]
-//   , Output extends keyof PortDataTypes>
-//   (compute: (...args: { [k in keyof T]: PortDataTypes[T[k][1]] }) => PortDataTypes[Output]
-//     , inputs: { [k in keyof T]: T[k] }
-//     , outputType: Output): NodeDef<T, Output> {
-//   return { compute, inputs, outputType }
-// }
+/** union of all valid data types */
+type PortTypes = ValidPortTypes[keyof ValidPortTypes]
 
-// let n2: NodeDef<[["a", "number"], ["b", "number"], ["c", "string"]], "number">
-// n2 = {
-//   compute: (ab: number, b: number, c: string) => {
-//     console.log(ab, b, c);
-//     return 1
-//   },
-//   inputs: [["a", "number"], ["b", "number"], ["c", "string"]],
-//   outputType: "number"
-// }
-//
-// const n3 = createNode(
-//   (ab: number, b: number, c: string) => {
-//     console.log(ab, b, c);
-//     return 1
-//   },
-//   [["a", "number"], ["b", "number"], ["c", "string"]],
-//   "number"
-// )
-// n3
+/** Node inputs are described by a unique label and a data type. Data types are defined as the keys of ValidPortTypes*/
+type InPort = [string, PortTypeKeys]
+type NodeInputs = InPort[]
 
-type KeyValueTuple = [string, Labels<PortDataTypes>][]
-
-export class Node<T extends KeyValueTuple = any
-  , OutputType extends keyof PortDataTypes = any
-  , Output extends PortDataTypes[OutputType] = any
+export class Node<T extends NodeInputs = any
+  , OutputType extends keyof ValidPortTypes = any
+  , Output extends ValidPortTypes[OutputType] = any
   , InLabels extends T[number][0] = string
-  , InTypes extends PortDataTypes[T[number][1]] = any> {
+  , InTypes extends ValidPortTypes[T[number][1]] = any> {
+
   public currentValue: Output | undefined
   public outputStream$: Observable<Output>
-  public inputStreams: Map<InLabels, ReplaySubject<DataType>>;
+  public inputStreams: Map<InLabels, ReplaySubject<PortTypes>>;
   private inputMap: Map<InLabels, InTypes>
-  private computeInputToOutput: (...args: { [k in keyof T]: PortDataTypes[T[k][1]] }) => Output
+  private computeInputToOutput: (...args: { [k in keyof T]: ValidPortTypes[T[k][1]] }) => Output
 
-  constructor(computeInputToOutput: (...args: { [k in keyof T]: PortDataTypes[T[k][1]] }) => Output,
+  constructor(computeInputToOutput: (...args: { [k in keyof T]: ValidPortTypes[T[k][1]] }) => Output,
     inputMap: { [k in keyof T]: T[k] },
     public outputType: OutputType,
     public id: string = "default") {
     this.computeInputToOutput = computeInputToOutput;
     //const numInputs = computeInputToOutput.length;
-    const inputArray: ReplaySubject<any>[] = []
-
-    this.inputStreams = new Map<InLabels, ReplaySubject<DataType>>()
+    const inputArray: ReplaySubject<PortTypes>[] = []
+    //Array.from({ length: numInputs }, () => new ReplaySubject<any>(1));
+    //
+    this.inputStreams = new Map<InLabels, ReplaySubject<PortTypes>>()
     this.inputMap = new Map<InLabels, InTypes>()
     inputMap.forEach(([label, type]) => {
-      const subject = new ReplaySubject<any>(1)
+      const subject = new ReplaySubject<PortTypes>(1)
       this.inputStreams.set(label as InLabels, subject)
       this.inputMap.set(label as InLabels, type as InTypes)
       inputArray.push(subject)
     }
     )
-    //Array.from({ length: numInputs }, () => new ReplaySubject<any>(1));
+
 
     this.outputStream$ = combineLatest(inputArray).pipe(
       map(inputs => {
-        const value = this.computeInputToOutput(...inputs as { [k in keyof T]: PortDataTypes[T[k][1]]; }); // TODO fix as
+        const value = this.computeInputToOutput(...inputs as { [k in keyof T]: ValidPortTypes[T[k][1]]; }); // TODO fix as
         //console.log(`Processing (${inputs}) through ${computeInputToOutput}....${value}`);
         return value;
       }), tap((output) => this.currentValue = output));
     this.currentValue = undefined
   }
 
-  getInputStream(key: InLabels): ReplaySubject<DataType> {
+  getInputStream(key: InLabels): ReplaySubject<PortTypes> {
     return this.inputStreams.get(key)!
   }
   getInputType(key: InLabels): InTypes {
@@ -100,7 +73,7 @@ export class Node<T extends KeyValueTuple = any
 export class Graph {
   private nodeAdjacencies: Map<Node, Node[]> = new Map();
 
-  // add output type restriction
+  // TODO: add output type restriction
   addNode/**<T extends KeyValueTuple, U extends keyof T>**/(node: Node, connections: { targetNode: Node/**<T>**/, targetInputLabel: string/**keyof KeyValueTuple/**U**/ }[] = []) {
     this.nodeAdjacencies.set(node, []);
     connections.forEach(({ targetNode, targetInputLabel }) => {
@@ -136,7 +109,7 @@ export class Graph {
     });
   }
 
-  getConnections(node: Node<any>) {
+  getConnections(node: Node) {
     return this.nodeAdjacencies.get(node)
   }
 }
