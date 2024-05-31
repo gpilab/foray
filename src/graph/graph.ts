@@ -26,16 +26,16 @@ type NodeInputs = readonly InPort[]
 type InputTypes<T extends NodeInputs> = {
   [K in keyof T]: T[K] extends readonly [string, infer U] ? (U extends PortTypeKeys ? ValidPortTypes[U] : never) : never;
 };
-type InputTypeLabels<T extends NodeInputs> = {
-  [K in keyof T]: T[K] extends readonly [string, infer U] ? (U extends PortTypeKeys ? U : never) : never;
-};
-
+// type InputTypeLabels<T extends NodeInputs> = {
+//   [K in keyof T]: T[K] extends readonly [string, infer U] ? (U extends PortTypeKeys ? U : never) : never;
+// };
+//
 type InputKeys<T extends NodeInputs> = {
   [K in keyof T]: T[K] extends readonly [infer U, PortTypeKeys] ? (U extends string ? U : never) : never;
 };
 
 // type InputTypesUnion<T extends NodeInputs> = InputTypes<T>[number]
-type InputTypeLabelsUnion<T extends NodeInputs> = InputTypeLabels<T>[number]
+//type InputTypeLabelsUnion<T extends NodeInputs> = InputTypeLabels<T>[number]
 type InputKeysUnion<T extends NodeInputs> = InputKeys<T>[number]
 
 // const n = [["x", "number"], ["s", "string"]] as const
@@ -81,19 +81,25 @@ type InputKeysUnion<T extends NodeInputs> = InputKeys<T>[number]
 // //@ts-expect-error
 // nlu = "z"
 //
-type InputTypeByLabel<T extends NodeInputs, K extends string> = Extract<T[number], readonly [K, any]>[1];
+type InputTypeLabelByKey<T extends NodeInputs, K extends string> = Extract<T[number], readonly [K, any]>[1];
+type InputTypeByKey<T extends NodeInputs, K extends string> = ValidPortTypes[Extract<T[number], readonly [K, any]>[1]];
+
+type InputSubjectMap<T extends NodeInputs> = {
+  [K in T[number][0]]: ReplaySubject<Extract<T[number], [K, any]>[1]>;
+};
 //
-// let xType: InputTypeByLabel<N, "x">
-// xType = "number"
-// let yType: InputTypeByLabel<N, "s">
+// let xType: InputTypeByKey<[["x", "number"]], "x">
+// xType = 1
+// let yType: InputTypeLabelByKey<[["y", "number"]], "y">
+// //@ts-expect-error
 // yType = "string"
 
 export class Node<I extends NodeInputs = any, O extends PortTypeKeys = any> {
   public id: string
-  public inputStreams: Map<string, ReplaySubject<ValidPortTypes[PortTypeKeys]>>
+  public inputStreams: InputSubjectMap<I>
   public outputStream$: Observable<ValidPortTypes[O]>
   readonly inputMap: I
-  public inputTypes: Map<InputKeysUnion<I>, InputTypeLabelsUnion<I>>
+  //public inputTypes: Map<InputKeysUnion<I>, InputTypeLabelsUnion<I>>
   public currentValue: ValidPortTypes[O] | undefined
 
   private computeInputToOutput: (...args: InputTypes<I>) => ValidPortTypes[O]
@@ -108,13 +114,15 @@ export class Node<I extends NodeInputs = any, O extends PortTypeKeys = any> {
     this.inputMap = inputMap
     this.computeInputToOutput = computeInputToOutput;
 
-    this.inputStreams = new Map()
-    this.inputTypes = new Map()
+    this.inputStreams = {} as any
+    //this.inputStreams = new Map()
+    //this.inputTypes = new Map()
     const inputSubjects: ReplaySubject<ValidPortTypes[PortTypeKeys]>[] = []
-    inputMap.forEach(([label, type]) => {
+    inputMap.forEach((label) => {
+      const key: InputKeysUnion<I> = label[0] as InputKeysUnion<I>
       const subject = new ReplaySubject<ValidPortTypes[PortTypeKeys]>(1)
-      this.inputStreams.set(label, subject)
-      this.inputTypes.set(label as InputKeysUnion<I>, type as InputTypeLabelsUnion<I>)
+      this.inputStreams[key] = subject
+      //this.inputTypes.set(label as InputKeysUnion<I>, type as InputTypeLabelsUnion<I>)
       inputSubjects.push(subject)
     })
 
@@ -124,13 +132,12 @@ export class Node<I extends NodeInputs = any, O extends PortTypeKeys = any> {
     );
   }
 
-  getInputStream(key: string): ReplaySubject<ValidPortTypes[PortTypeKeys]> {
-    return this.inputStreams.get(key)!
+  getInputStream<T extends I, K extends T[number][0]>(key: K): ReplaySubject<InputTypeByKey<T, K>> {
+    return this.inputStreams[key]
   }
 
-  getInputType<T extends I, K extends T[number][0]>(key: K): InputTypeByLabel<T, K> {
+  getInputType<T extends I, K extends T[number][0]>(key: K): InputTypeLabelByKey<T, K> {
     return this.inputMap.find(input => input[0] === key)
-    //return this.inputTypes.get(key)
   }
 }
 
@@ -168,7 +175,7 @@ export class Graph {
 
     // Subscribe the output of the source node to the input of the target node
     sourceNode.outputStream$.subscribe(output => {
-      const input = targetNode.inputStreams.get(targetInputLabel)
+      const input = targetNode.inputStreams[targetInputLabel]
       if (input === undefined) {
         throw Error("Attempted to access input label ${targetInputLabel} on node ${node}")
       }
