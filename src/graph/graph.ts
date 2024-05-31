@@ -19,13 +19,11 @@ type PortTypeKeys = keyof ValidPortTypes
 type InPort = readonly [string, PortTypeKeys]
 type NodeInputs = readonly InPort[]
 
-/** Compute outputs based on inputs */
-// type ComputeInputs<T extends NodeInputs> = { [k in keyof T]: ValidPortTypes[T[k][1]] }
-
 
 type InputTypes<T extends NodeInputs> = {
   [K in keyof T]: T[K] extends readonly [string, infer U] ? (U extends PortTypeKeys ? ValidPortTypes[U] : never) : never;
 };
+
 // type InputTypeLabels<T extends NodeInputs> = {
 //   [K in keyof T]: T[K] extends readonly [string, infer U] ? (U extends PortTypeKeys ? U : never) : never;
 // };
@@ -38,61 +36,12 @@ type InputTypesUnion<T extends NodeInputs> = InputTypes<T>[number]
 //type InputTypeLabelsUnion<T extends NodeInputs> = InputTypeLabels<T>[number]
 type InputKeysUnion<T extends NodeInputs> = InputKeys<T>[number]
 
-// const n = [["x", "number"], ["s", "string"]] as const
-//
-// type N = typeof n
-//
-// type NT = InputTypes<N>
-// let nt: NT
-// nt = [1, "a"]
-//
-// type NTU = InputTypesUnion<N> // string | number
-// let ntu: NTU
-// ntu = 1
-// ntu = "a"
-// //@ts-expect-error
-// ntu = { a: 1 }
-//
-// type NTL = InputTypeLabels<N> // ["number", "string"]
-// let ntl: NTL
-// ntl = ["number", "string"]
-// //@ts-expect-error
-// ntl = ["string", "number"]
-// //@ts-expect-error
-// ntl = ["number"]
-//
-// type NTLU = InputTypeLabelsUnion<N> //  "string" | "number"
-// let ntlu: NTLU
-// ntlu = "number"
-// ntlu = "string"
-// //@ts-expect-error
-// ntlu = "boolean"
-//
-// type NL = InputKeys<N> // ["x","s"]
-// let nl: NL
-// nl = ["x", "s"]
-// //@ts-expect-error
-// nl = ["s", "x"]
-//
-// type NLU = InputKeysUnion<N> // "x" | "s"
-// let nlu: NLU
-// nlu = "s"
-// nlu = "x"
-// //@ts-expect-error
-// nlu = "z"
-//
 type InputTypeLabelByKey<T extends NodeInputs, K extends string> = Extract<T[number], readonly [K, any]>[1];
 type InputTypeByKey<T extends NodeInputs, K extends string> = ValidPortTypes[Extract<T[number], readonly [K, any]>[1]];
 
 type InputSubjectMap<T extends NodeInputs> = {
   [K in T[number][0]]: ReplaySubject<Extract<T[number], [K, any]>[1]>;
 };
-//
-// let xType: InputTypeByKey<[["x", "number"]], "x">
-// xType = 1
-// let yType: InputTypeLabelByKey<[["y", "number"]], "y">
-// //@ts-expect-error
-// yType = "string"
 
 export class Node<I extends NodeInputs = any, O extends PortTypeKeys = any> {
   public id: string

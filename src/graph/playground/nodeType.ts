@@ -33,3 +33,48 @@ const n3 = createExampleNode(
   "number"
 )
 n3
+
+
+
+const n = [["x", "number"], ["s", "string"]] as const
+
+type N = typeof n
+
+type NT = InputTypes<N>
+let nt: NT
+nt = [1, "a"]
+
+type NTU = InputTypesUnion<N> // string | number
+let ntu: NTU
+ntu = 1
+ntu = "a"
+//@ts-expect-error
+ntu = { a: 1 }
+
+type NTL = InputTypeLabels<N> // ["number", "string"]
+let ntl: NTL
+ntl = ["number", "string"]
+//@ts-expect-error
+ntl = ["string", "number"]
+//@ts-expect-error
+ntl = ["number"]
+
+type NTLU = InputTypeLabelsUnion<N> //  "string" | "number"
+let ntlu: NTLU
+ntlu = "number"
+ntlu = "string"
+//@ts-expect-error
+ntlu = "boolean"
+
+type NL = InputKeys<N> // ["x","s"]
+let nl: NL
+nl = ["x", "s"]
+//@ts-expect-error
+nl = ["s", "x"]
+
+type NLU = InputKeysUnion<N> // "x" | "s"
+let nlu: NLU
+nlu = "s"
+nlu = "x"
+//@ts-expect-error
+nlu = "z"
