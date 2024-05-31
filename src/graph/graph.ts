@@ -34,7 +34,7 @@ type InputKeys<T extends NodeInputs> = {
   [K in keyof T]: T[K] extends readonly [infer U, PortTypeKeys] ? (U extends string ? U : never) : never;
 };
 
-// type InputTypesUnion<T extends NodeInputs> = InputTypes<T>[number]
+type InputTypesUnion<T extends NodeInputs> = InputTypes<T>[number]
 //type InputTypeLabelsUnion<T extends NodeInputs> = InputTypeLabels<T>[number]
 type InputKeysUnion<T extends NodeInputs> = InputKeys<T>[number]
 
@@ -115,14 +115,13 @@ export class Node<I extends NodeInputs = any, O extends PortTypeKeys = any> {
     this.computeInputToOutput = computeInputToOutput;
 
     this.inputStreams = {} as any
-    //this.inputStreams = new Map()
-    //this.inputTypes = new Map()
-    const inputSubjects: ReplaySubject<ValidPortTypes[PortTypeKeys]>[] = []
+
+    const inputSubjects: ReplaySubject<InputTypesUnion<I>>[] = []//combineLatest need an array, not sure if this is necessarily the best method
     inputMap.forEach((label) => {
       const key: InputKeysUnion<I> = label[0] as InputKeysUnion<I>
-      const subject = new ReplaySubject<ValidPortTypes[PortTypeKeys]>(1)
+      const subject = new ReplaySubject<InputTypesUnion<I>>(1)
       this.inputStreams[key] = subject
-      //this.inputTypes.set(label as InputKeysUnion<I>, type as InputTypeLabelsUnion<I>)
+
       inputSubjects.push(subject)
     })
 
@@ -137,10 +136,13 @@ export class Node<I extends NodeInputs = any, O extends PortTypeKeys = any> {
   }
 
   getInputType<T extends I, K extends T[number][0]>(key: K): InputTypeLabelByKey<T, K> {
-    return this.inputMap.find(input => input[0] === key)
+    const inputType = this.inputMap.find(input => input[0] === key)
+    if (inputType === undefined) {
+      throw Error(`Key ${key} is not present in input [${this.inputMap}]`)
+    }
+    return inputType[1]
   }
 }
-
 
 
 
@@ -148,7 +150,8 @@ export class Graph {
   private nodeAdjacencies: Map<Node, Node[]> = new Map();
 
   // TODO: add output type restriction
-  addNode/**<T extends KeyValueTuple, U extends keyof T>**/(node: Node, connections: { targetNode: Node/**<T>**/, targetInputLabel: string/**keyof KeyValueTuple/**U**/ }[] = []) {
+  addNode<T extends NodeInputs, K extends T[number][0], O extends InputTypeLabelByKey<T, K>>
+    (node: Node<any, O>, connections: { targetNode: Node<T>, targetInputLabel: K }[] = []) {
     this.nodeAdjacencies.set(node, []);
     connections.forEach(({ targetNode, targetInputLabel }) => {
       this.connectNodes(node, targetNode, targetInputLabel);
@@ -159,7 +162,8 @@ export class Graph {
   }
 
   // Connect output of one node to input of another node
-  connectNodes/**<T extends KeyValueTuple, U extends keyof T>**/(sourceNode: Node, targetNode: Node/**<T>**/, targetInputLabel: string/**U**/) {
+  connectNodes<T extends NodeInputs, K extends T[number][0]>
+    (sourceNode: Node, targetNode: Node<T>, targetInputLabel: K) {
     const sourceNodeAdjacencies = this.nodeAdjacencies.get(sourceNode)
     if (sourceNodeAdjacencies == undefined) {
       throw Error("Source node not present in graph");
@@ -168,7 +172,7 @@ export class Graph {
       throw Error("Target node not present in graph");
     }
     if (sourceNode.outputType != targetNode.getInputType(targetInputLabel)) {
-      throw Error("Attempted to connect nodes of type ${sourceNode.outputType} and ${targetNode.inputMap.get(targetInputLabel))}")
+      throw Error(`Attempted to connect nodes of type (source, output: ${sourceNode.outputType} )and (target, input: ${targetNode.getInputType(targetInputLabel)})`)
     }
     // Add target node to the adjacency list of the source node
     sourceNodeAdjacencies.push(targetNode);
@@ -177,7 +181,7 @@ export class Graph {
     sourceNode.outputStream$.subscribe(output => {
       const input = targetNode.inputStreams[targetInputLabel]
       if (input === undefined) {
-        throw Error("Attempted to access input label ${targetInputLabel} on node ${node}")
+        throw Error(`Attempted to access input label ${targetInputLabel} on node ${node} `)
       }
       input.next(output);
     });

@@ -119,8 +119,10 @@ describe('Node functionality', () => {
   it("should restrict what accessors can be used to get data types", () => {
     const sumNode = new Node((x: number, y: number) => x + y, [["x", "number"], ["y", "number"]] as const, "number");
 
-    //@ts-expect-error
-    sumNode.getInputType("a") // not one of the defined inputs!
+    try {
+      //@ts-expect-error
+      sumNode.getInputType("a") // not one of the defined inputs!
+    } catch { }
 
     sumNode.getInputType("x") // valid
     sumNode.getInputType("y") // valid
@@ -129,35 +131,45 @@ describe('Node functionality', () => {
 
   it("should restrict what accessors can be used when multiple types are input types are defined", () => {
     const repeatNode = new Node((c: string, n: number) => c.repeat(n), [["c", "string"], ["n", "number"]] as const, "string" as const);
-    //@ts-expect-error
-    repeatNode.getInputType("a") // not one of the defined inputs!
+    try {
+      //@ts-expect-error
+      repeatNode.getInputType("a") // not one of the defined inputs!
+    } catch { }
 
     repeatNode.getInputType("c") // valid
     repeatNode.getInputType("n") // valid
   })
   it("should restrict what getInputType returns", () => {
     const sumNode = new Node((x: number, y: number) => x + y, [["x", "number"], ["y", "number"]] as const, "number");
-    //return types are correctly inferred
-    //@ts-expect-error
-    sumNode.getInputType("y") == "string"
-    //@ts-expect-error
-    sumNode.getInputType("x") == "string"
+
+    try {
+      //return types are correctly inferred
+      //@ts-expect-error
+      sumNode.getInputType("y") == "string"
+      //@ts-expect-error
+      sumNode.getInputType("x") == "string"
+    } catch { }
 
     //@ts-expect-no-error
     sumNode.getInputType("x") == "number"
     //@ts-expect-no-error
     sumNode.getInputType("y") == "number"
+
+    expect(sumNode.getInputType("x")).toEqual("number")
+    expect(sumNode.getInputType("y")).toEqual("number")
   })
 
   it("multiple inputs types should still restrict what getInputType returns", () => {
     const repeatNode = new Node((c: string, n: number) => c.repeat(n), [["c", "string"], ["n", "number"]] as const, "string" as const);
 
-    //@ts-expect-error
-    repeatNode.getInputType("c") == "boolean" // none of the inputs
-    //@ts-expect-error
-    repeatNode.getInputType("c") == "number" // wrong type for input
-    //@ts-expect-error
-    repeatNode.getInputType("n") == "string"
+    try {
+      //@ts-expect-error
+      repeatNode.getInputType("c") == "boolean" // none of the inputs
+      //@ts-expect-error
+      repeatNode.getInputType("c") == "number" // wrong type for input
+      //@ts-expect-error
+      repeatNode.getInputType("n") == "string"
+    } catch { }
 
     //@ts-expect-no-error
     repeatNode.getInputType("c") == "string"
@@ -168,10 +180,12 @@ describe('Node functionality', () => {
     const sumNode = new Node((x: number, y: number) => x + y, [["x", "number"], ["y", "number"]] as const, "number");
     const repeatNode = new Node((c: string, n: number) => c.repeat(n), [["c", "string"], ["n", "number"]] as const, "string" as const);
 
-    //@ts-expect-error
-    sumNode.getInputStream("a")
-    //@ts-expect-error
-    repeatNode.getInputStream("a")
+    try {
+      //@ts-expect-error
+      sumNode.getInputStream("a")
+      //@ts-expect-error
+      repeatNode.getInputStream("a")
+    } catch { }
 
     //@ts-expect-no-error
     sumNode.getInputStream("x")
@@ -186,10 +200,12 @@ describe('Node functionality', () => {
     const sumNode = new Node((x: number, y: number) => x + y, [["x", "number"], ["y", "number"]] as const, "number");
     //return types are correctly inferred
 
-    //@ts-expect-error
-    sumNode.getInputStream("y") == new ReplaySubject<string>(1)
-    //@ts-expect-error
-    sumNode.getInputStream("x") == new ReplaySubject<boolean>(1)
+    try {
+      //@ts-expect-error
+      sumNode.getInputStream("y") == new ReplaySubject<string>(1)
+      //@ts-expect-error
+      sumNode.getInputStream("x") == new ReplaySubject<boolean>(1)
+    } catch { }
 
     //@ts-expect-no-error
     sumNode.getInputStream("x") == new ReplaySubject<number>
@@ -201,11 +217,12 @@ describe('Node functionality', () => {
   })
   it("multiple inputs types should still restrict what getInputType returns", () => {
     const repeatNode = new Node((c: string, n: number) => c.repeat(n), [["c", "string"], ["n", "number"]] as const, "string" as const);
-
-    //@ts-expect-error
-    repeatNode.getInputStream("c") == new ReplaySubject<number>(1)
-    //@ts-expect-error
-    repeatNode.getInputStream("n") == new ReplaySubject<string>(1)
+    try {
+      //@ts-expect-error
+      repeatNode.getInputStream("c") == new ReplaySubject<number>(1)
+      //@ts-expect-error
+      repeatNode.getInputStream("n") == new ReplaySubject<string>(1)
+    } catch { }
 
     //@ts-expect-no-error
     repeatNode.getInputStream("c") == new ReplaySubject<string>
