@@ -102,7 +102,7 @@ describe('Node functionality', () => {
     //@ts-expect-error
     const repeatNodeOutError = new Node((c: string, n: number) => c.repeat(n), [["c", "string"], ["n", "number"]], "number");
 
-    const repeatNode = new Node((c: string, n: number) => c.repeat(n), [["c", "string"], ["n", "number"]], "string");
+    const repeatNode = new Node<[["c", "string"], ["n", "number"]], "string">((c: string, n: number) => c.repeat(n), [["c", "string"], ["n", "number"]], "string");
     const input1$ = repeatNode.inputStreams.get("c")!
     const input2$ = repeatNode.inputStreams.get("n")!
     const output$ = repeatNode.outputStream$

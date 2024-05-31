@@ -13,60 +13,64 @@ interface ValidPortTypes {
 type PortTypeKeys = keyof ValidPortTypes
 
 /** union of all valid data types */
-type PortTypes = ValidPortTypes[keyof ValidPortTypes]
+// type PortTypes = ValidPortTypes[keyof ValidPortTypes]
 
-/** Node inputs are described by a unique label and a data type. Data types are defined as the keys of ValidPortTypes*/
+/** Node inputs are described by a unique label and a data type. Data types are defined as the keys of ValidPortTypes */
 type InPort = [string, PortTypeKeys]
 type NodeInputs = InPort[]
 
-export class Node<T extends NodeInputs = any
-  , OutputType extends keyof ValidPortTypes = any
-  , Output extends ValidPortTypes[OutputType] = any
-  , InLabels extends T[number][0] = string
-  , InTypes extends ValidPortTypes[T[number][1]] = any> {
+/** Compute outputs based on inputs */
+// type ComputeInputs<T extends NodeInputs> = { [k in keyof T]: ValidPortTypes[T[k][1]] }
 
-  public currentValue: Output | undefined
-  public outputStream$: Observable<Output>
-  public inputStreams: Map<InLabels, ReplaySubject<PortTypes>>;
-  private inputMap: Map<InLabels, InTypes>
-  private computeInputToOutput: (...args: { [k in keyof T]: ValidPortTypes[T[k][1]] }) => Output
 
-  constructor(computeInputToOutput: (...args: { [k in keyof T]: ValidPortTypes[T[k][1]] }) => Output,
-    inputMap: { [k in keyof T]: T[k] },
-    public outputType: OutputType,
-    public id: string = "default") {
+type InputDataTypes<T extends NodeInputs> = {
+  [K in keyof T]: T[K] extends [string, infer U] ? (U extends PortTypeKeys ? ValidPortTypes[U] : never) : never;
+};
+
+
+export class Node<I extends NodeInputs = any, O extends PortTypeKeys = any> {
+  public id: string
+  public inputStreams: Map<string, ReplaySubject<ValidPortTypes[PortTypeKeys]>>
+  public outputStream$: Observable<ValidPortTypes[O]>
+  public inputTypes: Map<string, PortTypeKeys>
+  public currentValue: ValidPortTypes[O] | undefined
+
+  private computeInputToOutput: (...args: InputDataTypes<I>) => ValidPortTypes[O]
+
+  constructor(
+    computeInputToOutput: (...args: InputDataTypes<I>) => ValidPortTypes[O],
+    inputMap: I,
+    public outputType: O,
+    id: string = "default_node_id"
+  ) {
+    this.id = id
     this.computeInputToOutput = computeInputToOutput;
-    //const numInputs = computeInputToOutput.length;
-    const inputArray: ReplaySubject<PortTypes>[] = []
-    //Array.from({ length: numInputs }, () => new ReplaySubject<any>(1));
-    //
-    this.inputStreams = new Map<InLabels, ReplaySubject<PortTypes>>()
-    this.inputMap = new Map<InLabels, InTypes>()
+
+    this.inputStreams = new Map()
+    this.inputTypes = new Map()
+    const inputSubjects: ReplaySubject<ValidPortTypes[PortTypeKeys]>[] = []
     inputMap.forEach(([label, type]) => {
-      const subject = new ReplaySubject<PortTypes>(1)
-      this.inputStreams.set(label as InLabels, subject)
-      this.inputMap.set(label as InLabels, type as InTypes)
-      inputArray.push(subject)
-    }
-    )
+      const subject = new ReplaySubject<ValidPortTypes[PortTypeKeys]>(1)
+      this.inputStreams.set(label, subject)
+      this.inputTypes.set(label, type)
+      inputSubjects.push(subject)
+    })
 
-
-    this.outputStream$ = combineLatest(inputArray).pipe(
-      map(inputs => {
-        const value = this.computeInputToOutput(...inputs as { [k in keyof T]: ValidPortTypes[T[k][1]]; }); // TODO fix as
-        //console.log(`Processing (${inputs}) through ${computeInputToOutput}....${value}`);
-        return value;
-      }), tap((output) => this.currentValue = output));
-    this.currentValue = undefined
+    this.outputStream$ = combineLatest(inputSubjects).pipe(
+      map(inputs => this.computeInputToOutput(...inputs as unknown as InputDataTypes<I>)),
+      tap(output => this.currentValue = output)
+    );
   }
 
-  getInputStream(key: InLabels): ReplaySubject<PortTypes> {
+  getInputStream(key: string): ReplaySubject<ValidPortTypes[PortTypeKeys]> {
     return this.inputStreams.get(key)!
   }
-  getInputType(key: InLabels): InTypes {
-    return this.inputMap.get(key)!
+
+  getInputType(key: string): PortTypeKeys {
+    return this.inputTypes.get(key)!
   }
 }
+
 
 
 
