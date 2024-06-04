@@ -1,5 +1,12 @@
-import { Node, Graph } from './graph.ts';
+import { Node, port, port2 } from './node.ts';
+import { Graph } from './graph.ts';
 
+const createConstantNode = () => new Node((x: number) => x, port("x", "number"), "number");
+const createIncrementNode = () => new Node((x: number) => x + 1, port("x", "number"), "number");
+const createDoubleNode = () => new Node((x: number) => x * 2, port("x", "number"), "number");
+const createDoubleStringNode = () => new Node((x: string) => x + x, port("x", "string"), "string");
+const createSquareNode = () => new Node((x: number) => x * x, port("x", "number"), "number");
+const createSumNode = () => new Node((x: number, y: number) => x + y, port2("x", "number", "y", "number"), "number");
 
 describe('Graph functionality', () => {
   // it("should not allow incompatible connections", () => {
@@ -26,8 +33,8 @@ describe('Graph functionality', () => {
 
   it("should throw error if connection types don't match", () => {
     const graph = new Graph();
-    const incrementNode = new Node((x: number) => x + 1, [["x", "number"] as const], "number");
-    const doubleStringNode = new Node((x: string) => x + x, [["x", "string"] as const], "string");
+    const incrementNode = createIncrementNode()
+    const doubleStringNode = createDoubleStringNode()
     const outSub = jest.fn((v) => v)
     const output$ = doubleStringNode.outputStream$
     output$.subscribe(outSub);
@@ -48,10 +55,10 @@ describe('Graph functionality', () => {
 
   it('should process multiple connected nodes correctly', () => {
     const graph = new Graph();
-    const sumNode = new Node((x: number, y: number) => x + y, [["x", "number"], ["y", "number"]] as const, "number");
-    const constantNode1 = new Node((x: number) => x, [["x", "number"]] as const, "number");
-    const constantNode2 = new Node((x: number) => x, [["x", "number"]] as const, "number");
-    const doubleNode = new Node((x: number) => x * 2, [["x", "number"]] as const, "number");
+    const sumNode = createSumNode()
+    const constantNode1 = createConstantNode()
+    const constantNode2 = createConstantNode()
+    const doubleNode = createDoubleNode()
     const outSub = jest.fn((v) => v)
     const output$ = sumNode.outputStream$
     output$.subscribe(outSub);
@@ -89,8 +96,8 @@ describe('Graph functionality', () => {
 
   it('should handle node connection order correctly', () => {
     const graph = new Graph();
-    const incrementNode = new Node((x: number) => x + 1, [["x", "number"]] as const, "number");
-    const squareNode = new Node((x: number) => x * x, [["x", "number"]] as const, "number");
+    const incrementNode = createIncrementNode()
+    const squareNode = new Node((x: number) => x * x, [{ name: "x", portType: "number" }] as const, "number");
     ;
     const outSub = jest.fn((v) => v)
     const output$ = squareNode.outputStream$
@@ -110,22 +117,22 @@ describe('Graph functionality', () => {
   });
 
   it("should give the correct number of connections", () => {
-    const constantNode = new Node((x: number) => x, [["x", "number"] as const], "number");
     const graph = new Graph();
-    const squareNode = new Node((x: number) => x * x, [["x", "number"] as const], "number");
-    const incrementNode = new Node((x: number) => x + 1, [["x", "number"] as const], "number");
-    const sumNode1 = new Node((x: number, y: number) => x + y, [["x", "number"], ["y", "number"]] as const, "number");
-    const sumNode2 = new Node((x: number, y: number) => x + y, [["x", "number"], ["y", "number"]] as const, "number");
+    const constantNode = createConstantNode()
+    const squareNode = createSquareNode()
+    const incrementNode = createIncrementNode()
+    const sumNode1 = createSumNode()
+    const sumNode2 = createSumNode()
     const outSub = jest.fn((v) => v)
     const output$ = sumNode2.outputStream$
     output$.subscribe(outSub);
 
-    graph.addNodes([constantNode, incrementNode, squareNode, sumNode1, sumNode2]);
-    graph.connectNodes(constantNode, incrementNode, "x")
+    graph.addNodes([constantNode, incrementNode, squareNode, sumNode1, sumNode2])
+    graph.connectNodes(constantNode, incrementNode, "x") // connection 1
     graph.connectNodes(incrementNode, squareNode, "x")
-    graph.connectNodes(constantNode, sumNode1, "x")
-    graph.connectNodes(constantNode, sumNode1, "y")
-    graph.connectNodes(constantNode, sumNode2, "x")
+    graph.connectNodes(constantNode, sumNode1, "x")// connection 2
+    graph.connectNodes(constantNode, sumNode1, "y")// connection 3
+    graph.connectNodes(constantNode, sumNode2, "x")// connection 4
     graph.connectNodes(sumNode1, sumNode2, "y")
     // TODO finish test!!!
     expect(graph.getConnections(constantNode)!.length).toEqual(4)
