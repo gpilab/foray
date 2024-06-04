@@ -1,7 +1,6 @@
 import { Observable, ReplaySubject, combineLatest } from 'rxjs';
 import { map, tap } from 'rxjs/operators';
 
-
 interface ValidPortTypes {
   "string": string
   "number": number
@@ -9,19 +8,27 @@ interface ValidPortTypes {
   "boolean": boolean
 }
 
-/** union of all valid  PortType */
-type PortTypeKeys = keyof ValidPortTypes
+/** union of all valid PortType */
+type PortTypeKey = keyof ValidPortTypes
 
 /** union of all valid data types */
 // type PortTypes = ValidPortTypes[keyof ValidPortTypes]
 
 /** Node inputs are described by a unique label and a data type. Data types are defined as the keys of ValidPortTypes */
-type InPort = readonly [string, PortTypeKeys]
+type InPort = readonly [string, PortTypeKey]
+
+// type InPortObj = {
+//   name: string
+//   portType: PortTypeKey
+// }
+
+
+// change to InPortObj
 type NodeInputs = readonly InPort[]
 
 
 type InputTypes<T extends NodeInputs> = {
-  [K in keyof T]: T[K] extends readonly [string, infer U] ? (U extends PortTypeKeys ? ValidPortTypes[U] : never) : never;
+  [K in keyof T]: T[K] extends readonly [string, infer U] ? (U extends PortTypeKey ? ValidPortTypes[U] : never) : never;
 };
 
 // type InputTypeLabels<T extends NodeInputs> = {
@@ -29,7 +36,7 @@ type InputTypes<T extends NodeInputs> = {
 // };
 //
 type InputKeys<T extends NodeInputs> = {
-  [K in keyof T]: T[K] extends readonly [infer U, PortTypeKeys] ? (U extends string ? U : never) : never;
+  [K in keyof T]: T[K] extends readonly [infer U, PortTypeKey] ? (U extends string ? U : never) : never;
 };
 
 type InputTypesUnion<T extends NodeInputs> = InputTypes<T>[number]
@@ -43,7 +50,7 @@ type InputSubjectMap<T extends NodeInputs> = {
   [K in T[number][0]]: ReplaySubject<Extract<T[number], [K, any]>[1]>;
 };
 
-export class Node<I extends NodeInputs = any, O extends PortTypeKeys = any> {
+export class Node<I extends NodeInputs = any, O extends PortTypeKey = PortTypeKey> {
   public id: string
   public inputStreams: InputSubjectMap<I>
   public outputStream$: Observable<ValidPortTypes[O]>
@@ -75,7 +82,7 @@ export class Node<I extends NodeInputs = any, O extends PortTypeKeys = any> {
     })
 
     this.outputStream$ = combineLatest(inputSubjects).pipe(
-      map(inputs => this.computeInputToOutput(...inputs as unknown as InputTypes<I>)),
+      map(inputs => this.computeInputToOutput(...inputs as InputTypes<I>)),
       tap(output => this.currentValue = output)
     );
   }
@@ -99,8 +106,8 @@ export class Graph {
   private nodeAdjacencies: Map<Node, Node[]> = new Map();
 
   // TODO: add output type restriction
-  addNode<T extends NodeInputs, K extends T[number][0], O extends InputTypeLabelByKey<T, K>>
-    (node: Node<any, O>, connections: { targetNode: Node<T>, targetInputLabel: K }[] = []) {
+  addNode<I extends NodeInputs, K extends I[number][0], O extends InputTypeLabelByKey<I, K>>
+    (node: Node<any, O>, connections: { targetNode: Node<I>, targetInputLabel: K }[] = []) {
     this.nodeAdjacencies.set(node, []);
     connections.forEach(({ targetNode, targetInputLabel }) => {
       this.connectNodes(node, targetNode, targetInputLabel);
