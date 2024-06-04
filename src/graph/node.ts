@@ -25,18 +25,13 @@ export type NodeInputs = readonly InPort[]
  * constrain the input of the compute function
  * - This might be able to be further constrained by requiring
  *   the input param name to match the node input name */
-export type ComputInputParamsO<T extends NodeInputs> = {
-  [K in keyof T]: T[K] extends [string, infer U] ? (U extends PortTypeKey ? ValidPortTypes[U] : never) : never;
-};
-
 export type ComputInputParams<T extends ReadonlyArray<InPort>> = {
   [K in keyof T]: ValidPortTypes[T[K]["portType"]] //extends { name: infer N, portKey: infer P } ? (T[K]["portType"] extends PortTypeKey ? ValidPortTypes[T[K]["portType"]] : never) : never
 }
 
-
 type InputKeys<T extends NodeInputs> = {
   [K in keyof T]: T[K] extends { name: infer U, portKey: PortTypeKey } ? (U extends string ? U : never) : never;
-};
+}
 
 type InputTypesUnion<T extends NodeInputs> = ComputInputParams<T>[number]
 //type InputTypeLabelsUnion<T extends NodeInputs> = InputTypeLabels<T>[number]
@@ -45,9 +40,6 @@ type InputKeysUnion<T extends NodeInputs> = InputKeys<T>[number]
 export type InputTypeLabelByKey<T extends NodeInputs, K extends string> = Extract<T[number], { name: K, portType: any }>["portType"];
 type InputTypeByKey<T extends NodeInputs, K extends string> = ValidPortTypes[Extract<T[number], { name: K, portType: any }>["portType"]];
 
-type InputSubjectMap<T extends NodeInputs> = {
-  [K in T[number]["name"]]: ReplaySubject<Extract<T[number], { name: K, portType: T[number]["portType"] }>["portType"]>;
-};
 
 /** Creates a node input with 1 port*/
 export function port<
@@ -69,12 +61,43 @@ export function port2<
     { name: name2, portType: type2 }]
 }
 
+type InputSubjectMap<T extends NodeInputs> = {
+  [K in T[number]["name"]]: ReplaySubject<Extract<T[number], { name: K, portType: T[number]["portType"] }>["portType"]>;
+};
+
+
+/**
+ * Nodes transform data
+ *
+ * They are defined by their input ports, output port, 
+ * and compute function that transforms inputs to outputs
+ *
+ * ### Input Ports
+ * `inputPorts` is a fixed length array of `inPort` objects
+ * `inPorts` have a unique name, and a data type. Data types are string literals
+ * defined in the `ValidPortTypes` type
+ *
+ * ### Output Port
+ * Each node can only have one output, so it doesn't need a name.
+ * It is uniquely defined by its data type
+ *
+ * ### Compute Function
+ * `computeInputToOutput` requires its inputs and outputs to match
+ * the input and output ports
+ *
+ * ### Streams
+ * inputs and ouputs are represented as streams of data
+ * `computeInputToOutput` doesn't need to be called manually, whenever 
+ * an input stream sends new data, computeInputToOutput will be called 
+ * if data exists on all inputs
+ **/
 export class Node<I extends NodeInputs = any, O extends PortTypeKey = PortTypeKey, C extends (...args: ComputInputParams<I>) => ValidPortTypes[O] = any> {
   public inputStreams: InputSubjectMap<I>
-  public outputStream$: Observable<ValidPortTypes[O]>
+  public outputPort$: Observable<ValidPortTypes[O]>
   public currentValue: ValidPortTypes[O] | undefined
 
   private computeInputToOutput: C
+
   constructor(
     public inputPorts: I,
     public outputType: O,
@@ -82,20 +105,17 @@ export class Node<I extends NodeInputs = any, O extends PortTypeKey = PortTypeKe
     public id: string = "default_node_id",
   ) {
     this.computeInputToOutput = computeInputToOutput;
-
     this.inputStreams = {} as any
 
-    //const inputSubjects: ReplaySubject<InputTypesUnion<I>>[] = []//combineLatest need an array, not sure if this is necessarily the best method
     inputPorts.forEach((input) => {
       const key: InputKeysUnion<I> = input.name as InputKeysUnion<I>
       const subject = new ReplaySubject<typeof input.portType>(1)
       this.inputStreams[key] = subject
-      //inputSubjects.push(subject)
     })
 
-    //coarse inputStreams into the format that combine latest needs
+    //coaerce inputStreams into the format that combine latest needs
     const inputSubjects = Object.values(this.inputStreams) as unknown as ReplaySubject<InputTypesUnion<I>>[]
-    this.outputStream$ = combineLatest(inputSubjects).pipe(
+    this.outputPort$ = combineLatest(inputSubjects).pipe(
       map(inputs => this.computeInputToOutput(...inputs as unknown as ComputInputParams<I>)),
       tap(output => this.currentValue = output)
     );

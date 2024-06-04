@@ -15,7 +15,7 @@ describe('Node functionality', () => {
     //const constantNode = new Node((x: number) => x, port("x", "number"), "number");
     const constantNode = createConstantNode()
     const outSub = jest.fn()
-    constantNode.outputStream$.subscribe(outSub) //listen to output to see if it's called
+    constantNode.outputPort$.subscribe(outSub) //listen to output to see if it's called
 
     await waitForPopulation(50) // wait to make sure everything has run
     expect(constantNode.currentValue).toBeUndefined()
@@ -30,7 +30,7 @@ describe('Node functionality', () => {
       expect(v).toEqual(start_value)
     })
 
-    constantNode.outputStream$.subscribe(outSub);
+    constantNode.outputPort$.subscribe(outSub);
     constantNode.getInputStream("x").next(start_value);
 
     expect(constantNode.currentValue).toEqual(start_value)
@@ -41,7 +41,7 @@ describe('Node functionality', () => {
     const constantNode = createConstantNode()
     const values = [7, 9, 11]
     const input$ = constantNode.getInputStream("x")
-    const output$ = constantNode.outputStream$
+    const output$ = constantNode.outputPort$
     const outSub = jest.fn((v) => v)
 
     output$.subscribe(outSub);
@@ -59,7 +59,7 @@ describe('Node functionality', () => {
   it("node w/ multiple inputs should not fire if all inputs are not supplied", () => {
     const sumNode = createSumNode()
     const input1$ = sumNode.getInputStream("x")
-    const output$ = sumNode.outputStream$
+    const output$ = sumNode.outputPort$
     const outSub = jest.fn((v) => v)
 
     output$.subscribe(outSub);
@@ -74,7 +74,7 @@ describe('Node functionality', () => {
     const sumNode = createSumNode()
     const input1$ = sumNode.getInputStream("x")!
     const input2$ = sumNode.getInputStream("y")!
-    const output$ = sumNode.outputStream$
+    const output$ = sumNode.outputPort$
     const outSub = jest.fn((v) => v)
 
     output$.subscribe(outSub);
@@ -114,7 +114,7 @@ describe('Node functionality', () => {
     const repeatNode = createRepeatNode()
     const input1$ = repeatNode.getInputStream("c")
     const input2$ = repeatNode.getInputStream("n")
-    const output$ = repeatNode.outputStream$
+    const output$ = repeatNode.outputPort$
     const outSub = jest.fn((v) => v)
     output$.subscribe(outSub);
 
