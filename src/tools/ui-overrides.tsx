@@ -49,6 +49,7 @@ export const customAssetURLs: TLUiAssetUrlOverrides = {
 
 export const uiOverrides: TLUiOverrides = {
   tools(editor, tools) {
+
     tools.mathText = {
       id: 'math-text',
       icon: 'pi-symbol',
@@ -56,6 +57,15 @@ export const uiOverrides: TLUiOverrides = {
       kbd: 'm',
       onSelect: () => {
         editor.setCurrentTool('math-text')
+      },
+    }
+    tools.nodeShape = {
+      id: 'node',
+      icon: 'pi-symbol',
+      label: 'Node',
+      kbd: 'n',
+      onSelect: () => {
+        editor.setCurrentTool('node')
       },
     }
     return tools
@@ -66,6 +76,7 @@ export const components: TLComponents = {
   Toolbar: (props) => {
     const tools = useTools()
     const isMathSelected = useIsToolSelected(tools['mathText'])
+    const isNodeSelected = useIsToolSelected(tools['nodeShape'])
 
     return (
       <DefaultToolbar {...props}>
@@ -76,6 +87,7 @@ export const components: TLComponents = {
         <ArrowToolbarItem />
         <TextToolbarItem />
         <TldrawUiMenuItem {...tools['mathText']} isSelected={isMathSelected} />
+        <TldrawUiMenuItem {...tools['nodeShape']} isSelected={isNodeSelected} />
         <RectangleToolbarItem />
         <LineToolbarItem />
         <TriangleToolbarItem />
@@ -106,6 +118,7 @@ export const components: TLComponents = {
     return (
       <DefaultKeyboardShortcutsDialog {...props}>
         <TldrawUiMenuItem {...tools['mathText']} />
+        <TldrawUiMenuItem {...tools['nodeShape']} />
         <DefaultKeyboardShortcutsDialogContent />
       </DefaultKeyboardShortcutsDialog>
     )

@@ -1,5 +1,5 @@
 import { Observable, ReplaySubject, combineLatest } from 'rxjs';
-import { map, tap } from 'rxjs/operators';
+import { map } from 'rxjs/operators';
 
 interface ValidPortTypes {
   "string": string
@@ -103,6 +103,7 @@ export class Node<I extends NodeInputs = any, O extends PortTypeKey = PortTypeKe
     public outputType: O,
     computeInputToOutput: C,
     public id: string = "default_node_id",
+    public nodeType: string = "default_node_type",
   ) {
     this.computeInputToOutput = computeInputToOutput;
     this.inputStreams = {} as any
@@ -116,13 +117,27 @@ export class Node<I extends NodeInputs = any, O extends PortTypeKey = PortTypeKe
     //coaerce inputStreams into the format that combine latest needs
     const inputSubjects = Object.values(this.inputStreams) as unknown as ReplaySubject<InputTypesUnion<I>>[]
     this.outputPort$ = combineLatest(inputSubjects).pipe(
-      map(inputs => this.computeInputToOutput(...inputs as unknown as ComputInputParams<I>)),
-      tap(output => this.currentValue = output)
+      map((inputs) => {
+        return this.computeInputToOutput(...inputs as unknown as ComputInputParams<I>)
+      })
     );
+
+    //subscription for self
+    this.outputPort$.subscribe((output) => {
+      console.log(`updating node ${this.id} currentValue(${output}) because outputPort$ has fired`)
+      this.currentValue = output
+    })
   }
 
   getInputStream<T extends I, K extends T[number]["name"]>(key: K): ReplaySubject<InputTypeByKey<T, K>> {
     return this.inputStreams[key]
+  }
+  getInputPort<T extends I, K extends T[number]["name"]>(key: K): InPort {//InputTypeLabelByKey<T, K> {
+    const port = this.inputPorts.find(input => input.name === key)
+    if (port === undefined) {
+      throw Error(`Key ${key} is not present in input [${this.inputPorts}]`)
+    }
+    return port
   }
 
   getInputType<T extends I, K extends T[number]["name"]>(key: K): InputTypeLabelByKey<T, K> {
@@ -131,5 +146,9 @@ export class Node<I extends NodeInputs = any, O extends PortTypeKey = PortTypeKe
       throw Error(`Key ${key} is not present in input [${this.inputPorts}]`)
     }
     return inputType.portType
+  }
+
+  getInPortIndex(port: InPort) {
+    return this.inputPorts.indexOf(port)
   }
 }
