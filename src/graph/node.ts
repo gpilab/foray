@@ -102,7 +102,7 @@ export class Node<I extends NodeInputs = any, O extends PortTypeKey = PortTypeKe
     public inputPorts: I,
     public outputType: O,
     computeInputToOutput: C,
-    public id: string = "default_node_id",
+    public nodeId: string = "default_node_id",
     public nodeType: string = "default_node_type",
   ) {
     this.computeInputToOutput = computeInputToOutput;
@@ -124,7 +124,7 @@ export class Node<I extends NodeInputs = any, O extends PortTypeKey = PortTypeKe
 
     //subscription for self
     this.outputPort$.subscribe((output) => {
-      console.log(`updating node ${this.id} currentValue(${output}) because outputPort$ has fired`)
+      console.log(`updating node ${this.nodeId} currentValue(${output}) because outputPort$ has fired`)
       this.currentValue = output
     })
   }

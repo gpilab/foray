@@ -16,7 +16,7 @@ export class Graph {
     (node: Node<any, O>,
       connections: { targetNode: Node<I>, targetInputLabel: K }[] = []) {
     if (this.nodeAdjacencies.get(node)) {
-      throw Error(`Attempted to add node ${node.id} to graph, but it already has been added!`)
+      throw Error(`Attempted to add node ${node.nodeId} to graph, but it already has been added!`)
     }
     this.nodeAdjacencies.set(node, []);
 
@@ -65,7 +65,7 @@ export class Graph {
     }
     const connectedNodes = this.nodeAdjacencies.get(node)
 
-    return connectedNodes?.map(([_label, node]) => node.id)
+    return connectedNodes?.map(([_label, node]) => node.nodeId)
   }
   getConnectedNodeInfo(nodeId: string): { port: InPort, nodeId: string, portIndex: number }[] {
     const node = this.getNode(nodeId)
@@ -80,7 +80,7 @@ export class Graph {
 
     return connectedNodes.map(([port, node]) => {
       const portIndex = node.getInPortIndex(port)
-      return { port: port, nodeId: node.id, portIndex: portIndex }
+      return { port: port, nodeId: node.nodeId, portIndex: portIndex }
     })
   }
 
@@ -88,6 +88,6 @@ export class Graph {
     return Array.from(this.nodeAdjacencies.keys())
   }
   getNode(nodeId: string) {
-    return this.getNodes().find((n) => n.id == nodeId)
+    return this.getNodes().find((n) => n.nodeId == nodeId)
   }
 }

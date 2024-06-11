@@ -151,7 +151,7 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
           return graphDispatch(
             {
               type: "fireNode",
-              nodeId: node.id,
+              nodeId: node.nodeId,
               port: node.getInputPort("x"),
               value: v
             })
