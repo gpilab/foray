@@ -1,6 +1,30 @@
 import { Observable, ReplaySubject, combineLatest } from 'rxjs';
 import { map } from 'rxjs/operators';
 
+// This file heavily uses complex types
+//
+// This provides a lot of guarantes that the 
+// ports, nodes and compute functions have types
+// that match.
+//
+// The downside is that it is more difficult to read, and make changes.
+//
+// The upside is taht once changes have been made, there are a lot fewer issues that
+// can be introduced across the code base. (as long as everything still type checks!)
+//
+// Checkout typescript docs if you are unfamilar with any of the syntax below
+// https://www.typescriptlang.org/docs/handbook/2/types-from-types.html
+
+/** 
+ * We want a node's ports to only alow connections between ports of the same type 
+ *
+ * This interface defines the set of valid port types, and a string that can uniquely
+ * be used to make sure port types match at runtime
+ *
+ * Typescript removes type information in the transpiled js, so we need the string values
+ * to have this info available at runtime.
+ * 
+ **/
 interface ValidPortTypes {
   "string": string
   "number": number
@@ -12,21 +36,22 @@ interface ValidPortTypes {
 export type PortTypeKey = keyof ValidPortTypes
 
 /** Node inputs are described by a unique label and a data type. Data types are defined as the keys of ValidPortTypes */
-export type InPort = {
+export type Port<T extends PortTypeKey = PortTypeKey> = {
   readonly name: string
-  readonly portType: PortTypeKey
+  readonly portType: T
 }
 
 /** A node's list of input ports*/
-export type NodeInputs = readonly InPort[]
+export type NodeInputs = readonly Port[]
 
-
-/** converts nodeinputs into a form that can be used to 
+/** 
+ * Converts nodeinputs into a form that can be used to 
  * constrain the input of the compute function
+ *
  * - This might be able to be further constrained by requiring
  *   the input param name to match the node input name */
-export type ComputInputParams<T extends ReadonlyArray<InPort>> = {
-  [K in keyof T]: ValidPortTypes[T[K]["portType"]] //extends { name: infer N, portKey: infer P } ? (T[K]["portType"] extends PortTypeKey ? ValidPortTypes[T[K]["portType"]] : never) : never
+export type ComputInputParams<T extends ReadonlyArray<Port>> = {
+  [K in keyof T]: ValidPortTypes[T[K]["portType"]]
 }
 
 type InputKeys<T extends NodeInputs> = {
@@ -41,6 +66,12 @@ export type InputTypeLabelByKey<T extends NodeInputs, K extends string> = Extrac
 type InputTypeByKey<T extends NodeInputs, K extends string> = ValidPortTypes[Extract<T[number], { name: K, portType: any }>["portType"]];
 
 
+/** Creates a node input with 1 port*/
+export function outPort<
+  T extends PortTypeKey>
+  (type: T) {
+  return { name: "out", portType: type }
+}
 /** Creates a node input with 1 port*/
 export function port<
   S extends string,
@@ -100,7 +131,7 @@ export class Node<I extends NodeInputs = any, O extends PortTypeKey = PortTypeKe
 
   constructor(
     public inputPorts: I,
-    public outputType: O,
+    public outputPort: Port<O>,
     computeInputToOutput: C,
     public nodeId: string = "default_node_id",
     public nodeType: string = "default_node_type",
@@ -124,7 +155,7 @@ export class Node<I extends NodeInputs = any, O extends PortTypeKey = PortTypeKe
 
     //subscription for self
     this.outputPort$.subscribe((output) => {
-      console.log(`updating node ${this.nodeId} currentValue(${output}) because outputPort$ has fired`)
+      //console.log(`updating node ${this.nodeId} currentValue(${output}) because outputPort$ has fired`)
       this.currentValue = output
     })
   }
@@ -132,7 +163,7 @@ export class Node<I extends NodeInputs = any, O extends PortTypeKey = PortTypeKe
   getInputStream<T extends I, K extends T[number]["name"]>(key: K): ReplaySubject<InputTypeByKey<T, K>> {
     return this.inputStreams[key]
   }
-  getInputPort<T extends I, K extends T[number]["name"]>(key: K): InPort {//InputTypeLabelByKey<T, K> {
+  getInputPort<T extends I, K extends T[number]["name"]>(key: K): Port {//InputTypeLabelByKey<T, K> {
     const port = this.inputPorts.find(input => input.name === key)
     if (port === undefined) {
       throw Error(`Key ${key} is not present in input [${this.inputPorts}]`)
@@ -141,14 +172,14 @@ export class Node<I extends NodeInputs = any, O extends PortTypeKey = PortTypeKe
   }
 
   getInputType<T extends I, K extends T[number]["name"]>(key: K): InputTypeLabelByKey<T, K> {
-    const inputType = this.inputPorts.find(input => input.name === key)
-    if (inputType === undefined) {
+    const inputPort = this.inputPorts.find(input => input.name === key)
+    if (inputPort === undefined) {
       throw Error(`Key ${key} is not present in input [${this.inputPorts}]`)
     }
-    return inputType.portType
+    return inputPort.portType
   }
 
-  getInPortIndex(port: InPort) {
+  getInPortIndex(port: Port) {
     return this.inputPorts.indexOf(port)
   }
 }

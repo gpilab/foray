@@ -1,4 +1,4 @@
-import { InPort } from "../../graph/node"
+import { Port } from "../../graph/node"
 
 const colorMap = {
   "string": "green",
@@ -8,7 +8,7 @@ const colorMap = {
 }
 
 type PortsProps = {
-  ports: InPort[],
+  ports: Port[],
   portIO: "in" | "out",
   currentValue?: string
 }
@@ -19,7 +19,7 @@ function Ports({ ports, portIO, currentValue }: PortsProps) {
     top: portIO == "in" ? "-5px" : "",
     bottom: portIO == "out" ? "-5px" : "",
   }}>
-    {ports.map((e: InPort) => {
+    {ports.map((e: Port) => {
       return <span
         key={e.name}
         style={{
@@ -41,8 +41,8 @@ function Ports({ ports, portIO, currentValue }: PortsProps) {
 type NodeBaseProps = {
   width: number
   height: number
-  inputPorts: InPort[]
-  outputPort: InPort //TODO improve names/type specificity for in/out ports
+  inputPorts: Port[]
+  outputPort: Port //TODO improve names/type specificity for in/out ports
   nodeType: string
   nodeId: string
   currentValue: string //TODO make this more specifc?
@@ -66,7 +66,7 @@ export function NodeBase({ width, height, inputPorts,
       <div style={{ fontSize: "14px" }}>{nodeType}</div>
       <div style={{ color: "grey" }}>{nodeId}    </div>
       {nodeType == "Constant" ?
-        <input inputMode="numeric" value={isNaN(parseInt(currentValue)) ? "" : currentValue} onChange={(e) => handleValueUpdate(parseInt(e.target.value))}></input> : ""
+        <input id={nodeId + "input"} inputMode="numeric" value={isNaN(parseInt(currentValue)) ? "" : currentValue} onChange={(e) => handleValueUpdate(parseInt(e.target.value))}></input> : ""
       }
     </div >
     <Ports portIO="out" ports={[outputPort]} currentValue={currentValue} />

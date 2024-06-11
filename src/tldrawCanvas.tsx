@@ -42,8 +42,8 @@ function createNodesAndArrows(editor: Editor, graph: Graph) {
     props: {
       nodeId: node.nodeId,
       nodeType: node.nodeType,
-      inputTypes: node.inputPorts, //TODO use more consistent names across node and shape
-      outputType: node.outputType,
+      inputPorts: node.inputPorts,
+      outputPort: node.outputPort,
       w: 200,
       h: 100
     },
@@ -73,7 +73,7 @@ function createNodesAndArrows(editor: Editor, graph: Graph) {
   //create arrows for each connection
   portConnections.forEach(({ port, fromTLID, toTLID, portIndex }) => {
     if (toTLID === undefined) {
-      throw Error("Connection could not be made between nodes")
+      throw Error("Initial graph creation caused malformed node connection")
     }
     editor.createShape(createArrow(fromTLID, toTLID, port.name, portIndex))
   })

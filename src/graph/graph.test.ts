@@ -1,12 +1,12 @@
-import { Node, port, port2 } from './node.ts';
+import { Node, outPort, port, port2 } from './node.ts';
 import { Graph } from './graph.ts';
 
-const createConstantNode = () => new Node(port("x", "number"), "number", (x: number) => x, "c", "ConstantNode");
-const createIncrementNode = () => new Node(port("x", "number"), "number", (x: number) => x + 1);
-const createDoubleNode = () => new Node(port("x", "number"), "number", (x: number) => x * 2);
-const createDoubleStringNode = () => new Node(port("x", "string"), "string", (x: string) => x + x);
-const createSquareNode = () => new Node(port("x", "number"), "number", (x: number) => x * x);
-const createSumNode = () => new Node(port2("x", "number", "y", "number"), "number", (x: number, y: number) => x + y, "abc", "Sum");
+const createConstantNode = () => new Node(port("x", "number"), outPort("number"), (x: number) => x, "c", "ConstantNode");
+const createIncrementNode = () => new Node(port("x", "number"), outPort("number"), (x: number) => x + 1);
+const createDoubleNode = () => new Node(port("x", "number"), outPort("number"), (x: number) => x * 2);
+const createDoubleStringNode = () => new Node(port("x", "string"), outPort("string"), (x: string) => x + x);
+const createSquareNode = () => new Node(port("x", "number"), outPort("number"), (x: number) => x * x);
+const createSumNode = () => new Node(port2("x", "number", "y", "number"), outPort("number"), (x: number, y: number) => x + y, "abc", "Sum");
 
 describe('Graph functionality', () => {
   // it("should not allow incompatible connections", () => {
@@ -127,7 +127,7 @@ describe('Graph functionality', () => {
     try {
       expect(graph.addNode(constantNode)).toThrow()
     } catch (e) {
-      expect(e).toEqual(Error("Attempted to add node to graph, but it already has been added!"))
+      expect(e).toEqual(Error("Attempted to add node c to graph, but it already has been added!"))
     }
 
   })

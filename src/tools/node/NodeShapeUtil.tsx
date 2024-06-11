@@ -7,14 +7,14 @@ import {
   TLShape,
 } from "tldraw";
 import { useGraph, GraphUI, useGraphDispatch } from "../../graph/graphContext";
-import { InPort, PortTypeKey } from "../../graph/node";
+import { Port, outPort } from "../../graph/node";
 import { NodeBase } from "./nodeComponents";
 
 const nodeShapeProps = {
   nodeId: T.string,
   nodeType: T.string,
-  inputTypes: T.array,
-  outputType: T.string,
+  inputPorts: T.array,
+  outputPort: T.any,
   currentValue: T.unknown,
   w: T.number,
   h: T.number,
@@ -69,8 +69,8 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
       h: 60,
       nodeId: "default_node_id",
       nodeType: "constant",
-      inputTypes: [],
-      outputType: "number",
+      inputPorts: [],
+      outputPort: outPort("number"),
       currentValue: undefined
     };
   }
@@ -125,13 +125,13 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
 
 
   component(shape: NodeShape) {
-    const { nodeType, nodeId, inputTypes, outputType, w, h } = shape.props
+    const { nodeType, nodeId, inputPorts: inputPorts, outputPort, w, h } = shape.props
 
     const graphUI = useGraph()
     const graphDispatch = useGraphDispatch()
     const node = graphUI.graph.getNode(nodeId)
 
-    console.log("re-rendering nodeShape ", nodeId)
+    //console.log("re-rendering nodeShape ", nodeId)
 
     const nodeNotInGraph =
       Error(`Attempted to update the value of node ${shape.props.nodeId}, but it doesn't exist in the graph!`)
@@ -143,8 +143,8 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
         height={h}
         nodeType={nodeType}
         nodeId={nodeId}
-        inputPorts={inputTypes as InPort[]}
-        outputPort={{ name: "out", portType: outputType as PortTypeKey }}
+        inputPorts={inputPorts as Port[]}
+        outputPort={outputPort}
         currentValue={node.currentValue as string} //TODO make type more correct
         handleValueUpdate={(v) => {
           if (node === undefined) { throw nodeNotInGraph }

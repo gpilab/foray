@@ -1,5 +1,5 @@
 import { Dispatch, createContext, useContext, useReducer } from 'react'
-import { InPort, Node, port, port2 } from './node.ts'
+import { Port, Node, port, port2, outPort } from './node.ts'
 import { Graph } from './graph.ts'
 
 export interface GraphUI {
@@ -30,7 +30,7 @@ export function useGraphDispatch() {
 type ACTIONTYPE =
   | { type: "initializeGraph"; }
   | { type: "addNode"; node: Node; }
-  | { type: "fireNode"; nodeId: string; port: InPort, value: number }
+  | { type: "fireNode"; nodeId: string; port: Port, value: number }
   | { type: "removeNode"; node: Node; }
   | { type: "addEdge"; from: string; to: string }
 
@@ -78,11 +78,11 @@ export function GraphProvider({ children, initialGraphUI }: GraphProviderProps) 
 
 function initializeGraph(): Graph {
   const createConstantNode = (id: string) =>
-    new Node(port("x", "number"), "number", (x: number) => x, id, "Constant");
+    new Node(port("x", "number"), outPort("number"), (x: number) => x, id, "Constant");
   const createSumNode = (id: string) =>
-    new Node(port2("x", "number", "y", "number"), "number", (x: number, y: number) => { return x + y }, id, "Sum");
+    new Node(port2("x", "number", "y", "number"), outPort("number"), (x: number, y: number) => { return x + y }, id, "Sum");
   const createMultiplyNode = (id: string) =>
-    new Node(port2("x", "number", "y", "number"), "number", (x: number, y: number) => { return x * y }, id, "Multiply");
+    new Node(port2("x", "number", "y", "number"), outPort("number"), (x: number, y: number) => { return x * y }, id, "Multiply");
 
   const c1 = createConstantNode("c1")
   const c2 = createConstantNode("c2")

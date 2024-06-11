@@ -1,13 +1,12 @@
-import { ReplaySubject } from 'rxjs';
-import { Node, port, port2 } from './node.ts';
+import { Node, outPort, port, port2 } from './node.ts';
 
 const waitForPopulation = async (delay: number) => {
   await new Promise(r => setTimeout(r, delay))
 }
 
-const createConstantNode = () => new Node(port("x", "number"), "number", (x: number) => x);
-const createSumNode = () => new Node(port2("x", "number", "y", "number"), "number", (x: number, y: number) => x + y);
-const createRepeatNode = () => new Node(port2("c", "string", "n", "number"), "string", (c: string, n: number) => c.repeat(n));
+const createConstantNode = () => new Node(port("x", "number"), outPort("number"), (x: number) => x);
+const createSumNode = () => new Node(port2("x", "number", "y", "number"), outPort("number"), (x: number, y: number) => x + y);
+const createRepeatNode = () => new Node(port2("c", "string", "n", "number"), outPort("string"), (c: string, n: number) => c.repeat(n));
 
 describe('Node functionality', () => {
 
@@ -131,7 +130,9 @@ describe('Node functionality', () => {
     try {
       //@ts-expect-error
       sumNode.getInputType("a") // not one of the defined inputs!
-    } catch { }
+    } catch {
+
+    }
 
     sumNode.getInputType("x") // valid
     sumNode.getInputType("y") // valid
@@ -171,14 +172,12 @@ describe('Node functionality', () => {
   it("multiple inputs types should still restrict what getInputType returns", () => {
     const repeatNode = createRepeatNode()
 
-    try {
-      //@ts-expect-error
-      repeatNode.getInputType("c") == "boolean" // none of the inputs
-      //@ts-expect-error
-      repeatNode.getInputType("c") == "number" // wrong type for input
-      //@ts-expect-error
-      repeatNode.getInputType("n") == "string"
-    } catch { }
+    //@ts-expect-error
+    repeatNode.getInputType("c") == "boolean" // none of the inputs
+    //@ts-expect-error
+    repeatNode.getInputType("c") == "number" // wrong type for input
+    //@ts-expect-error
+    repeatNode.getInputType("n") == "string"
 
     //@ts-expect-no-error
     repeatNode.getInputType("c") == "string"
@@ -189,12 +188,10 @@ describe('Node functionality', () => {
     const sumNode = createSumNode()
     const repeatNode = createRepeatNode()
 
-    try {
-      //@ts-expect-error
-      sumNode.getInputStream("a")
-      //@ts-expect-error
-      repeatNode.getInputStream("a")
-    } catch { }
+    //@ts-expect-error
+    sumNode.getInputStream("a")
+    //@ts-expect-error
+    repeatNode.getInputStream("a")
 
     //@ts-expect-no-error
     sumNode.getInputStream("x")
@@ -209,37 +206,34 @@ describe('Node functionality', () => {
     const sumNode = createSumNode()
     //return types are correctly inferred
 
-    try {
-      //@ts-expect-error
-      sumNode.getInputStream("y") == new ReplaySubject<string>(1)
-      //@ts-expect-error
-      sumNode.getInputStream("x") == new ReplaySubject<boolean>(1)
-    } catch { }
+    //@ts-expect-error
+    sumNode.getInputStream("x").next("asdf")
+    //@ts-expect-error
+    sumNode.getInputStream("y").next(true)
 
     //@ts-expect-no-error
-    sumNode.getInputStream("x") == new ReplaySubject<number>
+    sumNode.getInputStream("x").next(1)
     //@ts-expect-no-error
-    sumNode.getInputStream("y") == new ReplaySubject<number>
-
-    expect(sumNode.getInputStream("x")).toEqual(new ReplaySubject<number>(1))//not exhastive, this will always match other types
-    expect(sumNode.getInputStream("y")).toEqual(new ReplaySubject<number>(1))//not exhastive, this will always match other types
+    sumNode.getInputStream("y").next(2)
   })
+
   it("multiple inputs types should still restrict what getInputType returns", () => {
     const repeatNode = createRepeatNode()
-    try {
+
+    //this function would throw errors that are hard to catch
+    //but we just care about ts throwing a type error
+    //@ts-expect-error 
+    function willBreak() {
       //@ts-expect-error
-      repeatNode.getInputStream("c") == new ReplaySubject<number>(1)
+      repeatNode.getInputStream("c").next(123)
       //@ts-expect-error
-      repeatNode.getInputStream("n") == new ReplaySubject<string>(1)
-    } catch { }
+      repeatNode.getInputStream("n").next("asdf")
+    }
 
     //@ts-expect-no-error
-    repeatNode.getInputStream("c") == new ReplaySubject<string>
+    repeatNode.getInputStream("c").next("asdf")
     //@ts-expect-no-error
-    repeatNode.getInputStream("n") == new ReplaySubject<number>
-
-    expect(repeatNode.getInputStream("c")).toEqual(new ReplaySubject<string>(1)) //not exhastive, this will always match other types
-    expect(repeatNode.getInputStream("n")).toEqual(new ReplaySubject<number>(1)) //not exhastive, this will always match other types
+    repeatNode.getInputStream("n").next(123)
   })
 })
 
