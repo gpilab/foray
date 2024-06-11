@@ -8,7 +8,8 @@ import {
 } from "tldraw";
 import { useGraph, GraphUI, useGraphDispatch } from "../../graph/graphContext";
 import { Port, outPort } from "../../graph/node";
-import { NodeBase } from "./nodeComponents";
+import { NodeBase } from "./components/nodeComponents";
+import { NodeType } from "../../graph/nodeDefinitions";
 
 const nodeShapeProps = {
   nodeId: T.string,
@@ -141,7 +142,7 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
       <NodeBase
         width={w}
         height={h}
-        nodeType={nodeType}
+        nodeType={nodeType as NodeType}
         nodeId={nodeId}
         inputPorts={inputPorts as Port[]}
         outputPort={outputPort}

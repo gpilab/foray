@@ -1,6 +1,7 @@
 import { Dispatch, createContext, useContext, useReducer } from 'react'
-import { Port, Node, port, port2, outPort } from './node.ts'
+import { Port, Node } from './node.ts'
 import { Graph } from './graph.ts'
+import { createAddNode, createConstantNode, createMultiplyNode } from './nodeDefinitions.ts'
 
 export interface GraphUI {
   graph: Graph
@@ -77,20 +78,14 @@ export function GraphProvider({ children, initialGraphUI }: GraphProviderProps) 
 
 
 function initializeGraph(): Graph {
-  const createConstantNode = (id: string) =>
-    new Node(port("x", "number"), outPort("number"), (x: number) => x, id, "Constant");
-  const createSumNode = (id: string) =>
-    new Node(port2("x", "number", "y", "number"), outPort("number"), (x: number, y: number) => { return x + y }, id, "Sum");
-  const createMultiplyNode = (id: string) =>
-    new Node(port2("x", "number", "y", "number"), outPort("number"), (x: number, y: number) => { return x * y }, id, "Multiply");
 
   const c1 = createConstantNode("c1")
   const c2 = createConstantNode("c2")
   const c3 = createConstantNode("c3")
   const c4 = createConstantNode("c4")
 
-  const s1 = createSumNode("s1")
-  const s2 = createSumNode("s2")
+  const a1 = createAddNode("a1")
+  const a2 = createAddNode("a2")
 
   const m1 = createMultiplyNode("m1")
 
@@ -98,19 +93,19 @@ function initializeGraph(): Graph {
 
   initialGraph.addNode(c1)
   initialGraph.addNode(c2)
-  initialGraph.addNode(s1)
-  initialGraph.connectNodes(c1, s1, "y")
-  initialGraph.connectNodes(c2, s1, "x")
+  initialGraph.addNode(a1)
+  initialGraph.connectNodes(c1, a1, "y")
+  initialGraph.connectNodes(c2, a1, "x")
 
   initialGraph.addNode(c3)
-  initialGraph.addNode(s2)
-  initialGraph.connectNodes(c3, s2, "x")
-  initialGraph.connectNodes(s1, s2, "y")
+  initialGraph.addNode(a2)
+  initialGraph.connectNodes(c3, a2, "x")
+  initialGraph.connectNodes(a1, a2, "y")
 
   initialGraph.addNode(c4)
   initialGraph.addNode(m1)
   initialGraph.connectNodes(c4, m1, "x")
-  initialGraph.connectNodes(s2, m1, "y")
+  initialGraph.connectNodes(a2, m1, "y")
 
   c1.getInputStream("x").next(1)
   c2.getInputStream("x").next(2)

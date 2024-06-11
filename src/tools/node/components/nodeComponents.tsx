@@ -1,4 +1,7 @@
-import { Port } from "../../graph/node"
+import { ReactNode } from "react"
+import { Port } from "../../../graph/node"
+import { NodeType } from "../../../graph/nodeDefinitions"
+import { DefaultNode } from "./defaultNode"
 
 const colorMap = {
   "string": "green",
@@ -6,6 +9,7 @@ const colorMap = {
   "numberArray": "blue",
   "boolean": "yellow",
 }
+
 
 type PortsProps = {
   ports: Port[],
@@ -43,32 +47,40 @@ type NodeBaseProps = {
   height: number
   inputPorts: Port[]
   outputPort: Port //TODO improve names/type specificity for in/out ports
-  nodeType: string
+  nodeType: NodeType
   nodeId: string
   currentValue: string //TODO make this more specifc?
   handleValueUpdate: (val: number) => void
 }
 
-export function NodeBase({ width, height, inputPorts,
-  outputPort, nodeType, nodeId,
-  currentValue, handleValueUpdate }: NodeBaseProps) {
+export function NodeBase(p: NodeBaseProps) {
+  const { inputPorts, outputPort, currentValue } = p
   return <div>
     <Ports portIO="in" ports={inputPorts} />
-    <div
-      style={{
-        width: `${width}px`,
-        height: `${height}px`,
-        border: "2px solid white",
-        borderRadius: "4px",
-        padding: "15px 10px",
-        pointerEvents: "all"
-      }}>
-      <div style={{ fontSize: "14px" }}>{nodeType}</div>
-      <div style={{ color: "grey" }}>{nodeId}    </div>
-      {nodeType == "Constant" ?
-        <input id={nodeId + "input"} inputMode="numeric" value={isNaN(parseInt(currentValue)) ? "" : currentValue} onChange={(e) => handleValueUpdate(parseInt(e.target.value))}></input> : ""
-      }
-    </div >
+    {chooseComponent(p)}
     <Ports portIO="out" ports={[outputPort]} currentValue={currentValue} />
   </div>
 }
+
+function chooseComponent(p: NodeBaseProps): ReactNode {
+  const { nodeId, nodeType, currentValue, handleValueUpdate } = p
+  switch (p.nodeType) {
+    case ("Constant"): {
+      return <DefaultNode {...{ ...p, width: 90 }}>
+        <input style={{ width: "80%", height: "80%", fontSize: "25px", margin: "auto" }}
+          id={nodeId + "input"}
+          inputMode="numeric"
+          value={isNaN(parseInt(currentValue)) ? "" : currentValue}
+          onChange={(e) => handleValueUpdate(parseInt(e.target.value))}>
+        </input>
+      </DefaultNode >
+    }
+    default: {
+      return <DefaultNode {...p} >
+        <div style={{ fontSize: "14px" }}>{nodeType}</div>
+        <div style={{ color: "grey" }}>{nodeId}    </div>
+      </DefaultNode>
+    }
+  }
+}
+

@@ -1,5 +1,7 @@
 import { Observable, ReplaySubject, combineLatest } from 'rxjs';
 import { map } from 'rxjs/operators';
+import { NodeType } from "./nodeDefinitions.ts"
+
 
 // This file heavily uses complex types
 //
@@ -14,6 +16,8 @@ import { map } from 'rxjs/operators';
 //
 // Checkout typescript docs if you are unfamilar with any of the syntax below
 // https://www.typescriptlang.org/docs/handbook/2/types-from-types.html
+
+
 
 /** 
  * We want a node's ports to only alow connections between ports of the same type 
@@ -134,7 +138,7 @@ export class Node<I extends NodeInputs = any, O extends PortTypeKey = PortTypeKe
     public outputPort: Port<O>,
     computeInputToOutput: C,
     public nodeId: string = "default_node_id",
-    public nodeType: string = "default_node_type",
+    public nodeType: NodeType = "default_node_type",
   ) {
     this.computeInputToOutput = computeInputToOutput;
     this.inputStreams = {} as any

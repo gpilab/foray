@@ -1,12 +1,12 @@
 import { Node, outPort, port, port2 } from './node.ts';
 import { Graph } from './graph.ts';
 
-const createConstantNode = () => new Node(port("x", "number"), outPort("number"), (x: number) => x, "c", "ConstantNode");
+const createConstantNode = () => new Node(port("x", "number"), outPort("number"), (x: number) => x, "c", "Constant");
 const createIncrementNode = () => new Node(port("x", "number"), outPort("number"), (x: number) => x + 1);
 const createDoubleNode = () => new Node(port("x", "number"), outPort("number"), (x: number) => x * 2);
 const createDoubleStringNode = () => new Node(port("x", "string"), outPort("string"), (x: string) => x + x);
 const createSquareNode = () => new Node(port("x", "number"), outPort("number"), (x: number) => x * x);
-const createSumNode = () => new Node(port2("x", "number", "y", "number"), outPort("number"), (x: number, y: number) => x + y, "abc", "Sum");
+const createSumNode = () => new Node(port2("x", "number", "y", "number"), outPort("number"), (x: number, y: number) => x + y, "abc", "Add");
 
 describe('Graph functionality', () => {
   // it("should not allow incompatible connections", () => {
