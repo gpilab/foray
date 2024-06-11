@@ -6,14 +6,9 @@ import {
   TLBaseShape,
   TLShape,
 } from "tldraw";
-import { useGraph, GraphUI } from "../../graph/graphContext";
-import { useEffect, useState } from "react";
+import { useGraph, GraphUI, useGraphDispatch } from "../../graph/graphContext";
 import { InPort, PortTypeKey } from "../../graph/node";
 import { NodeBase } from "./nodeComponents";
-// import { Node, port } from "../../graph/node";
-// import { useNode } from "../../graph/useNode";
-
-
 
 const nodeShapeProps = {
   nodeId: T.string,
@@ -25,14 +20,9 @@ const nodeShapeProps = {
   h: T.number,
 };
 
-
 export type NodeShapeProps = ShapePropsType<typeof nodeShapeProps>;
-
 export type NodeShape = TLBaseShape<"node", NodeShapeProps>;
 
-function isNodeShape(shape: TLShape): shape is NodeShape {
-  return shape?.type == "node"
-}
 
 export class NodeShapeUtil extends ShapeUtil<NodeShape> {
   static override type = "node" as const;
@@ -40,7 +30,7 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
   graphUI: GraphUI | null = null
 
   override isAspectRatioLocked = (_shape: NodeShape) => true;
-  override canResize = (_shape: NodeShape) => true;
+  override canResize = (_shape: NodeShape) => false;
 
   //called for all shapes in the scene when an arrow is being placed?
   override canBind = (_shape: NodeShape, _otherShape?: any) => {
@@ -63,7 +53,6 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
   //               next: ${JSON.stringify(next)}`)
   // }
 
-
   // override onDragShapesOut = (shape: NodeShape, dragOutShapes: TLShape[]) => {
   //   this.logConnection("onDragShapesOut", shape, dragOutShapes)
   // }
@@ -72,21 +61,6 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
   //   this.logConnection("onDragShapesOver", shape, dragOutShapes)
   // }
 
-  logConnection(eventType: string, baseShape: NodeShape, connectionShape: TLShape[]) {
-    console.log(`${eventType}
-      Base Shape:
-        ${baseShape.props.nodeId}
-      ConnectionShape Shapes(${connectionShape.length}):
-        ${JSON.stringify(connectionShape.map((s) => {
-      if (isNodeShape(s)) {
-        return "node: " + s.props.nodeId
-      }
-      else {
-        return s
-      }
-    }))
-      }`)
-  }
 
 
   getDefaultProps(): NodeShape["props"] {
@@ -98,7 +72,6 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
       inputTypes: [],
       outputType: "number",
       currentValue: undefined
-      //node: createConstantNode("MyDefaultConstantNode")
     };
   }
 
@@ -106,10 +79,7 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
     return new Rectangle2d({
       width: shape.props.w,
       height: shape.props.h,
-      // should hitbox be edges only, or filled to include center
       isFilled: true,
-      // make shape editable with a single click if it is already selected
-      // causes problems if enabled when the shape is editable
       isLabel: false,
     });
   }
@@ -155,54 +125,18 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
 
 
   component(shape: NodeShape) {
-    const graphUI = useGraph()
-
-    // useEffect(() => {
-    //   console.log("refreshing graph")
-    //   this.graphUI = graphUI // hacky way to get up to date graph for functions on util to have access to the graph
-    //   // ideally we could pass this in the constructor, but tldraw doesn't let us construct the shapeutil ourselves
-    // }, [graphUI]
-    // )
-
     const { nodeType, nodeId, inputTypes, outputType, w, h } = shape.props
+
+    const graphUI = useGraph()
+    const graphDispatch = useGraphDispatch()
     const node = graphUI.graph.getNode(nodeId)
-    if (node === undefined) {
-      throw Error("Attempted to render node: ${nodeId}, which doesn't exist in the graph!")
-    }
 
-    const [currentValue, setCurrentValue] = useState(node.currentValue)
+    console.log("re-rendering nodeShape ", nodeId)
 
-    function updateAndFire(value: number) {
-      //console.log(node)
-      // const nodeUp = graphUI.graph.getNode(nodeId)
-      //console.log(nodeUp)
-      if (node != undefined) {
-        //nodeUp.currentValue = value
-        //console.log(value)
-        //console.log(nodeUp)
-        node.inputStreams["x"].next(value)
-      }
-    }
+    const nodeNotInGraph =
+      Error(`Attempted to update the value of node ${shape.props.nodeId}, but it doesn't exist in the graph!`)
+    if (node === undefined) { throw nodeNotInGraph }
 
-    useEffect(() => {
-      console.log("Setting up subscription to node ", node.id)
-      node.outputPort$.subscribe((v) => {
-        console.log(`UI subscriptiong to outputPort of ${node.id}, currentValue=${currentValue}, value=${v}`)
-        if (v != undefined && currentValue != v) {
-          console.log("UPDATING VALUE")
-          setCurrentValue(v)
-        }
-        else {
-          console.log("NOT updating value",)
-        }
-      })
-    }, []
-    )
-
-
-
-    //const graphDispatch = useGraphDispatch()
-    //console.log("initial render")
     return (
       <NodeBase
         width={w}
@@ -211,16 +145,39 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
         nodeId={nodeId}
         inputPorts={inputTypes as InPort[]}
         outputPort={{ name: "out", portType: outputType as PortTypeKey }}
-        currentValue={currentValue as string} //TODO make this more correct
-        handleValueUpdate={updateAndFire}
+        currentValue={node.currentValue as string} //TODO make type more correct
+        handleValueUpdate={(v) => {
+          if (node === undefined) { throw nodeNotInGraph }
+          return graphDispatch(
+            {
+              type: "fireNode",
+              nodeId: node.id,
+              port: node.getInputPort("x"),
+              value: v
+            })
+        }}
       >
-
       </NodeBase>
     )
   }
 }
 
-
-
-
-
+// function isNodeShape(shape: TLShape): shape is NodeShape {
+//   return shape?.type == "node"
+// }
+//
+// function logConnection(eventType: string, baseShape: NodeShape, connectionShape: TLShape[]) {
+//   console.log(`${eventType}
+//       Base Shape:
+//         ${baseShape.props.nodeId}
+//       ConnectionShape Shapes(${connectionShape.length}):
+//         ${JSON.stringify(connectionShape.map((s) => {
+//     if (isNodeShape(s)) {
+//       return "node: " + s.props.nodeId
+//     }
+//     else {
+//       return s
+//     }
+//   }))
+//     }`)
+// }

@@ -1,5 +1,42 @@
 import { InPort } from "../../graph/node"
 
+const colorMap = {
+  "string": "green",
+  "number": "purple",
+  "numberArray": "blue",
+  "boolean": "yellow",
+}
+
+type PortsProps = {
+  ports: InPort[],
+  portIO: "in" | "out",
+  currentValue?: string
+}
+
+function Ports({ ports, portIO, currentValue }: PortsProps) {
+  return <div style={{
+    position: "absolute",
+    top: portIO == "in" ? "-5px" : "",
+    bottom: portIO == "out" ? "-5px" : "",
+  }}>
+    {ports.map((e: InPort) => {
+      return <span
+        key={e.name}
+        style={{
+          width: 50,
+          height: 25,
+          borderRadius: "15px",
+          background: colorMap[e.portType],
+          padding: "5px 10px 5px 10px",
+          marginLeft: "5px",
+          marginRight: "5px"
+        }}>
+        {e.name}{currentValue ? ": " + currentValue : ""}
+      </span>
+    })
+    }
+  </div>
+}
 
 type NodeBaseProps = {
   width: number
@@ -12,42 +49,9 @@ type NodeBaseProps = {
   handleValueUpdate: (val: number) => void
 }
 
-const colorMap = {
-  "string": "green",
-  "number": "purple",
-  "numberArray": "blue",
-  "boolean": "yellow",
-}
-
-
-function Ports({ ports, portIO, currentValue }: { ports: InPort[], portIO: "in" | "out", currentValue?: string }) {
-  return <div style={{
-    position: "absolute",
-    top: portIO == "in" ? "-5px" : "",
-    bottom: portIO == "out" ? "-5px" : "",
-    zIndex: 9999999
-  }}>
-    {
-      ports.map((e: InPort) => {
-        return <span
-          key={e.name}
-          style={{
-            width: 50,
-            height: 25,
-            borderRadius: "15px",
-            background: colorMap[e.portType],
-            padding: "5px 10px 5px 10px",
-            marginLeft: "5px",
-            marginRight: "5px"
-          }}>
-          {e.name}{currentValue != null ? ": " + currentValue : ""}
-        </span>
-      })
-    }
-  </div >
-}
-
-export function NodeBase({ width, height, inputPorts, outputPort, nodeType, nodeId, currentValue, handleValueUpdate }: NodeBaseProps) {
+export function NodeBase({ width, height, inputPorts,
+  outputPort, nodeType, nodeId,
+  currentValue, handleValueUpdate }: NodeBaseProps) {
   return <div>
     <Ports portIO="in" ports={inputPorts} />
     <div
@@ -68,4 +72,3 @@ export function NodeBase({ width, height, inputPorts, outputPort, nodeType, node
     <Ports portIO="out" ports={[outputPort]} currentValue={currentValue} />
   </div>
 }
-
