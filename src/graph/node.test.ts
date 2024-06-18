@@ -1,12 +1,13 @@
-import { Node, outPort, port, port2 } from './node.ts';
+import { Node } from './node.ts';
+import { outPortFunction, port, port2 } from './nodeDefinitions.ts';
 
 const waitForPopulation = async (delay: number) => {
   await new Promise(r => setTimeout(r, delay))
 }
 
-const createConstantNode = () => new Node(port("x", "number"), outPort("number"), (x: number) => x);
-const createSumNode = () => new Node(port2("x", "number", "y", "number"), outPort("number"), (x: number, y: number) => x + y);
-const createRepeatNode = () => new Node(port2("c", "string", "n", "number"), outPort("string"), (c: string, n: number) => c.repeat(n));
+const createConstantNode = () => new Node(port("x", "number"), outPortFunction("number"), (x: number) => x);
+const createSumNode = () => new Node(port2("x", "number", "y", "number"), outPortFunction("number"), (x: number, y: number) => x + y);
+const createRepeatNode = () => new Node(port2("c", "string", "n", "number"), outPortFunction("string"), (c: string, n: number) => c.repeat(n));
 
 describe('Node functionality', () => {
 
@@ -48,7 +49,6 @@ describe('Node functionality', () => {
     input$.next(values[1]);
     input$.next(values[2]);
 
-    //await waitForPopulation(50)
     expect(constantNode.currentValue).toEqual(values[2])
     expect(outSub).toHaveBeenCalledTimes(3)
     expect(outSub).toHaveNthReturnedWith(1, values[0])

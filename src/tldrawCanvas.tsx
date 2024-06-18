@@ -35,20 +35,23 @@ export function TldrawCanvas() {
 function createNodesAndArrows(editor: Editor, graph: Graph) {
   const nodes = graph.getNodes()
 
-  const nodeCreationData = nodes.map(node =>
-  ({
-    node: node,
-    TLID: createShapeId(),
-    props: {
-      nodeId: node.nodeId,
-      nodeType: node.nodeType,
-      inputPorts: node.inputPorts,
-      outputPort: node.outputPort,
-      w: 200,
-      h: 100
-    },
-    connections: graph.getConnectedNodeInfo(node.nodeId)
-  }))
+  const nodeCreationData = nodes.map(node => {
+    const { nodeId, nodeAttributes, inputPorts, outputPort } = node
+    const { type, width, height } = nodeAttributes
+    return {
+      node: node,
+      TLID: createShapeId(),
+      props: {
+        nodeId: nodeId,
+        nodeType: type,
+        inputPorts: inputPorts,
+        outputPort: outputPort,
+        w: width ?? 200,
+        h: height ?? 100
+      },
+      connections: graph.getConnectedNodeInfo(node.nodeId)
+    }
+  })
 
   //create the node shapes
   nodeCreationData.forEach((fromNode, i) => {
@@ -92,7 +95,7 @@ function createArrow(startId: TLShapeId, endId: TLShapeId, _label: string, portI
         type: 'binding',
         isExact: true,
         boundShapeId: startId,
-        normalizedAnchor: { x: .15, y: 1.08 }, // where the arrow starts relative to parent
+        normalizedAnchor: { x: .5, y: 1 }, // where the arrow starts relative to parent
         isPrecise: true,
       },
       end: {

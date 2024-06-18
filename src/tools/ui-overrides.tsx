@@ -44,6 +44,7 @@ import {
 export const customAssetURLs: TLUiAssetUrlOverrides = {
   icons: {
     'pi-symbol': 'pi-symbol.svg',
+    'network': 'network.svg',
   }
 }
 
@@ -61,7 +62,7 @@ export const uiOverrides: TLUiOverrides = {
     }
     tools.nodeShape = {
       id: 'node',
-      icon: 'pi-symbol',
+      icon: 'network',
       label: 'Node',
       kbd: 'n',
       onSelect: () => {

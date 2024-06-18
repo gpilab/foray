@@ -7,9 +7,9 @@ import {
   TLShape,
 } from "tldraw";
 import { useGraph, GraphUI, useGraphDispatch } from "../../graph/graphContext";
-import { Port, outPort } from "../../graph/node";
-import { NodeBase } from "./components/nodeComponents";
-import { NodeType } from "../../graph/nodeDefinitions";
+import { Port, Node } from "../../graph/node";
+import { NodeBase } from "./components/nodeBase.tsx";
+import { outPortFunction } from "../../graph/nodeDefinitions.ts";
 
 const nodeShapeProps = {
   nodeId: T.string,
@@ -24,13 +24,26 @@ const nodeShapeProps = {
 export type NodeShapeProps = ShapePropsType<typeof nodeShapeProps>;
 export type NodeShape = TLBaseShape<"node", NodeShapeProps>;
 
+export const createNodeShapeProps = (node: Node) => {
+  const { width, height, type } = node.nodeAttributes
+  console.log("creating props for ", node.nodeId)
+  return {
+    nodeId: node.nodeId,
+    nodeType: type,
+    inputPorts: node.inputPorts,
+    outputPort: node.outputPort,
+    w: width ? width : 200,
+    h: height ? height : 100,
+  }
+}
+
 
 export class NodeShapeUtil extends ShapeUtil<NodeShape> {
   static override type = "node" as const;
   static override props = nodeShapeProps;
   graphUI: GraphUI | null = null
 
-  override isAspectRatioLocked = (_shape: NodeShape) => true;
+  override isAspectRatioLocked = (_shape: NodeShape) => false;
   override canResize = (_shape: NodeShape) => false;
 
   //called for all shapes in the scene when an arrow is being placed?
@@ -71,7 +84,7 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
       nodeId: "default_node_id",
       nodeType: "constant",
       inputPorts: [],
-      outputPort: outPort("number"),
+      outputPort: outPortFunction("number"),
       currentValue: undefined
     };
   }
@@ -86,7 +99,7 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
   }
 
   indicator(shape: NodeShape) {
-    return <rect width={shape.props.w} height={shape.props.h} />;
+    return <rect id={"myShapeIndicator" + shape.props.nodeId} strokeOpacity={0.5} style={{ zIndex: 0 }} rx={4} width={shape.props.w} height={shape.props.h} />;
   }
 
   // override onResize: TLOnResizeHandler<MathTextShape> = (shape, info) => {
@@ -126,7 +139,7 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
 
 
   component(shape: NodeShape) {
-    const { nodeType, nodeId, inputPorts: inputPorts, outputPort, w, h } = shape.props
+    const { nodeId, inputPorts, outputPort, w, h } = shape.props
 
     const graphUI = useGraph()
     const graphDispatch = useGraphDispatch()
@@ -142,18 +155,18 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
       <NodeBase
         width={w}
         height={h}
-        nodeType={nodeType as NodeType}
+        nodeAttributes={node.nodeAttributes}
         nodeId={nodeId}
         inputPorts={inputPorts as Port[]}
         outputPort={outputPort}
         currentValue={node.currentValue as string} //TODO make type more correct
-        handleValueUpdate={(v) => {
+        handleValueUpdate={(v, portLabel) => {
           if (node === undefined) { throw nodeNotInGraph }
           return graphDispatch(
             {
               type: "fireNode",
               nodeId: node.nodeId,
-              port: node.getInputPort("x"),
+              port: node.getInputPort(portLabel),
               value: v
             })
         }}

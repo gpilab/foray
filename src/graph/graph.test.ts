@@ -1,12 +1,11 @@
-import { Node, outPort, port, port2 } from './node.ts';
+import { Node, } from './node.ts';
 import { Graph } from './graph.ts';
+import { createAddNode, createConstantNode, outPortFunction, port } from './nodeDefinitions.ts';
 
-const createConstantNode = () => new Node(port("x", "number"), outPort("number"), (x: number) => x, "c", "Constant");
-const createIncrementNode = () => new Node(port("x", "number"), outPort("number"), (x: number) => x + 1);
-const createDoubleNode = () => new Node(port("x", "number"), outPort("number"), (x: number) => x * 2);
-const createDoubleStringNode = () => new Node(port("x", "string"), outPort("string"), (x: string) => x + x);
-const createSquareNode = () => new Node(port("x", "number"), outPort("number"), (x: number) => x * x);
-const createSumNode = () => new Node(port2("x", "number", "y", "number"), outPort("number"), (x: number, y: number) => x + y, "abc", "Add");
+const createIncrementNode = () => new Node(port("x", "number"), outPortFunction("number"), (x: number) => x + 1);
+const createDoubleNode = () => new Node(port("x", "number"), outPortFunction("number"), (x: number) => x * 2);
+const createDoubleStringNode = () => new Node(port("x", "string"), outPortFunction("string"), (x: string) => x + x);
+const createSquareNode = () => new Node(port("x", "number"), outPortFunction("number"), (x: number) => x * x);
 
 describe('Graph functionality', () => {
   // it("should not allow incompatible connections", () => {
@@ -56,9 +55,9 @@ describe('Graph functionality', () => {
 
   it('should process multiple connected nodes correctly', () => {
     const graph = new Graph();
-    const sumNode = createSumNode()
-    const constantNode1 = createConstantNode()
-    const constantNode2 = createConstantNode()
+    const sumNode = createAddNode("s1")
+    const constantNode1 = createConstantNode("c1")
+    const constantNode2 = createConstantNode("c2")
     const doubleNode = createDoubleNode()
     const outSub = jest.fn((v) => v)
     const output$ = sumNode.outputPort$
@@ -77,19 +76,19 @@ describe('Graph functionality', () => {
     expect(sumNode.currentValue).toBeUndefined()
     expect(outSub).toHaveBeenCalledTimes(0)
 
-    constantNode1.getInputStream("x").next(5)
+    constantNode1.pushValue(5, "none")
     expect(sumNode.currentValue).toBeUndefined()
     expect(outSub).toHaveBeenCalledTimes(0)
 
-    constantNode2.getInputStream("x").next(7)
+    constantNode2.pushValue(7, "none")
     expect(sumNode.currentValue).toEqual(17) //5*2 + 7
     expect(outSub).toHaveBeenCalledTimes(1)
 
-    constantNode2.getInputStream("x").next(9)
+    constantNode2.pushValue(9, "none")
     expect(sumNode.currentValue).toEqual(19)
     expect(outSub).toHaveBeenCalledTimes(2)
 
-    constantNode2.getInputStream("x").next(11)
+    constantNode2.pushValue(11, "none")
     expect(sumNode.currentValue).toEqual(21)
     expect(outSub).toHaveBeenCalledTimes(3)
   });
@@ -120,14 +119,14 @@ describe('Graph functionality', () => {
   it("Graphs can't have the same node added twice", () => {
 
     const graph = new Graph();
-    const constantNode = createConstantNode()
+    const constantNode = createConstantNode("c1")
 
     graph.addNode(constantNode)
 
     try {
       expect(graph.addNode(constantNode)).toThrow()
     } catch (e) {
-      expect(e).toEqual(Error("Attempted to add node c to graph, but it already has been added!"))
+      expect(e).toEqual(Error("Attempted to add node c1 to graph, but it already has been added!"))
     }
 
   })
@@ -135,64 +134,64 @@ describe('Graph functionality', () => {
   it("should give the correct number of connections", () => {
 
     const graph = new Graph();
-    const constantNodeIn = createConstantNode()
-    const constantNode1 = createConstantNode()
-    const constantNode2 = createConstantNode()
-    const constantNode3 = createConstantNode()
-    const constantNode4 = createConstantNode()
+    const cIn = createConstantNode("cIn")
+    const a1 = createAddNode("a1")
+    const a2 = createAddNode("a2")
+    const a3 = createAddNode("a3")
+    const a4 = createAddNode("a4")
 
-    graph.addNodes([constantNodeIn, constantNode1, constantNode2, constantNode3, constantNode4])
-    graph.connectNodes(constantNodeIn, constantNode1, "x")
-    graph.connectNodes(constantNodeIn, constantNode2, "x")
-    graph.connectNodes(constantNodeIn, constantNode3, "x")
-    graph.connectNodes(constantNodeIn, constantNode4, "x")
+    graph.addNodes([cIn, a1, a2, a3, a4])
+    graph.connectNodes(cIn, a1, "x")
+    graph.connectNodes(cIn, a2, "x")
+    graph.connectNodes(cIn, a3, "x")
+    graph.connectNodes(cIn, a4, "x")
 
-    expect(graph.getConnectedNodes(constantNodeIn)!.length).toEqual(4)
+    expect(graph.getConnectedNodes(cIn)!.length).toEqual(4)
   })
 
   it("nodes fire when all inputs are satisfied, and any input changes", () => {
     const graph = new Graph();
-    const constantNode = createConstantNode()
+    const c1 = createConstantNode("c1")
     const constOutSub = jest.fn((v) => v)
-    constantNode.outputPort$.subscribe(constOutSub)
+    c1.outputPort$.subscribe(constOutSub)
 
     const squareNode = createSquareNode()
     const incrementNode = createIncrementNode()
-    const sumNode1 = createSumNode()
-    const sum1OutSub = jest.fn((v) => v)
-    sumNode1.outputPort$.subscribe(sum1OutSub)
+    const a1 = createAddNode("a1")
+    const a1OutSub = jest.fn((v) => v)
+    a1.outputPort$.subscribe(a1OutSub)
 
-    const sumNode2 = createSumNode()
-    const sum2OutSub = jest.fn((v) => v)
-    sumNode2.outputPort$.subscribe(sum2OutSub)
+    const a2 = createAddNode("a2")
+    const a2OutSub = jest.fn((v) => v)
+    a2.outputPort$.subscribe(a2OutSub)
 
-    graph.addNodes([constantNode, incrementNode, squareNode, sumNode1, sumNode2])
-    graph.connectNodes(constantNode, incrementNode, "x") // connection 1
+    graph.addNodes([c1, incrementNode, squareNode, a1, a2])
+    graph.connectNodes(c1, incrementNode, "x") // connection 1
     graph.connectNodes(incrementNode, squareNode, "x")
-    graph.connectNodes(constantNode, sumNode1, "x")// connection 2
-    graph.connectNodes(constantNode, sumNode1, "y")// connection 3
-    graph.connectNodes(constantNode, sumNode2, "x")// connection 4
-    graph.connectNodes(sumNode1, sumNode2, "y")
+    graph.connectNodes(c1, a1, "x")// connection 2
+    graph.connectNodes(c1, a1, "y")// connection 3
+    graph.connectNodes(c1, a2, "x")// connection 4
+    graph.connectNodes(a1, a2, "y")
 
-    expect(graph.getConnectedNodes(constantNode)!.length).toEqual(4)
+    expect(graph.getConnectedNodes(c1)!.length).toEqual(4)
 
     //kick off first input
-    constantNode.getInputStream("x").next(2);
+    c1.pushValue(2, "none");
 
     //start and end nodes ony run once
     expect(constOutSub).toHaveBeenCalledTimes(1)
-    expect(sum1OutSub).toHaveBeenCalledTimes(1)
-    expect(sum2OutSub).toHaveBeenCalledTimes(1)
+    expect(a1OutSub).toHaveBeenCalledTimes(1)
+    expect(a2OutSub).toHaveBeenCalledTimes(1)
 
-    constantNode.getInputStream("x").next(3);
+    c1.pushValue(3, "none");
 
     expect(constOutSub).toHaveBeenCalledTimes(2) // 2 inputs, one for each "next"
 
     // this behavior could be suprising to users. I'm not certain if this is how it should behave.
     // maybe calculations should be canceled and restarted if new inputs come in before computation is complete?
     // that seems like it could have some complicated effects...
-    expect(sum1OutSub).toHaveBeenCalledTimes(3) // fires two additional times, one when "x" is changed, and one for "y"
-    expect(sum2OutSub).toHaveBeenCalledTimes(4) // fires three additional times, 2 from sum1 (y), and 1 from constant being updated
+    expect(a1OutSub).toHaveBeenCalledTimes(3) // fires two additional times, one when "x" is changed, and one for "y"
+    expect(a2OutSub).toHaveBeenCalledTimes(4) // fires three additional times, 2 from sum1 (y), and 1 from constant being updated
 
   });
 })

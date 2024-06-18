@@ -1,7 +1,7 @@
 import { Dispatch, createContext, useContext, useReducer } from 'react'
 import { Port, Node } from './node.ts'
 import { Graph } from './graph.ts'
-import { createAddNode, createConstantNode, createMultiplyNode } from './nodeDefinitions.ts'
+import { createAddNode, createAndNode, createBoolNode, createConstantNode, createDefaultNode, createMultiplyNode, createNotNode, createOrNode, createXorNode } from './nodeDefinitions.ts'
 
 export interface GraphUI {
   graph: Graph
@@ -36,17 +36,23 @@ type ACTIONTYPE =
   | { type: "addEdge"; from: string; to: string }
 
 function graphReducer(graphUI: GraphUI, action: ACTIONTYPE): GraphUI {
+  console.log("In Graph Reducer for action", action.type)
   switch (action.type) {
     case "initializeGraph": {
       return { ...graphUI, graph: initializeGraph() }
     }
     case "addNode": {
+      console.log("adding from reducer")
+      if (graphUI.graph.getNode(action.node.nodeId) !== undefined) {
+        console.log("In reducer, node already exists in graph")
+        return graphUI
+      }
       graphUI.graph.addNode(action.node)
       return { ...graphUI, graph: graphUI.graph }
     }
     case "fireNode": {
       const node = graphUI.graph.getNode(action.nodeId)
-      node?.getInputStream("x").next(action.value)
+      node?.getInputStream(action.port.name).next(action.value)
       return { ...graphUI, graph: graphUI.graph }
     }
     default:
@@ -79,6 +85,7 @@ export function GraphProvider({ children, initialGraphUI }: GraphProviderProps) 
 
 function initializeGraph(): Graph {
 
+  const d1 = createDefaultNode("d1")
   const c1 = createConstantNode("c1")
   const c2 = createConstantNode("c2")
   const c3 = createConstantNode("c3")
@@ -107,10 +114,32 @@ function initializeGraph(): Graph {
   initialGraph.connectNodes(c4, m1, "x")
   initialGraph.connectNodes(a2, m1, "y")
 
-  c1.getInputStream("x").next(1)
-  c2.getInputStream("x").next(2)
-  c3.getInputStream("x").next(3)
-  c4.getInputStream("x").next(4)
+
+  c1.pushValue(1, "none")
+  c2.pushValue(2, "none")
+  c3.pushValue(3, "none")
+  c4.pushValue(4, "none")
+
+  initialGraph.addNode(d1)
+
+
+  const b1 = createBoolNode("b1", false)
+  const b2 = createBoolNode("b2", false)
+
+  const and = createAndNode("and1")
+  const or = createOrNode("or1")
+  const xor = createXorNode("xor1")
+  const not = createNotNode("not1")
+
+  initialGraph.addNodes([b1, not, b2, and])
+  initialGraph.addNodes([or, xor])
+  initialGraph.connectNodes(b1, not, "a")
+  initialGraph.connectNodes(b2, and, "a")
+  initialGraph.connectNodes(b1, and, "b")
+  initialGraph.connectNodes(b2, or, "a")
+  initialGraph.connectNodes(b1, or, "b")
+  initialGraph.connectNodes(b2, xor, "a")
+  initialGraph.connectNodes(b1, xor, "b")
 
   return initialGraph
 }

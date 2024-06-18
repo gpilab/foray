@@ -1,6 +1,6 @@
 import { BlockMath } from "react-katex"
-import { NodeBaseProps } from "./nodeBase"
-import { Ports } from "./Ports"
+import { NodeBaseProps } from "../nodeBase"
+import { Ports } from "../Ports"
 
 type DefaultNodeProps = {
   showInfo?: boolean,
@@ -8,7 +8,7 @@ type DefaultNodeProps = {
   children?: React.ReactNode
 }
 
-export function DefaultNode({ showInfo = true, nodeData, children }: DefaultNodeProps) {
+export function Gate({ showInfo = true, nodeData, children }: DefaultNodeProps) {
   const { width, height, nodeAttributes, nodeId, inputPorts, outputPort, currentValue } = nodeData
   return <div>
     <Ports portIO="in" ports={inputPorts} />
