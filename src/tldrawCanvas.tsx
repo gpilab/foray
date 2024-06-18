@@ -7,13 +7,16 @@ import { MathShapeTool } from './tools/math/MathShapeTool'
 import 'tldraw/tldraw.css'
 import './App.css'
 import _startShape from "./assets/zeno.json"
-import { NodeShapeUtil } from './tools/node/NodeShapeUtil.tsx'
+import { NodeShape, NodeShapeUtil, createNodeShapeProps } from './tools/node/NodeShapeUtil.tsx'
 import { NodeShapeTool } from './tools/node/NodeShapeTool.tsx'
-import { useGraph } from './graph/graphContext.tsx'
+import { useGraph, useGraphDispatch } from './graph/graphContext.tsx'
 import { Graph } from './graph/graph.ts'
+import { createAddNode, createConstantNode, createMultiplyNode, createSubtractNode } from './graph/nodeDefinitions'
 
 export function TldrawCanvas() {
+  console.log("rendering tldraw canvas")
   const graphUI = useGraph()
+  const graphDispatch = useGraphDispatch()
   return < Tldraw
     shapeUtils={[MathTextShapeUtil, NodeShapeUtil]}
     tools={[MathShapeTool, NodeShapeTool]}
@@ -27,7 +30,41 @@ export function TldrawCanvas() {
         .selectAll()
         .deleteShapes(editor.getSelectedShapeIds())
 
+      editor.sideEffects.registerBeforeCreateHandler('shape', (newShape) => {
+        if (newShape.type === 'node') {
+          const nodeShape = newShape as NodeShape
+          if (graphUI.graph.getNode(newShape.id)) {
+            return newShape
+          }
+          const nodeType = nodeShape.props.nodeType
+          console.log("node Type: ", nodeType)
+          let newNode = null
+          if (nodeType == "Add") {
+            newNode = createAddNode(nodeShape.id)
+          } else if (nodeType == "Constant") {
+            newNode = createConstantNode(nodeShape.id, 0)
+          }
+          else if (nodeType == "Subtract") {
+            newNode = createSubtractNode(nodeShape.id)
+          }
+          else if (nodeType == "Multiply") {
+            newNode = createMultiplyNode(nodeShape.id)
+          }
+          else {
+            console.log("couldn't find node from info!")
+            newNode = createAddNode(nodeShape.id)
+          }
+
+          console.log("dispatching from editor side effect")
+          graphDispatch({ type: "addNode", node: createConstantNode(newShape.id) })
+        }
+        return newShape
+      }
+      )
+
+      console.log("onMount")
       createNodesAndArrows(editor, graphUI.graph)
+      console.log("done with onMount")
     }}>
   </Tldraw >
 }
@@ -35,20 +72,13 @@ export function TldrawCanvas() {
 function createNodesAndArrows(editor: Editor, graph: Graph) {
   const nodes = graph.getNodes()
 
-  const nodeCreationData = nodes.map(node =>
-  ({
-    node: node,
-    TLID: createShapeId(),
-    props: {
-      nodeId: node.nodeId,
-      nodeType: node.nodeType,
-      inputPorts: node.inputPorts,
-      outputPort: node.outputPort,
-      w: 200,
-      h: 100
-    },
-    connections: graph.getConnectedNodeInfo(node.nodeId)
-  }))
+  const nodeCreationData = nodes.map(node => {
+    return {
+      node: node,
+      TLID: createShapeId(),
+      connections: graph.getConnectedNodeInfo(node.nodeId)
+    }
+  })
 
   //create the node shapes
   nodeCreationData.forEach((fromNode, i) => {
@@ -58,7 +88,7 @@ function createNodesAndArrows(editor: Editor, graph: Graph) {
       type: "node",
       x: 300 + 150 * (i % 2 == 0 ? 1 : -1),
       y: 200 + i * 130,
-      props: fromNode.props
+      props: createNodeShapeProps(fromNode.node)
     })
   })
 
@@ -92,7 +122,7 @@ function createArrow(startId: TLShapeId, endId: TLShapeId, _label: string, portI
         type: 'binding',
         isExact: true,
         boundShapeId: startId,
-        normalizedAnchor: { x: .15, y: 1.08 }, // where the arrow starts relative to parent
+        normalizedAnchor: { x: .5, y: 1 }, // where the arrow starts relative to parent
         isPrecise: true,
       },
       end: {

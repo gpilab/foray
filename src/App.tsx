@@ -6,7 +6,7 @@ import { TldrawCanvas } from './tldrawCanvas.tsx'
 
 export default function CustomUiExample() {
   return (
-    <GraphProvider>
+    <GraphProvider >
       <TldrawCanvas />
     </GraphProvider >
   )

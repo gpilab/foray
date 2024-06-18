@@ -40,10 +40,12 @@ import {
   useIsToolSelected,
   useTools,
 } from 'tldraw'
+import { NodeSelectionUI } from './node/components/nodeSelectionUI'
 
 export const customAssetURLs: TLUiAssetUrlOverrides = {
   icons: {
     'pi-symbol': 'pi-symbol.svg',
+    'network': 'network.svg',
   }
 }
 
@@ -61,7 +63,7 @@ export const uiOverrides: TLUiOverrides = {
     }
     tools.nodeShape = {
       id: 'node',
-      icon: 'pi-symbol',
+      icon: 'network',
       label: 'Node',
       kbd: 'n',
       onSelect: () => {
@@ -73,6 +75,9 @@ export const uiOverrides: TLUiOverrides = {
 }
 
 export const components: TLComponents = {
+  InFrontOfTheCanvas: () => {
+    return <NodeSelectionUI />
+  },
   Toolbar: (props) => {
     const tools = useTools()
     const isMathSelected = useIsToolSelected(tools['mathText'])

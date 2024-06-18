@@ -11,10 +11,14 @@ import { InputTypeLabelByKey, NodeInputs, Node, Port } from "./node";
  */
 export class Graph {
   private nodeAdjacencies: Map<Node, [Port, Node][]> = new Map();
+  public addCount = 0
 
   addNode<I extends NodeInputs, K extends I[number]["name"], O extends InputTypeLabelByKey<I, K>>
     (node: Node<any, O>,
       connections: { targetNode: Node<I>, targetInputLabel: K }[] = []) {
+    console.log("added node # ", this.addCount, " to graph: ", node.nodeId)
+    this.addCount += 1
+
     if (this.nodeAdjacencies.get(node)) {
       throw Error(`Attempted to add node ${node.nodeId} to graph, but it already has been added!`)
     }

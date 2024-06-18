@@ -1,6 +1,7 @@
 import { Observable, ReplaySubject, combineLatest } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { NodeType } from "./nodeDefinitions.ts"
+import { NodeAttributes, defaultNodeAtrributes } from "./nodeDefinitions.ts"
+import { createShapeId } from 'tldraw';
 
 
 // This file heavily uses complex types
@@ -29,7 +30,7 @@ import { NodeType } from "./nodeDefinitions.ts"
  * to have this info available at runtime.
  * 
  **/
-interface ValidPortTypes {
+export interface ValidPortTypes {
   "string": string
   "number": number
   "numberArray": number[]
@@ -38,6 +39,7 @@ interface ValidPortTypes {
 
 /** union of all valid port type */
 export type PortTypeKey = keyof ValidPortTypes
+export type PortTypes = ValidPortTypes[keyof ValidPortTypes]
 
 /** Node inputs are described by a unique label and a data type. Data types are defined as the keys of ValidPortTypes */
 export type Port<T extends PortTypeKey = PortTypeKey> = {
@@ -62,7 +64,7 @@ type InputKeys<T extends NodeInputs> = {
   [K in keyof T]: T[K] extends { name: infer U, portKey: PortTypeKey } ? (U extends string ? U : never) : never;
 }
 
-type InputTypesUnion<T extends NodeInputs> = ComputInputParams<T>[number]
+//type InputTypesUnion<T extends NodeInputs> = ComputInputParams<T>[number]
 //type InputTypeLabelsUnion<T extends NodeInputs> = InputTypeLabels<T>[number]
 type InputKeysUnion<T extends NodeInputs> = InputKeys<T>[number]
 
@@ -70,31 +72,6 @@ export type InputTypeLabelByKey<T extends NodeInputs, K extends string> = Extrac
 type InputTypeByKey<T extends NodeInputs, K extends string> = ValidPortTypes[Extract<T[number], { name: K, portType: any }>["portType"]];
 
 
-/** Creates a node input with 1 port*/
-export function outPort<
-  T extends PortTypeKey>
-  (type: T) {
-  return { name: "out", portType: type }
-}
-/** Creates a node input with 1 port*/
-export function port<
-  S extends string,
-  T extends PortTypeKey>
-  (name: S, type: T) {
-  return [{ name: name, portType: type }]
-}
-
-/** Creates a node input with 2 ports*/
-export function port2<
-  S1 extends string,
-  T1 extends PortTypeKey,
-  S2 extends string,
-  T2 extends PortTypeKey>
-  (name1: S1, type1: T1, name2: S2, type2: T2): [{ name: S1, portType: T1 }, { name: S2, portType: T2 }] {
-  return [
-    { name: name1, portType: type1 },
-    { name: name2, portType: type2 }]
-}
 
 type InputSubjectMap<T extends NodeInputs> = {
   [K in T[number]["name"]]: ReplaySubject<Extract<T[number], { name: K, portType: T[number]["portType"] }>["portType"]>;
@@ -130,30 +107,29 @@ export class Node<I extends NodeInputs = any, O extends PortTypeKey = PortTypeKe
   public inputStreams: InputSubjectMap<I>
   public outputPort$: Observable<ValidPortTypes[O]>
   public currentValue: ValidPortTypes[O] | undefined
-
   private computeInputToOutput: C
+  public nodeId: string
 
   constructor(
     public inputPorts: I,
     public outputPort: Port<O>,
     computeInputToOutput: C,
-    public nodeId: string = "default_node_id",
-    public nodeType: NodeType = "default_node_type",
+    nodeId: string = "default_node_id",
+    public nodeAttributes: NodeAttributes = defaultNodeAtrributes
   ) {
     this.computeInputToOutput = computeInputToOutput;
     this.inputStreams = {} as any
+    this.nodeId = createShapeId(nodeId)
+
 
     inputPorts.forEach((input) => {
       const key: InputKeysUnion<I> = input.name as InputKeysUnion<I>
-      const subject = new ReplaySubject<typeof input.portType>(1)
-      this.inputStreams[key] = subject
+      this.inputStreams[key] = new ReplaySubject<typeof input.portType>(1)
     })
 
-    //coaerce inputStreams into the format that combine latest needs
-    const inputSubjects = Object.values(this.inputStreams) as unknown as ReplaySubject<InputTypesUnion<I>>[]
-    this.outputPort$ = combineLatest(inputSubjects).pipe(
+    this.outputPort$ = combineLatest(this.inputStreams).pipe(
       map((inputs) => {
-        return this.computeInputToOutput(...inputs as unknown as ComputInputParams<I>)
+        return this.computeInputToOutput(...Object.values(inputs) as unknown as ComputInputParams<I>)
       })
     );
 
@@ -185,5 +161,9 @@ export class Node<I extends NodeInputs = any, O extends PortTypeKey = PortTypeKe
 
   getInPortIndex(port: Port) {
     return this.inputPorts.indexOf(port)
+  }
+
+  pushValue<T extends I, K extends T[number]["name"]>(value: InputTypeByKey<I, K>, portName: K) {
+    this.getInputStream(portName).next(value)
   }
 }
