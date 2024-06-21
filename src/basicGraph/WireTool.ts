@@ -30,14 +30,9 @@ class Idle extends StateNode {
 
     //create the wire, and bind it to target
     const wireId = createShapeId()
-    // const wireAnchor = calcShapeAnchor(this.editor, Mat.Identity(), target, { x: .5, y: .5 })
     this.editor.createShape({
       id: wireId,
       type: 'wire',
-      // props: {
-      //   start: wireAnchor,
-      //   end: this.editor.inputs.currentPagePoint.toJson()
-      // }
     })
 
     this.editor.createBinding({
@@ -76,10 +71,9 @@ class ConnectingNodes extends StateNode {
     if (this.checkValidBind(target)) {
       this.bindEndWire(target)
       this.editor.setCurrentTool('select')
-      // this.exit(info, 'wire')
+
       this.editor.setSelectedShapes([])
       this.parent.transition('idle')
-      // this.exit(info, 'wire')
     }
   }
 
@@ -87,15 +81,14 @@ class ConnectingNodes extends StateNode {
     const target = getShapeAtCursor(this.editor, this.currentWireId)
     if (this.checkValidBind(target)) {
       this.bindEndWire(target)
+
       this.editor.setSelectedShapes([])
       this.parent.transition('idle')
-      // this.exit(info, 'wire')
     }
     else {
       this.editor.deleteShape(this.currentWireId!)
       this.editor.setSelectedShapes([])
       this.parent.transition('idle')
-      // this.exit(info, 'wire')
     }
   }
 
@@ -116,7 +109,6 @@ class ConnectingNodes extends StateNode {
     this.currentWireId = undefined
     this.editor.setSelectedShapes([])
     this.parent.transition('idle')
-
   }
 
   /**
@@ -126,13 +118,7 @@ class ConnectingNodes extends StateNode {
     if (target === undefined) {
       return false
     }
-    console.log(this.currentWireId)
     const wireShape = this.editor.getShape(this.currentWireId!)!
-    console.log(wireShape)
-    const boundShapes = this.editor.getBindingsFromShape(wireShape, 'wire')
-    console.log(boundShapes)
-    console.log(boundShapes[0])
-    console.log(boundShapes[0].toId)
     const startShapeId = this.editor.getBindingsFromShape(wireShape, 'wire')[0].toId
 
     const targetIsStartShape = target?.id == startShapeId
@@ -141,13 +127,6 @@ class ConnectingNodes extends StateNode {
   }
 
   bindEndWire(target: TLShape) {
-    // const wireAnchor = calcShapeAnchor(this.editor, Mat.Identity(), target, { x: .5, y: .5 })
-
-    this.editor.updateShape({
-      id: this.currentWireId!,
-      type: "wire",
-      // props: { end: wireAnchor }
-    })
 
     this.editor.createBinding({
       type: 'wire',
