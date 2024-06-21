@@ -1,5 +1,6 @@
 import {
   DefaultToolbar, DefaultToolbarContent,
+  TLUiAssetUrlOverrides,
   TLUiComponents, TLUiOverrides, Tldraw,
   TldrawUiMenuItem, useIsToolSelected, useTools
 } from 'tldraw'
@@ -23,8 +24,17 @@ export default function BasicTldrawGraph() {
       tools={[WireTool]}
       overrides={overrides}
       components={components}
+      assetUrls={customAssetURLs}
     />
   )
+}
+
+export const customAssetURLs: TLUiAssetUrlOverrides = {
+  icons: {
+    'pi-symbol': 'pi-symbol.svg',
+    'network': 'network.svg',
+    'wire': 'wire.svg',
+  }
 }
 
 const overrides: TLUiOverrides = {
@@ -32,8 +42,8 @@ const overrides: TLUiOverrides = {
     schema['wire'] = {
       id: 'wire',
       label: 'wire',
-      icon: 'heart-icon',
-      kbd: 'p',
+      icon: 'wire',
+      kbd: 'w',
       onSelect: () => {
         editor.setCurrentTool('wire')
       },
