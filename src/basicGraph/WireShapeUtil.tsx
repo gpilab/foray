@@ -1,10 +1,16 @@
 import {
   DefaultColorStyle,
   Mat,
-  Polyline2d, RecordPropsType, SVGContainer, ShapeUtil, TLBaseShape,
+  Polyline2d, RecordPropsType, SVGContainer, ShapeUtil, T, TLBaseShape,
+  TLOnResizeEndHandler,
   TLOnResizeHandler,
+  TLOnResizeStartHandler,
+  TLOnRotateEndHandler,
   TLOnRotateHandler,
+  TLOnRotateStartHandler,
+  TLOnTranslateEndHandler,
   TLOnTranslateHandler,
+  TLOnTranslateStartHandler,
   Vec, VecModel,
   getDefaultColorTheme, useIsDarkMode,
   vecModelValidator
@@ -13,6 +19,7 @@ import { WireBinding } from './WireBindingUtil'
 
 export const wireShapeProps = {
   color: DefaultColorStyle,
+  isPlacing: T.boolean,
   start: vecModelValidator,
   end: vecModelValidator,
 }
@@ -32,6 +39,7 @@ export class WireShapeUtil extends ShapeUtil<WireShape> {
       color: 'black' as const,
       start: { x: 0, y: 0 },
       end: { x: 50, y: 100 },
+      isPlacing: true
     }
   }
 
@@ -50,9 +58,18 @@ export class WireShapeUtil extends ShapeUtil<WireShape> {
 
 
   //Don't allow user mutations, shape will be calculated only using bound shapes
+  override onRotateStart: TLOnRotateStartHandler<WireShape> = (shape) => shape
+  override onRotateEnd: TLOnRotateEndHandler<WireShape> = (initial, _current) => initial
   override onRotate: TLOnRotateHandler<WireShape> = (initial, _current) => initial
+
   override onTranslate: TLOnTranslateHandler<WireShape> = (initial, _current) => initial
+  override onTranslateStart: TLOnTranslateStartHandler<WireShape> = (shape) => shape
+  override onTranslateEnd: TLOnTranslateEndHandler<WireShape> = (initial, _current) => initial
+
   override onResize: TLOnResizeHandler<WireShape> = (initial, _current) => initial
+  override onResizeStart: TLOnResizeStartHandler<WireShape> = (shape) => shape
+  override onResizeEnd: TLOnResizeEndHandler<WireShape> = (initial, _current) => initial
+
 
 
   override getGeometry(shape: WireShape) {
@@ -97,6 +114,7 @@ export class WireShapeUtil extends ShapeUtil<WireShape> {
     const startBinding = bindings.find(b => b.props.terminal === "start")
     if (startBinding === undefined) {
       console.log("rendering line without start!")
+      console.log(bindings)
       return {
         start: { x: 0, y: 0 },
         end: { x: 0, y: 0 }

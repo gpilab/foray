@@ -1,5 +1,5 @@
 import {
-  BindingOnShapeDeleteOptions, BindingOnShapeIsolateOptions,
+  BindingOnDeleteOptions,
   BindingUtil, TLBaseBinding
 } from 'tldraw'
 
@@ -19,17 +19,8 @@ export class WireBindingUtil extends BindingUtil<WireBinding> {
       terminal: "start" as const
     }
   }
-
-  // when the thing we're stuck to is deleted, delete the wire too 
-  override onBeforeDeleteToShape({ binding }: BindingOnShapeDeleteOptions<WireBinding>): void {
-    this.editor.deleteShape(binding.fromId)
-  }
-
-  override onBeforeIsolateFromShape(options: BindingOnShapeIsolateOptions<WireBinding>): void {
-    this.editor.deleteShape(options.binding.fromId)
-  }
-
-  override onBeforeIsolateToShape(options: BindingOnShapeIsolateOptions<WireBinding>): void {
+  //cleanup wire shape when binding is deleted.
+  onAfterDelete(options: BindingOnDeleteOptions<WireBinding>): void {
     this.editor.deleteShape(options.binding.fromId)
   }
 }

@@ -12,12 +12,14 @@ export class WireTool extends StateNode {
 class Idle extends StateNode {
   static override id = 'idle'
 
-
   override onEnter = () => {
     this.editor.setCursor({ type: 'cross', rotation: 0 })
   }
 
   override onCancel = () => {
+    this.editor.setCurrentTool('select')
+  }
+  override onComplete = () => {
     this.editor.setCurrentTool('select')
   }
 
@@ -30,6 +32,8 @@ class Idle extends StateNode {
 
     //create the wire, and bind it to target
     const wireId = createShapeId()
+
+    this.editor.mark(`creating: ${wireId}`)
     this.editor.createShape({
       id: wireId,
       type: 'wire',
@@ -43,7 +47,6 @@ class Idle extends StateNode {
         terminal: "start"
       },
     })
-    this.editor.setSelectedShapes([wireId])
     this.parent.transition("connecting_nodes", wireId)
   }
 }
@@ -53,6 +56,7 @@ class ConnectingNodes extends StateNode {
   currentWireId?: TLShapeId
 
   onEnter = (wireId: TLShapeId) => {
+    console.log("onEnter")
     //keep track of the current wire we are working with
     this.currentWireId = wireId
   }
@@ -63,17 +67,13 @@ class ConnectingNodes extends StateNode {
       type: "wire",
       props: { end: this.editor.inputs.currentPagePoint.toJson() }
     })
-
   }
 
   override onPointerUp: TLEventHandlers['onPointerUp'] = (_info) => {
     const target = getShapeAtCursor(this.editor, this.currentWireId)
     if (this.checkValidBind(target)) {
       this.bindEndWire(target)
-      this.editor.setCurrentTool('select')
-
-      this.editor.setSelectedShapes([])
-      this.parent.transition('idle')
+      this.complete()
     }
   }
 
@@ -81,35 +81,64 @@ class ConnectingNodes extends StateNode {
     const target = getShapeAtCursor(this.editor, this.currentWireId)
     if (this.checkValidBind(target)) {
       this.bindEndWire(target)
-
-      this.editor.setSelectedShapes([])
-      this.parent.transition('idle')
+      this.complete()
     }
     else {
-      this.editor.deleteShape(this.currentWireId!)
-      this.editor.setSelectedShapes([])
-      this.parent.transition('idle')
+      this.cancel()
     }
   }
 
-
-  override onCancel: TLEventHandlers['onCancel'] = () => {
-    this.cancel()
+  cancel = () => {
+    console.log("myCancel")
+    this.editor.deleteShape(this.currentWireId!)
+    this.complete()
   }
 
-  override onComplete: TLEventHandlers['onComplete'] = () => {
-    this.cancel()
-  }
-
-  override onInterrupt: TLEventHandlers['onInterrupt'] = () => {
-    this.cancel()
-  }
-
-  cancel() {
+  complete = () => {
+    console.log("myComplete")
+    this.editor.mark(`creating: ${this.currentWireId}`)
     this.currentWireId = undefined
-    this.editor.setSelectedShapes([])
-    this.parent.transition('idle')
+
+    if (this.editor.getInstanceState().isToolLocked) {
+      this.parent.transition('idle')
+    } else {
+      this.editor.setCurrentTool('select.idle')
+    }
   }
+
+  override onExit = () => {
+    console.log("onExit")
+    if (this.currentWireId !== undefined) {
+      console.log("Wire not cleaned up yet!")
+      this.editor.deleteShape(this.currentWireId!)
+      this.currentWireId = undefined
+    }
+  }
+
+  /**
+   * Runs when right click during action. CONFUSINGLY NAMED!(to me)
+   */
+  override onComplete: TLEventHandlers['onComplete'] = () => {
+    console.log("onComplete")
+    this.cancel()
+  }
+
+  /**
+   * Runs when right click during action. CONFUSINGLY NAMED!(to me)
+   */
+  override onCancel = () => {
+    console.log("onCancel")
+    this.cancel()
+  }
+
+  /**
+   * 
+   */
+  override onInterrupt = () => {
+    console.log("onInterupt")
+    this.cancel()
+  }
+
 
   /**
    * Wire can (currently) bind to any shape other than the start shape
@@ -127,7 +156,7 @@ class ConnectingNodes extends StateNode {
   }
 
   bindEndWire(target: TLShape) {
-
+    this.editor.sendToBack([this.currentWireId!]) //wires in the back looks better
     this.editor.createBinding({
       type: 'wire',
       fromId: this.currentWireId!,
@@ -136,9 +165,7 @@ class ConnectingNodes extends StateNode {
         terminal: "end"
       },
     })
-
   }
-
 }
 
 function getShapeAtCursor(editor: Editor, excludeId?: TLShapeId): TLShape | undefined {
@@ -147,7 +174,6 @@ function getShapeAtCursor(editor: Editor, excludeId?: TLShapeId): TLShape | unde
     filter: (potentialTarget) =>
       editor.canBindShapes({ fromShape: { type: "wire" }, toShape: potentialTarget, binding: 'wire' })
       && potentialTarget.id !== excludeId
-
   })
   return target
 }
