@@ -163,7 +163,7 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
   indicator(shape: NodeShape) {
     return <rect rx={5}
       strokeWidth={nodeStrokeWidth}
-      strokeOpacity={.2}
+      strokeOpacity={.5}
       width={shape.props.width}
       height={shape.props.height} />
   }
