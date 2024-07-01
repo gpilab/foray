@@ -1,3 +1,4 @@
+import { TLDefaultColorStyle } from 'tldraw';
 import { ValidPortTypes, Node, PortTypeKey, Port } from './node.ts';
 
 export type AlgebraicExpression =
@@ -55,10 +56,10 @@ export function port2<
     { name: name2, portType: type2 }]
 }
 
-export const portColorMap: Record<keyof ValidPortTypes, string> = {
-  "string": "goldenrod",
-  "number": "purple",
-  "numberArray": "blue",
+export const portColorMap: Record<keyof ValidPortTypes, TLDefaultColorStyle> = {
+  "string": "orange",
+  "number": "violet",
+  "numberArray": "light-blue",
   "boolean": "green",
 }
 

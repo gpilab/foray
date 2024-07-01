@@ -1,4 +1,6 @@
-import { Editor, StateNode, TLEventHandlers, TLShape, TLShapeId, createShapeId } from "tldraw"
+import { Editor, StateNode, TLEventHandlers, TLShape, TLShapeId, VecLike, createShapeId } from "tldraw"
+import { NodeShapeUtil, NodeShape } from "./nodeShapeUtil"
+import { WireBinding } from "./WireBindingUtil"
 
 
 
@@ -17,19 +19,51 @@ class Idle extends StateNode {
   }
 
   override onCancel = () => {
-    this.editor.setCurrentTool('select')
+    if (this.editor.getInstanceState().isToolLocked) {
+      this.parent.transition('idle')
+    } else {
+      this.editor.setCurrentTool('select.idle')
+    }
   }
   override onComplete = () => {
-    this.editor.setCurrentTool('select')
+    if (this.editor.getInstanceState().isToolLocked) {
+      this.parent.transition('idle')
+    } else {
+      this.editor.setCurrentTool('select.idle')
+    }
+  }
+  override onDoubleClick: TLEventHandlers['onDoubleClick'] = (_info) => {
+    const { inputs } = this.editor
+    const { currentPagePoint } = inputs
+
+    //create the wire, and bind it to target
+    const nodeId = createShapeId()
+
+    this.editor.mark(`creating: ${nodeId}`)
+    this.editor.createShape({
+      id: nodeId,
+      type: 'node',
+      x: currentPagePoint.x,
+      y: currentPagePoint.y
+    })
+
+    //stop tldraw from inserting text shape
+    this.editor.cancelDoubleClick();
+
+    this.onComplete()
   }
 
   override onPointerDown: TLEventHandlers['onPointerDown'] = (_info) => {
     const target = getShapeAtCursor(this.editor)
 
-    if (target === undefined) {
+    if (target?.type !== "node") {
       return
     }
 
+
+    const pagePoint = this.editor.inputs.currentPagePoint
+    const relativeShapePoint = this.editor.getPointInShapeSpace(target, pagePoint)
+    const port = NodeShapeUtil.getNearestPortFromPoint(target as NodeShape, "all", relativeShapePoint)!
     //create the wire, and bind it to target
     const wireId = createShapeId()
 
@@ -37,17 +71,35 @@ class Idle extends StateNode {
     this.editor.createShape({
       id: wireId,
       type: 'wire',
+      // line rendering currently expects this to start as x,y == 0,0. 
+      // x,y are free to change after initial drawing is complete
+      x: pagePoint.x,
+      y: pagePoint.y
     })
-
+    this.editor.sendToBack([wireId])
     this.editor.createBinding({
       type: 'wire',
       fromId: wireId,
       toId: target.id,
       props: {
-        terminal: "start"
+        terminal: "start",
+        portname: port.name  //TODO should be able to create ports starting from inputs
       },
     })
     this.parent.transition("connecting_nodes", wireId)
+  }
+  override onRightClick: TLEventHandlers['onRightClick'] = (_info) => {
+    const target = getShapeAtCursor(this.editor)
+    if (target?.type !== "node") {
+      return
+    }
+
+    const pagePoint = this.editor.inputs.currentPagePoint
+    const relativeShapePoint = this.editor.getPointInShapeSpace(target, pagePoint)
+    const port = NodeShapeUtil.getNearestPortFromPoint(target as NodeShape, "all", relativeShapePoint)!
+
+    deleteBindingsAtPort(this.editor, target.id, port.name)
+    //TODO handle transition back to select idle better.
   }
 }
 
@@ -56,7 +108,6 @@ class ConnectingNodes extends StateNode {
   currentWireId?: TLShapeId
 
   onEnter = (wireId: TLShapeId) => {
-    console.log("onEnter")
     //keep track of the current wire we are working with
     this.currentWireId = wireId
   }
@@ -71,31 +122,32 @@ class ConnectingNodes extends StateNode {
 
   override onPointerUp: TLEventHandlers['onPointerUp'] = (_info) => {
     const target = getShapeAtCursor(this.editor, this.currentWireId)
-    if (this.checkValidBind(target)) {
-      this.bindEndWire(target)
-      this.complete()
+
+    if (!this.checkValidBind(target)) {
+      return
     }
+
+    this.bindEndWire(target, this.editor.inputs.currentPagePoint)
+    this.complete()
   }
 
   override onPointerDown: TLEventHandlers['onPointerDown'] = (_info) => {
     const target = getShapeAtCursor(this.editor, this.currentWireId)
-    if (this.checkValidBind(target)) {
-      this.bindEndWire(target)
-      this.complete()
-    }
-    else {
+    if (!this.checkValidBind(target)) {
       this.cancel()
+      return
     }
-  }
 
-  cancel = () => {
-    console.log("myCancel")
-    this.editor.deleteShape(this.currentWireId!)
+    this.bindEndWire(target, this.editor.inputs.currentPagePoint)
     this.complete()
   }
 
+  cancel = () => {
+    this.editor.deleteShape(this.currentWireId!)
+    this.editor.setCurrentTool('select.idle')
+  }
+
   complete = () => {
-    console.log("myComplete")
     this.editor.mark(`creating: ${this.currentWireId}`)
     this.currentWireId = undefined
 
@@ -107,7 +159,6 @@ class ConnectingNodes extends StateNode {
   }
 
   override onExit = () => {
-    console.log("onExit")
     if (this.currentWireId !== undefined) {
       console.log("Wire not cleaned up yet!")
       this.editor.deleteShape(this.currentWireId!)
@@ -119,23 +170,13 @@ class ConnectingNodes extends StateNode {
    * Runs when right click during action. CONFUSINGLY NAMED!(to me)
    */
   override onComplete: TLEventHandlers['onComplete'] = () => {
-    console.log("onComplete")
     this.cancel()
   }
 
-  /**
-   * Runs when right click during action. CONFUSINGLY NAMED!(to me)
-   */
   override onCancel = () => {
-    console.log("onCancel")
     this.cancel()
   }
-
-  /**
-   * 
-   */
   override onInterrupt = () => {
-    console.log("onInterupt")
     this.cancel()
   }
 
@@ -143,29 +184,57 @@ class ConnectingNodes extends StateNode {
   /**
    * Wire can (currently) bind to any shape other than the start shape
   */
-  checkValidBind(target: TLShape | undefined): target is TLShape {
-    if (target === undefined) {
+  checkValidBind(target: TLShape | undefined): target is NodeShape {
+    if (target?.type !== "node") {
       return false
     }
     const wireShape = this.editor.getShape(this.currentWireId!)!
     const startShapeId = this.editor.getBindingsFromShape(wireShape, 'wire')[0].toId
 
-    const targetIsStartShape = target?.id == startShapeId
+    const targetIsStartShape = target.id == startShapeId
 
     return !targetIsStartShape
   }
 
-  bindEndWire(target: TLShape) {
-    this.editor.sendToBack([this.currentWireId!]) //wires in the back looks better
+  bindEndWire(target: NodeShape, pagePoint: VecLike) {
+    const relativeShapePoint = this.editor.getPointInShapeSpace(target, pagePoint)
+    const port = NodeShapeUtil.getNearestPortFromPoint(target, "in", relativeShapePoint)!
+    if (port === undefined) {
+      //no valid port found
+      this.cancel()
+    }
+
+    //get the port the pointer is over
+    this.editor.sendToBack([this.currentWireId!]) //wires in background looks better
+    this.editor.updateShape({
+      id: this.currentWireId!,
+      type: "wire",
+    })
+
+    //override any existing bindings on this input port
+    deleteBindingsAtPort(this.editor, target.id, port.name)
     this.editor.createBinding({
       type: 'wire',
       fromId: this.currentWireId!,
       toId: target.id,
       props: {
-        terminal: "end"
+        terminal: "end",
+        portName: port.name
       },
     })
   }
+}
+
+function deleteBindingsAtPort(editor: Editor, nodeShapeId: TLShapeId, portName: string) {
+  const nodeBindings = editor.getBindingsToShape(nodeShapeId, "wire") as WireBinding[]
+  const toDelete = nodeBindings.filter(b => b.props.portName == portName)
+
+  //if we lock wires, we must unlock the wires so they can get deleted
+  // const wireUpdates = toDelete.map(s => s.fromId)
+  //   .map(wireShapeId => ({ id: wireShapeId, type: "wire", isLocked: false }))
+  // editor.updateShapes(wireUpdates)
+
+  editor.deleteBindings(toDelete)
 }
 
 function getShapeAtCursor(editor: Editor, excludeId?: TLShapeId): TLShape | undefined {

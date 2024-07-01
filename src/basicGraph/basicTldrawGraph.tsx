@@ -10,6 +10,7 @@ import '../App.css'
 import { WireShapeUtil } from './WireShapeUtil'
 import { WireBindingUtil } from './WireBindingUtil'
 import { WireTool } from './WireTool'
+import { NodeShapeUtil } from './nodeShapeUtil'
 
 export default function BasicTldrawGraph() {
   return (
@@ -19,7 +20,7 @@ export default function BasicTldrawGraph() {
       onMount={(editor) => {
         ; (window as any).editor = editor
       }}
-      shapeUtils={[WireShapeUtil]}
+      shapeUtils={[WireShapeUtil, NodeShapeUtil]}
       bindingUtils={[WireBindingUtil]}
       tools={[WireTool]}
       overrides={overrides}

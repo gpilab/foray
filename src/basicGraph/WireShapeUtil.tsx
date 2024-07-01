@@ -1,30 +1,24 @@
 import {
   DefaultColorStyle,
+  Editor,
   Mat,
-  Polyline2d, RecordPropsType, SVGContainer, ShapeUtil, T, TLBaseShape,
+  Polyline2d, RecordPropsType, SVGContainer, ShapeUtil, TLBaseShape,
   TLDefaultColorStyle,
-  TLOnResizeEndHandler,
-  TLOnResizeHandler,
-  TLOnResizeStartHandler,
-  TLOnRotateEndHandler,
-  TLOnRotateHandler,
-  TLOnRotateStartHandler,
-  TLOnTranslateEndHandler,
-  TLOnTranslateHandler,
-  TLOnTranslateStartHandler,
+  TLOnBeforeUpdateHandler,
   Vec,
+  VecLike,
   getDefaultColorTheme,
+  lerp,
+  track,
   useEditor,
   useIsDarkMode,
-  vecModelValidator
 } from 'tldraw'
 import { WireBinding } from './WireBindingUtil'
+import { NodeShapeUtil } from './nodeShapeUtil'
+import { NodeShape } from '../tools/node/NodeShapeUtil'
 
 export const wireShapeProps = {
   color: DefaultColorStyle,
-  isPlacing: T.boolean,
-  start: vecModelValidator,
-  end: vecModelValidator,
 }
 
 type WireShapeProps = RecordPropsType<typeof wireShapeProps>
@@ -38,12 +32,7 @@ export class WireShapeUtil extends ShapeUtil<WireShape> {
   static override type = 'wire' as const
 
   override getDefaultProps() {
-    return {
-      color: 'black' as const,
-      start: { x: 0, y: 0 },
-      end: { x: 50, y: 100 },
-      isPlacing: true,
-    }
+    return { color: 'grey' as const, }
   }
 
   canSnap = () => false
@@ -52,56 +41,47 @@ export class WireShapeUtil extends ShapeUtil<WireShape> {
     return true //TODO make specific binding requirements
   }
   override canEdit = () => false
-  override canResize = () => false
-  override hideRotateHandle = () => true
   override isAspectRatioLocked = () => false
   override canBeLaidOut = () => false
+
   override hideSelectionBoundsBg = () => true
   override hideSelectionBoundsFg = () => true
+  override hideRotateHandle = () => true
+  override canResize = () => false
+
+  override onBeforeUpdate: TLOnBeforeUpdateHandler<WireShape> = (_prev, next) => {
+    // workaround to prevent the wire from blowing in some group resizing scenarios
+    // wire rendering only depends start and end shapes, so we don't actually need x,y to update
+    return { ...next, x: 0, y: 0 }
+  }
 
 
-  //Don't allow user mutations, shape will be calculated only using bound shapes
-  override onRotateStart: TLOnRotateStartHandler<WireShape> = (shape) => shape
-  override onRotateEnd: TLOnRotateEndHandler<WireShape> = (initial, _current) => initial
-  override onRotate: TLOnRotateHandler<WireShape> = (initial, _current) => initial
-
-  override onTranslate: TLOnTranslateHandler<WireShape> = (initial, _current) => initial
-  override onTranslateStart: TLOnTranslateStartHandler<WireShape> = (shape) => shape
-  override onTranslateEnd: TLOnTranslateEndHandler<WireShape> = (initial, _current) => initial
-
-  override onResize: TLOnResizeHandler<WireShape> = (initial, _current) => initial
-  override onResizeStart: TLOnResizeStartHandler<WireShape> = (shape) => shape
-  override onResizeEnd: TLOnResizeEndHandler<WireShape> = (initial, _current) => initial
-
-
-
-  override getGeometry(shape: WireShape) {
-    const { start, end } = this.getLineShape(shape)
-
+  override getGeometry(wireShape: WireShape) {
+    const { start, end } = WireShapeUtil.getLineShape(wireShape, this.editor)
     return new Polyline2d({ points: [Vec.From(start), Vec.From(end)] })
   }
 
-  override component(shape: WireShape) {
+  override component(wireShape: WireShape) {
     const editor = useEditor()
-    const { start, end } = this.getLineShape(shape)
+    const { start, end } = WireShapeUtil.getLineShape(wireShape, editor)
 
-    return <LineComponent color={shape.props.color}
-      shape={shape}
+    return <LineComponent color={wireShape.props.color}
+      wireShape={wireShape}
       end={end}
       start={start}
-      strokeWidth={3}
-      debug={true}
+      strokeWidth={2}
+      debug={false}
       isSelected={editor.getSelectedShapeIds()
-        .indexOf(shape.id) != -1
+        .indexOf(wireShape.id) != -1
       }
     />
   }
 
-  override indicator(shape: WireShape) {
-    const { start, end } = this.getLineShape(shape)
+  override indicator(wireShape: WireShape) {
+    const { start, end } = WireShapeUtil.getLineShape(wireShape, this.editor)
 
     return <LineComponent color={"blue"}
-      shape={shape}
+      wireShape={wireShape}
       end={end}
       start={start}
       strokeWidth={1}
@@ -111,8 +91,8 @@ export class WireShapeUtil extends ShapeUtil<WireShape> {
   /**
    * Calcualte a start and end wire position using the shapes bound to the wire
    */
-  getLineShape(shape: WireShape): { start: Vec, end: Vec } {
-    const bindings = this.editor.getBindingsFromShape<WireBinding>(shape, "wire")
+  static getLineShape(wireShape: WireShape, editor: Editor): { start: Vec, end: Vec } {
+    const bindings = editor.getBindingsFromShape<WireBinding>(wireShape, "wire")
     const startBinding = bindings.find(b => b.props.terminal === "start")
 
     if (startBinding === undefined) {
@@ -124,42 +104,38 @@ export class WireShapeUtil extends ShapeUtil<WireShape> {
       }
     }
 
-    const start = this.getTerminalInWireSpace(shape, startBinding)
+    const start = WireShapeUtil.getTerminalInWireSpace(wireShape, startBinding, editor)
     const endBinding = bindings.find(b => b.props.terminal === "end")
 
     if (endBinding === undefined) {
       // If there isn't an end yet, use current mouse position as the end point
+      const pointInShapeSpace = editor.getPointInShapeSpace(wireShape, editor.inputs.currentPagePoint)
       return {
         start: start,
-        end: this.editor.inputs.currentPagePoint
+        end: pointInShapeSpace
       }
     }
 
-    const end = this.getTerminalInWireSpace(shape, endBinding)
+    const end = WireShapeUtil.getTerminalInWireSpace(wireShape, endBinding, editor)
     return { start: start, end: end }
   }
 
   /**
-   * Inspiration from tldraw straight arrow calculation
+   * get the wire start/end point relative to the wire's transform
    */
-  getTerminalInWireSpace(wireShape: WireShape, binding: WireBinding) {
-    const { point, size } = this.editor.getShapeGeometry(binding.toId).bounds
-    const shapePoint = Vec.Add(
-      point,
-      Vec.MulV({ x: 0.5, y: 0.5 }, size)
-    )
+  static getTerminalInWireSpace(wireShape: WireShape, binding: WireBinding, editor: Editor) {
+    const boundShape = editor.getShape(binding.toId)! as NodeShape
+    const ioType = binding.props.terminal === "start" ? "out" : "in"
 
-    const arrowPageTransform = this.editor.getShapePageTransform(wireShape)!
-    const pagePoint = Mat.applyToPoint(
-      this.editor.getShapePageTransform(binding.toId)!,
-      shapePoint
-    )
-    const linePoint = Mat.applyToPoint(
-      Mat.Inverse(arrowPageTransform),
-      pagePoint
-    )
+    const portRelativeLoc = NodeShapeUtil.getRelativePortLocation(boundShape, ioType, binding.props.portName)
 
-    return linePoint
+    //account for node's translation,rotation, and scale
+    const boundShapeTransform = editor.getShapePageTransform(boundShape)
+    const pagePoint = Mat.applyToPoint(boundShapeTransform, portRelativeLoc)
+
+    const wirePoint = editor.getPointInShapeSpace(wireShape, pagePoint)
+
+    return wirePoint
   }
 }
 
@@ -169,12 +145,12 @@ type LineProps = {
   end: Vec,
   strokeWidth: number,
   color: TLDefaultColorStyle,
-  shape: WireShape,
+  wireShape: WireShape,
   debug?: boolean
   isSelected?: boolean
 }
 
-function LineComponent({ shape, start, end, color, strokeWidth, debug = false, isSelected = false }: LineProps) {
+const LineComponent = track(({ wireShape, start, end, color, strokeWidth, debug = false, isSelected = false }: LineProps) => {
   const isDarkMode = useIsDarkMode()
   const theme = getDefaultColorTheme({ isDarkMode: isDarkMode })
   const colorVal = theme[color].solid
@@ -187,7 +163,7 @@ function LineComponent({ shape, start, end, color, strokeWidth, debug = false, i
   const arrowLeg2 = Vec.Rot(arrowLegUnit, -radians).add(center).toJson()
 
   return (
-    <SVGContainer id={shape.id} style={{ pointerEvents: "none" }}>
+    <SVGContainer id={wireShape.id} style={{ pointerEvents: "none" }}>
       <g stroke={colorVal}
         fill="none"
         strokeWidth={strokeWidth}
@@ -195,14 +171,15 @@ function LineComponent({ shape, start, end, color, strokeWidth, debug = false, i
         strokeLinecap="round"
         pointerEvents="none"
       >
-        <path
-          d={`M ${start.x} ${start.y} L${end.x} ${end.y}`} />
-        <g strokeWidth={strokeWidth * .75} opacity={.1}>
-          <path id="dir_ind_1"
-            d={`M ${center.x} ${center.y} L${arrowLeg1.x} ${arrowLeg1.y}`} />
-          <path id="dir_ind_2"
-            d={`M ${center.x} ${center.y} L${arrowLeg2.x} ${arrowLeg2.y}`} />
-        </g>
+        <BezierS start={start} end={end} intensity={0.5} />
+        {debug ?
+          <g strokeWidth={strokeWidth * .5} opacity={.5}>
+            <path id="dir_ind_1"
+              d={`M ${center.x} ${center.y} L${arrowLeg1.x} ${arrowLeg1.y}`} />
+            <path id="dir_ind_2"
+              d={`M ${center.x} ${center.y} L${arrowLeg2.x} ${arrowLeg2.y}`} />
+          </g>
+          : ""}
         {debug && isSelected ? <g strokeWidth={.5} opacity={.5}>
           <path stroke="#00cccc" id="start"
             d={`M 0 0 L ${start.x} ${start.y}`} />
@@ -218,4 +195,16 @@ function LineComponent({ shape, start, end, color, strokeWidth, debug = false, i
       </g>
     </SVGContainer>
   )
+})
+
+
+function BezierS(props: { start: VecLike, end: VecLike, intensity?: number }) {
+  const { start, end, intensity = .5 } = props
+  const c1 = lerp(start.y, end.y, intensity)
+  const c2 = lerp(start.y, end.y, 1 - intensity)
+  return <path
+    d={`M ${start.x} ${start.y} 
+        C${start.x} ${c1}  
+        ${end.x} ${c2}  
+        ${end.x} ${end.y}`} />
 }
