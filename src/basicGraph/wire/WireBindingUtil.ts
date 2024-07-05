@@ -4,11 +4,13 @@ import {
   BindingOnShapeChangeOptions,
   BindingOnShapeIsolateOptions,
   BindingUtil, RecordPropsType, T, TLBaseBinding,
+  TLShapeId,
 } from 'tldraw'
+import { NodeShape } from '../node/nodeShapeUtil'
 
 const wireBindingProps = {
   terminal: T.literalEnum("start", "end"),
-  portName: T.optional(T.string)
+  portName: T.string
 }
 
 type WireBindingProps = RecordPropsType<typeof wireBindingProps>
@@ -62,58 +64,75 @@ export class WireBindingUtil extends BindingUtil<WireBinding> {
   }
 
   onAfterCreate(options: BindingOnCreateOptions<WireBinding>): void {
-    this.propogate(options.binding)
+    console.log("onAfterCreate")
+    if (options.binding.props.terminal == "end") {
+      console.log("initial propogation for end binding")
+      this.propogate(options.binding.fromId)
+    }
   }
 
   //start terminals propogate changes  FROM node TO wires
   onAfterChangeToShape(options: BindingOnShapeChangeOptions<WireBinding>): void {
     if (options.binding.props.terminal == "start") {
-      this.propogate(options.binding)
+      this.propogate(options.binding.fromId)
     }
   }
 
-  //end terminals propogate changes TO nodes FROM wires
-  onAfterChangeFromShape(options: BindingOnShapeChangeOptions<WireBinding>): void {
-    if (options.binding.props.terminal == "end") {
-      this.propogate(options.binding)
+  private propogate(wireShapeId: TLShapeId) {
+    //pass data from parentNode's output to childNode's input
+    const wireShape = this.editor.getShape(wireShapeId)!
+    const bindings = this.editor.getBindingsInvolvingShape<WireBinding>(wireShape)
+
+    const startBinding = bindings.find(b => b.props.terminal == "start")
+    const endBinding = bindings.find(b => b.props.terminal == "end")
+
+    if (startBinding === undefined) {
+      throw new Error(`Failed to find startBindng for wire: ${wireShapeId}, bindings: ${bindings.toString()}`)
     }
-  }
+    if (endBinding === undefined) {
+      throw new Error(`Failed to find endBinding for wire: ${wireShapeId}, bindings: ${bindings.toString()}`)
+    }
 
-  private propogate(binding: WireBinding) {
-    const { parentShape, childShape } = this.getParentChild(binding)
+    const parentNode = this.editor.getShape<NodeShape>(startBinding.toId)
+    const childNode = this.editor.getShape<NodeShape>(endBinding.toId)
 
-    if (!("color" in parentShape.props && "color" in childShape.props)) {
+    if (parentNode === undefined) {
+      throw new Error(`Failed to find parent node for wire: ${wireShapeId}`)
+    }
+    if (childNode === undefined) {
+      throw new Error(`Failed to find child node for wire: ${wireShapeId}`)
+    }
+
+    const parentOutPort = parentNode.props.output["out"]
+    const childInPort = childNode.props.inputs[endBinding.props.portName]
+
+
+    if (parentOutPort.value == childInPort.value) {
       return
     }
-    const newColor = parentShape.props.color
-    const oldColor = childShape.props.color
 
-    if (newColor == oldColor) {
-      return
-    }
+    const updatedInputs = structuredClone(childNode.props.inputs)
+    updatedInputs[childInPort.name] = { ...childInPort, value: parentOutPort.value }
 
-    console.log(`updating color from ${childShape.props.color} to `, newColor)
-    window.setTimeout(() => this.editor.updateShape({ id: childShape.id, type: childShape.type, props: { ...childShape.props, color: newColor } }), 100)
+
+    console.log(`updating port from ${childInPort.value} to ${parentOutPort.value}`)
+    // artificial delay for testing 
+    window.setTimeout(() =>
+      this.editor.updateShape({
+        id: childNode.id,
+        type: "node",
+        props: { ...childNode.props, inputs: updatedInputs }
+      }), 100)
   }
 
-  private getParentChild(binding: WireBinding) {
-    const { parentId, childId } = {
-      parentId: binding.props.terminal == "start" ? binding.toId : binding.fromId,
-      childId: binding.props.terminal == "start" ? binding.fromId : binding.toId
-    }
-    return {
-      parentShape: this.editor.getShape(parentId)!,
-      childShape: this.editor.getShape(childId)!
-    }
 
-  }
   //cleanup wire shape when binding is deleted.
   onAfterDelete(options: BindingOnDeleteOptions<WireBinding>): void {
     console.log("after delete binding", options)
     this.editor.deleteShape(options.binding.fromId)
   }
 
-  onBeforeIsolateToShape(options: BindingOnShapeIsolateOptions<WireBinding>): void {
+  _onBeforeIsolateToShape(options: BindingOnShapeIsolateOptions<WireBinding>): void {
     console.log("isolating to", options)
     this.editor.updateShape({ id: options.binding.fromId, type: "wire", isLocked: false })
   }

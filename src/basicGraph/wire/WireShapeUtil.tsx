@@ -1,8 +1,9 @@
 import {
+  CubicBezier2d,
   DefaultColorStyle,
   Editor,
   Mat,
-  Polyline2d, RecordPropsType, SVGContainer, ShapeUtil, TLBaseShape,
+  RecordPropsType, SVGContainer, ShapeUtil, T, TLBaseShape,
   TLDefaultColorStyle,
   TLOnBeforeUpdateHandler,
   Vec,
@@ -14,15 +15,15 @@ import {
   useIsDarkMode,
 } from 'tldraw'
 import { WireBinding } from './WireBindingUtil'
-import { NodeShapeUtil } from './nodeShapeUtil'
-import { NodeShape } from '../tools/node/NodeShapeUtil'
+import { NodeShape, NodeShapeUtil } from '../node/nodeShapeUtil'
 
 export const wireShapeProps = {
   color: DefaultColorStyle,
+  value: T.optional(T.any)
 }
 
 type WireShapeProps = RecordPropsType<typeof wireShapeProps>
-type WireShape = TLBaseShape<'wire', WireShapeProps>
+export type WireShape = TLBaseShape<'wire', WireShapeProps>
 
 
 /**
@@ -32,7 +33,7 @@ export class WireShapeUtil extends ShapeUtil<WireShape> {
   static override type = 'wire' as const
 
   override getDefaultProps() {
-    return { color: 'grey' as const, }
+    return { color: 'grey' as const, value: 1 }
   }
 
   canSnap = () => false
@@ -57,13 +58,13 @@ export class WireShapeUtil extends ShapeUtil<WireShape> {
 
 
   override getGeometry(wireShape: WireShape) {
-    const { start, end } = WireShapeUtil.getLineShape(wireShape, this.editor)
-    return new Polyline2d({ points: [Vec.From(start), Vec.From(end)] })
+    return WireGeometry(WireShapeUtil.getWireStartEnd(wireShape, this.editor)
+    )
   }
 
   override component(wireShape: WireShape) {
     const editor = useEditor()
-    const { start, end } = WireShapeUtil.getLineShape(wireShape, editor)
+    const { start, end } = WireShapeUtil.getWireStartEnd(wireShape, editor)
 
     return <LineComponent color={wireShape.props.color}
       wireShape={wireShape}
@@ -71,14 +72,13 @@ export class WireShapeUtil extends ShapeUtil<WireShape> {
       start={start}
       strokeWidth={2}
       debug={false}
-      isSelected={editor.getSelectedShapeIds()
-        .indexOf(wireShape.id) != -1
+      isSelected={editor.getSelectedShapeIds().includes(wireShape.id)
       }
     />
   }
 
   override indicator(wireShape: WireShape) {
-    const { start, end } = WireShapeUtil.getLineShape(wireShape, this.editor)
+    const { start, end } = WireShapeUtil.getWireStartEnd(wireShape, this.editor)
 
     return <LineComponent color={"blue"}
       wireShape={wireShape}
@@ -91,7 +91,7 @@ export class WireShapeUtil extends ShapeUtil<WireShape> {
   /**
    * Calcualte a start and end wire position using the shapes bound to the wire
    */
-  static getLineShape(wireShape: WireShape, editor: Editor): { start: Vec, end: Vec } {
+  static getWireStartEnd(wireShape: WireShape, editor: Editor): { start: Vec, end: Vec } {
     const bindings = editor.getBindingsFromShape<WireBinding>(wireShape, "wire")
     const startBinding = bindings.find(b => b.props.terminal === "start")
 
@@ -124,7 +124,7 @@ export class WireShapeUtil extends ShapeUtil<WireShape> {
    * get the wire start/end point relative to the wire's transform
    */
   static getTerminalInWireSpace(wireShape: WireShape, binding: WireBinding, editor: Editor) {
-    const boundShape = editor.getShape(binding.toId)! as NodeShape
+    const boundShape = editor.getShape(binding.toId) as NodeShape
     const ioType = binding.props.terminal === "start" ? "out" : "in"
 
     const portRelativeLoc = NodeShapeUtil.getRelativePortLocation(boundShape, ioType, binding.props.portName)
@@ -150,10 +150,10 @@ type LineProps = {
   isSelected?: boolean
 }
 
-const LineComponent = track(({ wireShape, start, end, color, strokeWidth, debug = false, isSelected = false }: LineProps) => {
+const LineComponent = track(({ wireShape, start, end, strokeWidth, debug = false, isSelected = false }: LineProps) => {
   const isDarkMode = useIsDarkMode()
   const theme = getDefaultColorTheme({ isDarkMode: isDarkMode })
-  const colorVal = theme[color].solid
+  const colorVal = theme["grey"].solid
 
   const startToEnd = Vec.Sub(end, start).toJson()
   const center = Vec.Div(startToEnd, 2).add(start).toJson()
@@ -171,7 +171,7 @@ const LineComponent = track(({ wireShape, start, end, color, strokeWidth, debug 
         strokeLinecap="round"
         pointerEvents="none"
       >
-        <BezierS start={start} end={end} intensity={0.5} />
+        <BezierS start={start} end={end} />
         {debug ?
           <g strokeWidth={strokeWidth * .5} opacity={.5}>
             <path id="dir_ind_1"
@@ -198,13 +198,35 @@ const LineComponent = track(({ wireShape, start, end, color, strokeWidth, debug 
 })
 
 
+function WireGeometry(props: { start: VecLike, end: VecLike }) {
+  const { start, end, } = props
+  const intensity = .5
+
+  const minYClearence = 50
+  const VerticalControlOffset = end.y > start.y
+    ? Math.max(end.y - start.y, minYClearence) // 
+    : lerp(minYClearence, 400, Math.min((start.y - end.y) / 500, 1))
+
+  const HorizontalControlOffset = end.y > start.y
+    ? 0
+    : lerp(0, (end.x - start.x) * 1.5, Math.max(Math.min((end.y - start.y) / 500, 1), -1))
+
+
+  const c1x = lerp(start.x, start.x - HorizontalControlOffset, intensity)
+  const c2x = lerp(end.x, end.x + HorizontalControlOffset, intensity)
+
+  const c1y = lerp(start.y, start.y + VerticalControlOffset, intensity)
+  const c2y = lerp(end.y, end.y - VerticalControlOffset, intensity)
+
+  return new CubicBezier2d({
+    start: Vec.From(start),
+    end: Vec.From(end),
+    cp1: Vec.From({ x: c1x, y: c1y }),
+    cp2: Vec.From({ x: c2x, y: c2y })
+  })
+}
+
+
 function BezierS(props: { start: VecLike, end: VecLike, intensity?: number }) {
-  const { start, end, intensity = .5 } = props
-  const c1 = lerp(start.y, end.y, intensity)
-  const c2 = lerp(start.y, end.y, 1 - intensity)
-  return <path
-    d={`M ${start.x} ${start.y} 
-        C${start.x} ${c1}  
-        ${end.x} ${c2}  
-        ${end.x} ${end.y}`} />
+  return <path d={WireGeometry(props).getSvgPathData()} />
 }

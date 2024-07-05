@@ -16,8 +16,6 @@
 
     /* Linting */
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
   "types": [
@@ -31,6 +29,7 @@
     "src/**/*.d.ts",
     "src/**/*.tsx",
     "tests/**/*.ts",
-    "tests/**/*.tsx"],
+    "tests/**/*.tsx",
+  "./eslint.config.js"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

@@ -7,19 +7,17 @@ import {
 
 import 'tldraw/tldraw.css'
 import '../App.css'
-import { WireShapeUtil } from './WireShapeUtil'
-import { WireBindingUtil } from './WireBindingUtil'
-import { WireTool } from './WireTool'
-import { NodeShapeUtil } from './nodeShapeUtil'
+import { WireShapeUtil } from './wire/WireShapeUtil'
+import { WireBindingUtil } from './wire/WireBindingUtil'
+import { WireTool } from './wire/WireTool'
+import { NodeShapeUtil } from './node/nodeShapeUtil'
+import { NodeStylePanel } from './node/nodeStylePanel'
 
 export default function BasicTldrawGraph() {
   return (
     <Tldraw
       persistenceKey="basicTldrawGraph"
       inferDarkMode
-      onMount={(editor) => {
-        ; (window as any).editor = editor
-      }}
       shapeUtils={[WireShapeUtil, NodeShapeUtil]}
       bindingUtils={[WireBindingUtil]}
       tools={[WireTool]}
@@ -56,6 +54,7 @@ const overrides: TLUiOverrides = {
 }
 
 const components: TLUiComponents = {
+  StylePanel: NodeStylePanel,
   Toolbar: (...props) => {
     const wire = useTools().wire
     const isWireSelected = useIsToolSelected(wire)

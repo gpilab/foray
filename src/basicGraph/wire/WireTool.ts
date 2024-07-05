@@ -1,5 +1,5 @@
 import { Editor, StateNode, TLEventHandlers, TLShape, TLShapeId, VecLike, createShapeId } from "tldraw"
-import { NodeShapeUtil, NodeShape } from "./nodeShapeUtil"
+import { NodeShapeUtil, NodeShape } from "../node/nodeShapeUtil"
 import { WireBinding } from "./WireBindingUtil"
 
 
@@ -63,7 +63,10 @@ class Idle extends StateNode {
 
     const pagePoint = this.editor.inputs.currentPagePoint
     const relativeShapePoint = this.editor.getPointInShapeSpace(target, pagePoint)
-    const port = NodeShapeUtil.getNearestPortFromPoint(target as NodeShape, "all", relativeShapePoint)!
+    const port = NodeShapeUtil.getNearestPortFromPoint(target as NodeShape, "all", relativeShapePoint)
+    if (port === undefined) {
+      return
+    }
     //create the wire, and bind it to target
     const wireId = createShapeId()
 
@@ -96,9 +99,10 @@ class Idle extends StateNode {
 
     const pagePoint = this.editor.inputs.currentPagePoint
     const relativeShapePoint = this.editor.getPointInShapeSpace(target, pagePoint)
-    const port = NodeShapeUtil.getNearestPortFromPoint(target as NodeShape, "all", relativeShapePoint)!
-
-    deleteBindingsAtPort(this.editor, target.id, port.name)
+    const port = NodeShapeUtil.getNearestPortFromPoint(target as NodeShape, "all", relativeShapePoint)
+    if (port !== undefined) {
+      deleteBindingsAtPort(this.editor, target.id, port.name)
+    }
     //TODO handle transition back to select idle better.
   }
 }
@@ -161,7 +165,7 @@ class ConnectingNodes extends StateNode {
   override onExit = () => {
     if (this.currentWireId !== undefined) {
       console.log("Wire not cleaned up yet!")
-      this.editor.deleteShape(this.currentWireId!)
+      this.editor.deleteShape(this.currentWireId)
       this.currentWireId = undefined
     }
   }
@@ -198,10 +202,11 @@ class ConnectingNodes extends StateNode {
 
   bindEndWire(target: NodeShape, pagePoint: VecLike) {
     const relativeShapePoint = this.editor.getPointInShapeSpace(target, pagePoint)
-    const port = NodeShapeUtil.getNearestPortFromPoint(target, "in", relativeShapePoint)!
+    const port = NodeShapeUtil.getNearestPortFromPoint(target, "in", relativeShapePoint)
     if (port === undefined) {
       //no valid port found
       this.cancel()
+      return
     }
 
     //get the port the pointer is over
@@ -226,7 +231,7 @@ class ConnectingNodes extends StateNode {
 }
 
 function deleteBindingsAtPort(editor: Editor, nodeShapeId: TLShapeId, portName: string) {
-  const nodeBindings = editor.getBindingsToShape(nodeShapeId, "wire") as WireBinding[]
+  const nodeBindings = editor.getBindingsToShape<WireBinding>(nodeShapeId, "wire")
   const toDelete = nodeBindings.filter(b => b.props.portName == portName)
 
   //if we lock wires, we must unlock the wires so they can get deleted
