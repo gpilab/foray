@@ -93,8 +93,10 @@ export class WireBindingUtil extends BindingUtil<WireBinding> {
       throw new Error(`Failed to find endBinding for wire: ${wireShapeId}, bindings: ${bindings.toString()}`)
     }
 
-    const parentNode = this.editor.getShape<NodeShape>(startBinding.toId)
-    const childNode = this.editor.getShape<NodeShape>(endBinding.toId)
+    const parentNodeId = startBinding.toId
+    const childNodeId = endBinding.toId
+    const parentNode = this.editor.getShape<NodeShape>(parentNodeId)
+    const childNode = this.editor.getShape<NodeShape>(childNodeId)
 
     if (parentNode === undefined) {
       throw new Error(`Failed to find parent node for wire: ${wireShapeId}`)
@@ -111,18 +113,22 @@ export class WireBindingUtil extends BindingUtil<WireBinding> {
       return
     }
 
-    const updatedInputs = structuredClone(childNode.props.inputs)
-    updatedInputs[childInPort.name] = { ...childInPort, value: parentOutPort.value }
 
 
     console.log(`updating port from ${childInPort.value} to ${parentOutPort.value}`)
     // artificial delay for testing 
-    window.setTimeout(() =>
+    window.setTimeout(() => {
+      const upToDateChild = this.editor.getShape<NodeShape>(childNodeId)!
+      const updatedInputs = structuredClone(upToDateChild.props.inputs)
+      updatedInputs[childInPort.name] = { ...childInPort, value: parentOutPort.value }
+
       this.editor.updateShape({
         id: childNode.id,
         type: "node",
-        props: { ...childNode.props, inputs: updatedInputs }
-      }), 100)
+        props: { inputs: updatedInputs }
+      })
+    }, 100)
+
   }
 
 

@@ -161,14 +161,13 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
         outputPort={outputPort}
         currentValue={node.currentValue as string} //TODO make type more correct
         handleValueUpdate={(v, portLabel) => {
-          if (node === undefined) { throw nodeNotInGraph }
-          return graphDispatch(
+          graphDispatch(
             {
               type: "fireNode",
               nodeId: node.nodeId,
               port: node.getInputPort(portLabel),
               value: v
-            })
+            });
         }}
       >
       </NodeBase>

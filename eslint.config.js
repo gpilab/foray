@@ -5,7 +5,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   eslint.configs.recommended,
-  ...tseslint.configs.strictTypeChecked,
+  ...tseslint.configs.recommendedTypeChecked,
   // ...tseslint.configs.stylisticTypeChecked,
   {
     languageOptions: {
@@ -18,6 +18,10 @@ export default tseslint.config(
   {
     "rules": {
       "@typescript-eslint/no-unused-vars": ["off"],
+      "@typescript-eslint/no-unsafe-assignment": ["off"],
+      "@typescript-eslint/no-unsafe-argument": ["off"],
+      "@typescript-eslint/no-unsafe-member-access": ["off"],
+      "@typescript-eslint/no-unsafe-call": ["off"],
       "@typescript-eslint/restrict-template-expressions": ["error",
         {
           allowAny: true,

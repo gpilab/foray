@@ -50,7 +50,7 @@ const nodeShapeProps = {
   color: DefaultColorStyle
 }
 
-type NodeShapeProps = RecordPropsType<typeof nodeShapeProps>
+export type NodeShapeProps = RecordPropsType<typeof nodeShapeProps>
 
 export type NodeShape = TLBaseShape<'node', NodeShapeProps>
 
@@ -88,11 +88,13 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
 
   //TODO Make this more like a reducer, so that we make sure we are handling all possible state changes, 
   //especially when multiple changes need to be made
+  //TODO make sure ports with multiple children upate correctly! i.e. one change doesn't overwrite the other
   override onBeforeUpdate: TLOnBeforeUpdateHandler<NodeShape> = (prev: NodeShape, next: NodeShape) => {
 
     //handle updates to port type
     if (prev.props.nodeType != next.props.nodeType) {
-      const { inputs, output, config } = getPorts(next.props.nodeType)
+      console.log("setting ports to default")
+      const { inputs, output, config } = getPortDefaults(next.props.nodeType)
 
       //delete all bindings
       //TODO keep bindings that still fulfill data type
@@ -105,7 +107,9 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
     }
 
     //handle updates to inputs
-    if (JSON.stringify(next.props.inputs) !== JSON.stringify(prev.props.inputs)) {
+    if (JSON.stringify(next.props.inputs) !== JSON.stringify(prev.props.inputs)
+      || JSON.stringify(next.props.config) !== JSON.stringify(prev.props.config)
+    ) {
       const newOutput = this.computeNodeValue(next.props.nodeType, next.props.inputs, next.props.output, next.props.config)
       return { ...next, props: { ...next.props, output: newOutput } }
 
@@ -130,7 +134,7 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
       }
 
       const nextValue = nodeCompute(node)
-      console.log("New Output Value: ", nextValue)
+      // console.log("New Output Value: ", nextValue)
 
       return { "out": { ...output["out"], value: nextValue } }
     } else {
@@ -251,7 +255,7 @@ const NodeSvg = track(({ shape }: { shape: NodeShape }) => {
 
   const inputs = Object.values(shape.props.inputs)
   const output = shape.props.output["out"]
-  console.log(inputs, shape.props.output)
+
   const { width, height } = shape.props
   const nodeColor = theme[shape.props.color].solid
   const backgroundColor = theme["background"]
@@ -283,7 +287,7 @@ const NodeSvg = track(({ shape }: { shape: NodeShape }) => {
       </SVGContainer>
     </div>
     <div style={{ width: width, height: height, position: "absolute", }} id="nodeContent">
-      <NodeContent nodeType={shape.props.nodeType} />
+      <NodeContent nodeShape={shape} />
     </div>
   </HTMLContainer>
 })
@@ -330,12 +334,16 @@ const IOPort = track(({ port }: { port: Port }) => {
       return <circle r={portDiameter / 2} />
     </g>
     <text
-      text-anchor="end"
+      textAnchor="end"
       strokeWidth="0"
       fill={theme["grey"].solid}
       y={portDiameter * 0.2 * (port.ioType === "in" ? -1 : 2)}
       x={-portDiameter * 2 / 4}>
-      {port.value}
+      {//TODO handle all data types
+        typeof port.value == "number"
+          ? parseFloat(port.value.toPrecision(12))
+          : "..."
+      }
     </text>
   </g>
 })
@@ -344,7 +352,7 @@ function getPortXPosition(portIndex: number) {
   return (portStartOffset + portDiameter / 2) + (portIndex * (portDiameter + portSpacing))
 }
 
-function getPorts(nodeType: NodeTypeStyle) {
+function getPortDefaults(nodeType: NodeTypeStyle) {
   if (nodeType === "Constant") {
     return {
       inputs: {},
