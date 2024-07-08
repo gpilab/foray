@@ -1,12 +1,11 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import './index.css'
-import BasicTldrawGraph from './basicGraph/basicTldrawGraph'
+import GPI from './gpi'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <div style={{ height: "100vh" }}>
-      <BasicTldrawGraph />
+      <GPI />
     </div>
   </React.StrictMode >,
 )

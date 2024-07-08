@@ -8,12 +8,11 @@ import {
 } from 'tldraw'
 
 import { TLBaseShape } from 'tldraw'
-import { portColorMap } from '../../graph/nodeDefinitions'
 import { useHover } from 'usehooks-ts'
 import { useRef } from 'react'
 import { NodeContent } from './NodeContent'
 import { nodeTypeStyle } from './nodeStylePanel'
-import { Port } from './portDefinition'
+import { Port, portColorMap } from './portDefinition'
 import { addNodeDefinition, checkAllPortsPopulated, Config, getDefaultNodeDefinition, nodeCompute, NodeInputs, NodeOutputs, NodeType, } from './nodeDefinitions'
 
 

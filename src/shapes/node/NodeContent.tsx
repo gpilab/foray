@@ -79,7 +79,7 @@ const ConstantNode = track((props: { config: Config, nodeShape: NodeShape, updat
         textAlign: "center",
         border: "none",
         color: theme.black.solid,
-        textDecoration: "underline",
+        textDecoration: inputError ? "underline" : "",
         backgroundColor: "transparent",
         textDecorationColor: inputError ? theme.red.solid : theme.text,
         borderRadius: "5px"

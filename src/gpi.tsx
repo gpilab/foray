@@ -6,29 +6,29 @@ import {
 } from 'tldraw'
 
 import 'tldraw/tldraw.css'
-import '../App.css'
-import { WireShapeUtil } from './wire/WireShapeUtil'
-import { WireBindingUtil } from './wire/WireBindingUtil'
-import { WireTool } from './wire/WireTool'
-import { NodeShapeUtil } from './node/nodeShapeUtil'
-import { NodeStylePanel } from './node/nodeStylePanel'
+import './App.css'
+import { WireShapeUtil } from './shapes/wire/WireShapeUtil'
+import { WireBindingUtil } from './shapes/wire/WireBindingUtil'
+import { WireTool } from './shapes/wire/WireTool'
+import { NodeShapeUtil } from './shapes/node/nodeShapeUtil'
+import { NodeStylePanel } from './shapes/node/nodeStylePanel'
+import { MathTextShapeUtil } from './shapes/math/MathShapeUtil'
+import { MathShapeTool } from './shapes/math/MathShapeTool'
 
-export default function BasicTldrawGraph() {
+export default function GPI() {
   return (
     <Tldraw
       persistenceKey="basicTldrawGraph"
       inferDarkMode
-      shapeUtils={[WireShapeUtil, NodeShapeUtil]}
+      shapeUtils={[WireShapeUtil, NodeShapeUtil, MathTextShapeUtil]}
       bindingUtils={[WireBindingUtil]}
-      tools={[WireTool]}
+      tools={[WireTool, MathShapeTool]}
       overrides={overrides}
       components={components}
       assetUrls={customAssetURLs}
     />
   )
 }
-
-
 
 export const customAssetURLs: TLUiAssetUrlOverrides = {
   icons: {
@@ -39,28 +39,41 @@ export const customAssetURLs: TLUiAssetUrlOverrides = {
 }
 
 const overrides: TLUiOverrides = {
-  tools(editor, schema) {
-    schema['wire'] = {
+  tools(editor, tools) {
+    tools.mathText = {
+      id: 'math-text',
+      icon: 'pi-symbol',
+      label: 'Math',
+      kbd: 'm',
+      onSelect: () => {
+        editor.setCurrentTool('math-text')
+      },
+    }
+    tools.wire = {
       id: 'wire',
       label: 'wire',
-      icon: 'wire',
+      icon: 'network',
       kbd: 'w',
       onSelect: () => {
         editor.setCurrentTool('wire')
       },
     }
-    return schema
+    return tools
   },
 }
 
 const components: TLUiComponents = {
   StylePanel: NodeStylePanel,
   Toolbar: (...props) => {
-    const wire = useTools().wire
+    const tools = useTools()
+    const wire = tools.wire
+    const math = tools.mathText
     const isWireSelected = useIsToolSelected(wire)
+    const isMathSelected = useIsToolSelected(math)
     return (
       <DefaultToolbar {...props}>
         <TldrawUiMenuItem {...wire} isSelected={isWireSelected} />
+        <TldrawUiMenuItem {...math} isSelected={isMathSelected} />
         <DefaultToolbarContent />
       </DefaultToolbar>
     )

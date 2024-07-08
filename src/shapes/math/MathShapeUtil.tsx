@@ -1,7 +1,6 @@
 import {
   DefaultColorStyle,
   Rectangle2d,
-  ShapePropsType,
   ShapeUtil,
   T,
   TLBaseShape,
@@ -13,6 +12,7 @@ import {
   TLOnBeforeCreateHandler,
   useEditor,
   Vec,
+  RecordPropsType,
 } from "tldraw";
 import "katex/dist/katex.min.css";
 import { BlockMath } from "react-katex";
@@ -30,7 +30,7 @@ const mathTextShapeProps = {
   h: T.number,
 };
 
-export type MathTextShapeProps = ShapePropsType<typeof mathTextShapeProps>;
+export type MathTextShapeProps = RecordPropsType<typeof mathTextShapeProps>;
 
 export type MathTextShape = TLBaseShape<"math-text", MathTextShapeProps>;
 
@@ -41,7 +41,7 @@ export class MathTextShapeUtil extends ShapeUtil<MathTextShape> {
 
   override isAspectRatioLocked = (_shape: MathTextShape) => true;
   override canResize = (_shape: MathTextShape) => true;
-  override canBind = (_shape: MathTextShape) => true;
+  //override canBind = (_shape: MathTextShape) => true;
   override canEdit = (_shape: MathTextShape) => true;
 
   static initialText = "a^2+b^2 = c^2";
