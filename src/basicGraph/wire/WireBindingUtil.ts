@@ -2,11 +2,11 @@ import {
   BindingOnCreateOptions,
   BindingOnDeleteOptions,
   BindingOnShapeChangeOptions,
-  BindingOnShapeIsolateOptions,
   BindingUtil, RecordPropsType, T, TLBaseBinding,
   TLShapeId,
 } from 'tldraw'
 import { NodeShape } from '../node/nodeShapeUtil'
+import { PortDataType } from '../node/portDefinition'
 
 const wireBindingProps = {
   terminal: T.literalEnum("start", "end"),
@@ -15,65 +15,63 @@ const wireBindingProps = {
 
 type WireBindingProps = RecordPropsType<typeof wireBindingProps>
 
+/**
+ * Bindings relate two shapes. The wire bindings relate nodes to wires.
+ * Each wire has a start and an end binding that connects each terminal 
+ * of the wire to a specific node port.
+ *
+ *
+ * Each connection between nodes deals with the following tldraw Records:
+ * ## parentNode
+ * - inputPorts
+ * - outputPort
+ *   - !!The start terminal binding will refer to this port
+ *
+ * ## childNode
+ * - inputPorts
+ *   - !!The end terminal binding will refer to ONE of these ports
+ * - outputPort
+ *
+ * ## Start terminal binding
+ * - fromId: wireShapeId
+ * - toId: parentNodeId
+ * - portName: !!Name of output port on parentNode, currently always named "out"
+ *
+ * ## End terminal binding
+ * - fromId: wireShapeId
+ * - toId: childNodeId
+ * - portName: !!Name of input port on childNode
+ *
+ * Using this information, data is passed from parent to child whenever the parent shape 
+ * set's it's output port value
+ */
 export type WireBinding = TLBaseBinding<'wire', WireBindingProps>
 
 /**
  * Determines how wire should behave when bound shapes change
  * Each wire has 2 bindings, 1 for the start terminal, one for the end terminal
  * (technically a wire only has a start binding while the wire is being created(dragging out) by the user)
- *
- * Each connection between nodes deals with the following RecordPropsType
- *
- * ## parentNode
- *
- * ## childNode
- *
- * ## wireShape
- *
- *
- * ## Start terminal binding
- * - fromId: wireShapeId
- * - toId: parentNodeId
- * - portName: name of output port on parentNode
- *
- * ## End terminal binding
- * - fromId: wireShapeId
- * - toId: childNodeId
- * - portName: name of input port on childNode
- *
- * Binding relationship:
- * ```
- * parent <-toId-- `startBinding` --fromId-> wire
- * child <-toId-- `endBinding` --fromId-> wire
- * ```
- *
- * Data propogates as follows:
- * ```
- * parent -> wire -> child
- * ```
- *
  */
 export class WireBindingUtil extends BindingUtil<WireBinding> {
   static override type = 'wire' as const
 
   override getDefaultProps() {
     return {
-      terminal: "start" as const, //
+      terminal: "start" as const,// start bindings bind to the parent's output port 
       portName: "out" as const // default name for output ports
     }
   }
 
   onAfterCreate(options: BindingOnCreateOptions<WireBinding>): void {
-    console.log("onAfterCreate")
     if (options.binding.props.terminal == "end") {
       console.log("initial propogation for end binding")
       this.propogate(options.binding.fromId)
     }
   }
 
-  //start terminals propogate changes  FROM node TO wires
   onAfterChangeToShape(options: BindingOnShapeChangeOptions<WireBinding>): void {
     if (options.binding.props.terminal == "start") {
+      //the parentNode has changed, propogate changes
       this.propogate(options.binding.fromId)
     }
   }
@@ -110,42 +108,60 @@ export class WireBindingUtil extends BindingUtil<WireBinding> {
 
 
     if (parentOutPort.value == childInPort.value) {
+      // ports are already synced, no need to updated
       return
     }
 
-
-
-    console.log(`updating port from ${childInPort.value} to ${parentOutPort.value}`)
     // artificial delay for testing 
     window.setTimeout(() => {
-      const upToDateChild = this.editor.getShape<NodeShape>(childNodeId)!
-      const updatedInputs = structuredClone(upToDateChild.props.inputs)
-      updatedInputs[childInPort.name] = { ...childInPort, value: parentOutPort.value }
-
-      this.editor.updateShape({
-        id: childNode.id,
-        type: "node",
-        props: { inputs: updatedInputs }
-      })
+      this.updatePort(childNodeId, childInPort.name, parentOutPort.value)
     }, 100)
+  }
 
+  /**
+   * Update a node's port value
+  */
+  private updatePort(nodeId: TLShapeId, portName: string, portValue: PortDataType | undefined) {
+    // grab a new object to make sure we have the most up-to-date shape
+    const upToDateChild = this.editor.getShape<NodeShape>(nodeId)
+    if (upToDateChild === undefined) {
+      console.log("attempted to update port that no longer exists!")
+      return
+    }
+    const updatedInputs = structuredClone(upToDateChild.props.inputs)
+    updatedInputs[portName] = { ...upToDateChild.props.inputs[portName], value: portValue }
+
+    this.editor.updateShape({
+      id: nodeId,
+      type: "node",
+      props: { inputs: updatedInputs }
+    })
   }
 
 
-  //cleanup wire shape when binding is deleted.
+  /**
+   * Perform any necessary cleanup after a binding is deleted
+  */
   onAfterDelete(options: BindingOnDeleteOptions<WireBinding>): void {
+    const { fromId, toId } = options.binding
+    const { terminal, portName } = options.binding.props
     console.log("after delete binding", options)
-    this.editor.deleteShape(options.binding.fromId)
+    this.editor.deleteShape(fromId)
+    if (terminal == "end") {
+      //clear the connected child node port
+      this.updatePort(toId, portName, undefined)
+    }
+
   }
 
-  _onBeforeIsolateToShape(options: BindingOnShapeIsolateOptions<WireBinding>): void {
-    console.log("isolating to", options)
-    this.editor.updateShape({ id: options.binding.fromId, type: "wire", isLocked: false })
-  }
-
-  onBeforeIsolateFromShape(options: BindingOnShapeIsolateOptions<WireBinding>): void {
-    console.log("isolating to", options)
-    this.editor.updateShape({ id: options.binding.fromId, type: "wire", isLocked: false })
-  }
-
+  // May be necessary for handling edge cases with operations on groups of nodes like copy/paste 
+  // onBeforeIsolateToShape(options: BindingOnShapeIsolateOptions<WireBinding>): void {
+  //   console.log("isolating to", options)
+  //   this.editor.updateShape({ id: options.binding.fromId, type: "wire", isLocked: false })
+  // }
+  //
+  // onBeforeIsolateFromShape(options: BindingOnShapeIsolateOptions<WireBinding>): void {
+  //   console.log("isolating to", options)
+  //   this.editor.updateShape({ id: options.binding.fromId, type: "wire", isLocked: false })
+  // }
 }

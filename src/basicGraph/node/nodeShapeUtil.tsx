@@ -12,33 +12,25 @@ import { portColorMap } from '../../graph/nodeDefinitions'
 import { useHover } from 'usehooks-ts'
 import { useRef } from 'react'
 import { NodeContent } from './NodeContent'
-import { NodeTypeStyle, nodeTypeStyle } from './nodeStylePanel'
-import { InPort, OutPort, Port } from './portDefinition'
-import { addNodeDefinition, checkAllPortsPopulated, Config, nodeCompute, NodeInputs, NodeOutputs, NodeType, } from './nodeDefinitions'
+import { nodeTypeStyle } from './nodeStylePanel'
+import { Port } from './portDefinition'
+import { addNodeDefinition, checkAllPortsPopulated, Config, getDefaultNodeDefinition, nodeCompute, NodeInputs, NodeOutputs, NodeType, } from './nodeDefinitions'
 
 
+const TLBasePort = {
+  name: T.string,
+  dataType: T.literalEnum("boolean", "number", "numberArray"),
+  value: T.optional(T.any)
+}
 const TLOutPort = T.object({
-  name: T.string,
+  ...TLBasePort,
   ioType: T.literal("out"),
-  dataType: T.literalEnum("boolean", "number", "numberArray"),
-  value: T.optional(T.any)
 })
+
 const TLInPort = T.object({
-  name: T.string,
+  ...TLBasePort,
   ioType: T.literal("in"),
-  dataType: T.literalEnum("boolean", "number", "numberArray"),
-  //TODO figure out a better way to make this type, I'm not sure how to use TLDraw's
-  //type utility to make the union we need here
-  value: T.optional(T.any)
 })
-
-const porta: InPort = { name: "a", ioType: "in", dataType: "number", value: undefined } as const
-const portb: InPort = { name: "b", ioType: "in", dataType: "number", value: undefined } as const
-const portd: OutPort = { name: "d", ioType: "out", dataType: "boolean", value: undefined } as const
-const algebra_inputs = { a: porta, b: portb }
-const algebra_output = { out: portd }
-
-
 
 const nodeShapeProps = {
   width: T.nonZeroNumber,
@@ -56,11 +48,6 @@ export type NodeShape = TLBaseShape<'node', NodeShapeProps>
 
 export class NodeShapeUtil extends ShapeUtil<NodeShape> {
   static override type = 'node' as const
-
-  /**
-   * Unsure why this needs to be overriden, we already passed this info in.
-   * Without the override TL validation fails
-   */
   static override props = nodeShapeProps
 
   override canResize: TLShapeUtilFlag<NodeShape> = () => false
@@ -75,10 +62,7 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
     return {
       width: 200,
       height: 100,
-      //not sure why this complains, maybe T.any type from TLDraw typing?
-      // eslint-disable-next-line   
       inputs: addNodeDefinition.state.inputs,
-      // eslint-disable-next-line 
       output: addNodeDefinition.state.output,
       nodeType: "Add",
       config: {},
@@ -86,43 +70,35 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
     }
   }
 
-  //TODO Make this more like a reducer, so that we make sure we are handling all possible state changes, 
+  //TODO Make this more like a reducer, so that we make sure we are handling all possible state changes
   //especially when multiple changes need to be made
   //TODO make sure ports with multiple children upate correctly! i.e. one change doesn't overwrite the other
   override onBeforeUpdate: TLOnBeforeUpdateHandler<NodeShape> = (prev: NodeShape, next: NodeShape) => {
-
     //handle updates to port type
     if (prev.props.nodeType != next.props.nodeType) {
       console.log("setting ports to default")
-      const { inputs, output, config } = getPortDefaults(next.props.nodeType)
+      const { inputs, output, config } = getDefaultNodeDefinition(next.props.nodeType).state
 
-      //delete all bindings
       //TODO keep bindings that still fulfill data type
+      //delete all old bindings
       this.editor.deleteBindings(this.editor.getBindingsInvolvingShape(prev))
 
-      const newNext = { ...next, props: { ...next.props, inputs, output } }
+      //compute output for the new nodeType
       const newOutput = this.computeNodeValue(next.props.nodeType, inputs, output, config)
-
-      return { ...newNext, props: { ...next.props, inputs, output: newOutput } }
+      return { ...next, props: { ...next.props, inputs, output: newOutput } }
     }
 
     //handle updates to inputs
     if (JSON.stringify(next.props.inputs) !== JSON.stringify(prev.props.inputs)
-      || JSON.stringify(next.props.config) !== JSON.stringify(prev.props.config)
-    ) {
+      || JSON.stringify(next.props.config) !== JSON.stringify(prev.props.config)) {
       const newOutput = this.computeNodeValue(next.props.nodeType, next.props.inputs, next.props.output, next.props.config)
       return { ...next, props: { ...next.props, output: newOutput } }
-
     }
-
     return next
   }
 
-
-
   computeNodeValue(nodeType: NodeType, inputs: NodeInputs, output: NodeOutputs, config: Config) {
     //don't compute if there are any undefined inputs
-
     if (checkAllPortsPopulated(inputs)) {
       const populatedInputs = inputs
       //TODO call nodedef compute func
@@ -132,18 +108,20 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
         output: output,
         config: config,
       }
-
       const nextValue = nodeCompute(node)
       // console.log("New Output Value: ", nextValue)
-
       return { "out": { ...output["out"], value: nextValue } }
     } else {
       console.log(`Encountered undefined port value when calculating output for node: ${nodeType}`)
-      return output
+      //Force the output to be undefined if some inputs are undefined
+      return { "out": { ...output["out"], value: undefined } }
     }
   }
 
-
+  /**
+   * The visual boudary shape of the node, used for 
+   * things like collision detection
+   */
   getGeometry(shape: NodeShape) {
     const inputCircles = NodeShapeUtil.portLocations("in", shape).map(location => location.geometry)
     const outputCircles = NodeShapeUtil.portLocations("out", shape).map(location => location.geometry)
@@ -158,6 +136,9 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
     })
   }
 
+
+  /** Determines the relative positions for ports
+   */
   static portLocations(ioType: "in" | "out", shape: NodeShape): { port: Port, geometry: Circle2d }[] {
     const { inputs, output } = shape.props
     const radius = portDiameter / 2 + portSpacing / 2 // we add some extra padding here, to give a larger hitbox
@@ -187,7 +168,7 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
   }
 
   /**
-   * Get port location relative to the node's location
+   * Get nearest port to the `relativePoint`
    */
   static getNearestPortFromPoint(shape: NodeShape, ioType: "in" | "out" | "all", relativePoint: VecLike) {
     const portLocations = ioType != "all" ? this.portLocations(ioType, shape) : this.portLocations("in", shape).concat(this.portLocations("out", shape))
@@ -314,6 +295,8 @@ const IOPort = track(({ port }: { port: Port }) => {
 
   const theme = getDefaultColorTheme({ isDarkMode: isDarkMode })
   const color = theme[portColorMap[dataType]].solid
+
+
   return <g id="portOuterBound">
     <circle
       ref={ref}
@@ -339,30 +322,24 @@ const IOPort = track(({ port }: { port: Port }) => {
       fill={theme["grey"].solid}
       y={portDiameter * 0.2 * (port.ioType === "in" ? -1 : 2)}
       x={-portDiameter * 2 / 4}>
-      {//TODO handle all data types
-        typeof port.value == "number"
-          ? parseFloat(port.value.toPrecision(12))
-          : "..."
-      }
+      {displayPortValue(port)}
     </text>
   </g>
 })
 
-function getPortXPosition(portIndex: number) {
-  return (portStartOffset + portDiameter / 2) + (portIndex * (portDiameter + portSpacing))
+function displayPortValue(port: Port) {
+  if (port.value === undefined) {
+    return ""
+  }
+  switch (port.dataType) {
+    case "number": {
+      const value = port.value as number
+      return parseFloat(value.toPrecision(12))
+    }
+    default: "..."
+  }
 }
 
-function getPortDefaults(nodeType: NodeTypeStyle) {
-  if (nodeType === "Constant") {
-    return {
-      inputs: {},
-      output: algebra_output,
-      config: { value: 7 }
-    }
-  }
-  return {
-    inputs: algebra_inputs,
-    output: algebra_output,
-    config: {}
-  }
+function getPortXPosition(portIndex: number) {
+  return (portStartOffset + portDiameter / 2) + (portIndex * (portDiameter + portSpacing))
 }

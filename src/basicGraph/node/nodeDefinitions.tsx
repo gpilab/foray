@@ -155,7 +155,6 @@ const constantDef = createNodeDef(
   }
 )
 
-
 // I don't know how to have a Record of definitions with any types without use `any`
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const nodeDefaultDefinitions = {

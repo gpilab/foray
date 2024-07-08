@@ -3,7 +3,7 @@ import {
   DefaultColorStyle,
   Editor,
   Mat,
-  RecordPropsType, SVGContainer, ShapeUtil, T, TLBaseShape,
+  RecordPropsType, SVGContainer, ShapeUtil, TLBaseShape,
   TLDefaultColorStyle,
   TLOnBeforeUpdateHandler,
   Vec,
@@ -19,7 +19,6 @@ import { NodeShape, NodeShapeUtil } from '../node/nodeShapeUtil'
 
 export const wireShapeProps = {
   color: DefaultColorStyle,
-  value: T.optional(T.any)
 }
 
 type WireShapeProps = RecordPropsType<typeof wireShapeProps>
@@ -27,7 +26,7 @@ export type WireShape = TLBaseShape<'wire', WireShapeProps>
 
 
 /**
- * Determines how the wire shape behaves under various scenarios
+ * Determines how the wire shape should behave
  */
 export class WireShapeUtil extends ShapeUtil<WireShape> {
   static override type = 'wire' as const
