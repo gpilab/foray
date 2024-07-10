@@ -1,26 +1,30 @@
 import {
   Circle2d, DefaultColorStyle, Geometry2d,
   Group2d, HTMLContainer, RecordPropsType,
-  Rectangle2d, SVGContainer, ShapeUtil, T,
-  TLOnBeforeUpdateHandler, TLShapeUtilFlag,
-  Vec, VecLike, getDefaultColorTheme, track,
-  useEditor, useIsDarkMode
+  Rectangle2d, ShapeUtil, T,
+  TLOnBeforeUpdateHandler, TLOnResizeHandler, TLShapeUtilFlag,
+  Vec, VecLike
 } from 'tldraw'
 
 import { TLBaseShape } from 'tldraw'
-import { useHover } from 'usehooks-ts'
-import { useRef } from 'react'
-import { NodeContent } from './NodeContent'
 import { nodeTypeStyle } from './nodeStylePanel'
-import { Port, portColorMap } from './portDefinition'
-import { addNodeDefinition, checkAllPortsPopulated, Config, getDefaultNodeDefinition, nodeCompute, NodeInputs, NodeOutputs, NodeType, } from './nodeDefinitions'
+import { Port } from './portDefinition'
+import { addNodeDefinition, getDefaultNodeDefinition } from './nodeDefinitions'
+import { checkAllPortsPopulated, Config, nodeCompute, NodeInputs, NodeOutputs, NodeType } from './nodeType'
+import { nodeUIConfig } from './nodeConstants'
+import { NodeBase } from './components/nodeBase'
 
+
+/// tldraw types
+/// requried for tldraw to properly perform 
+/// validation when serializing shapes
 
 const TLBasePort = {
   name: T.string,
   dataType: T.literalEnum("boolean", "number", "numberArray"),
   value: T.optional(T.any)
 }
+
 const TLOutPort = T.object({
   ...TLBasePort,
   ioType: T.literal("out"),
@@ -32,41 +36,54 @@ const TLInPort = T.object({
 })
 
 const nodeShapeProps = {
+  // UI props
   width: T.nonZeroNumber,
   height: T.nonZeroNumber,
+  color: DefaultColorStyle,
+
+  // Node behaviour props
+  nodeType: nodeTypeStyle,
   inputs: T.dict(T.string, TLInPort),
   output: T.object({ "out": TLOutPort }),
   config: T.dict(T.string, T.any),
-  nodeType: nodeTypeStyle,
-  color: DefaultColorStyle
 }
 
-export type NodeShapeProps = RecordPropsType<typeof nodeShapeProps>
+export const defaultNodeProps: NodeShapeProps = {
+  width: 200,
+  height: 100,
+  inputs: addNodeDefinition.state.inputs,
+  output: addNodeDefinition.state.output,
+  nodeType: "Add",
+  config: {},
+  color: "black"
+}
+const { portStartOffset, portDiameter, portSpacing, nodeStrokeWidth } = nodeUIConfig
 
+export function getPortXPosition(portIndex: number) {
+  return (portStartOffset + portDiameter / 2) + (portIndex * (portDiameter + portSpacing))
+}
+
+
+export type NodeShapeProps = RecordPropsType<typeof nodeShapeProps>
 export type NodeShape = TLBaseShape<'node', NodeShapeProps>
+
 
 export class NodeShapeUtil extends ShapeUtil<NodeShape> {
   static override type = 'node' as const
   static override props = nodeShapeProps
 
-  override canResize: TLShapeUtilFlag<NodeShape> = () => false
+  override canResize: TLShapeUtilFlag<NodeShape> = () => true
+  override hideResizeHandles = () => false
   override canEdit: TLShapeUtilFlag<NodeShape> = () => false
   override isAspectRatioLocked: TLShapeUtilFlag<NodeShape> = () => false
   override hideSelectionBoundsBg = () => true
   override hideSelectionBoundsFg = () => true
   override hideRotateHandle = () => true
-  override hideResizeHandles = () => true
 
-  getDefaultProps(): NodeShape['props'] {
-    return {
-      width: 200,
-      height: 100,
-      inputs: addNodeDefinition.state.inputs,
-      output: addNodeDefinition.state.output,
-      nodeType: "Add",
-      config: {},
-      color: "black"
-    }
+  getDefaultProps(): NodeShapeProps {
+    //using spread so that props aren't considered readonly.
+    //tldraw needs to make changes to this object
+    return { ...defaultNodeProps }
   }
 
   //TODO Make this more like a reducer, so that we make sure we are handling all possible state changes
@@ -77,6 +94,7 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
     if (prev.props.nodeType != next.props.nodeType) {
       console.log("setting ports to default")
       const { inputs, output, config } = getDefaultNodeDefinition(next.props.nodeType).state
+      console.log("config: ", config)
 
       //TODO keep bindings that still fulfill data type
       //delete all old bindings
@@ -84,7 +102,7 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
 
       //compute output for the new nodeType
       const newOutput = this.computeNodeValue(next.props.nodeType, inputs, output, config)
-      return { ...next, props: { ...next.props, inputs, output: newOutput } }
+      return { ...next, props: { ...next.props, inputs, output: newOutput, config } }
     }
 
     //handle updates to inputs
@@ -96,11 +114,23 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
     return next
   }
 
+  onResize: TLOnResizeHandler<NodeShape> = (shape: NodeShape, info) => {
+    const { width, height } = info.initialShape.props
+    const minWidth = portDiameter * 3
+    const minHeight = portDiameter * 1.5
+    return {
+      id: shape.id, type: "node",
+      props: {
+        width: Math.max(width * info.scaleX, minWidth),
+        height: Math.max(height * info.scaleY, minHeight)
+      }
+    }
+  }
+
   computeNodeValue(nodeType: NodeType, inputs: NodeInputs, output: NodeOutputs, config: Config) {
     //don't compute if there are any undefined inputs
     if (checkAllPortsPopulated(inputs)) {
       const populatedInputs = inputs
-      //TODO call nodedef compute func
       const node = {
         type: nodeType,
         inputs: populatedInputs,
@@ -108,7 +138,6 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
         config: config,
       }
       const nextValue = nodeCompute(node)
-      // console.log("New Output Value: ", nextValue)
       return { "out": { ...output["out"], value: nextValue } }
     } else {
       console.log(`Encountered undefined port value when calculating output for node: ${nodeType}`)
@@ -183,8 +212,8 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
     //   //specific port was selected
     //   return nearestLocation.port
     // }
-    //TODO intelligently select default port if specific port wasn't clicked
-    //return portLocations[0].port
+    // TODO intelligently select default port if specific port wasn't clicked
+    // return portLocations[0].port
   }
 
   /**
@@ -204,15 +233,15 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
     }
 
     // calculate offset based on which input index corresponds to portName
-    const portIndex = portName === "b" ? 1 : 0//shape.props.inputs[portName] //TODO sort port names alphabetically and get portName's index from that list 
+    // TODO sort port names alphabetically and get portName's index from that list 
+    const portIndex = portName === "b" ? 1 : 0//shape.props.inputs[portName] 
 
     return new Vec(getPortXPosition(portIndex), -portDiameter / 2)
   }
-
   component(shape: NodeShape) {
     return <HTMLContainer>
-      <NodeSvg shape={shape} />
-    </HTMLContainer>
+      <NodeBase shape={shape} />
+    </HTMLContainer >
   }
 
   indicator(shape: NodeShape) {
@@ -223,122 +252,6 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
       height={shape.props.height} />
   }
 }
-const portStartOffset = 10
-const portDiameter = 30
-const portSpacing = 12.5
-const nodeStrokeWidth = 2
-const portStrokeWidth = 2
-
-const NodeSvg = track(({ shape }: { shape: NodeShape }) => {
-  const isDarkMode = useIsDarkMode()
-  const theme = getDefaultColorTheme({ isDarkMode: isDarkMode })
-
-  const inputs = Object.values(shape.props.inputs)
-  const output = shape.props.output["out"]
-
-  const { width, height } = shape.props
-  const nodeColor = theme[shape.props.color].solid
-  const backgroundColor = theme["background"]
-  return <HTMLContainer>
-    <div>
-      <SVGContainer>
-        <defs>
-          <filter id="blurry" x="0%" y="0%" height="100%" width="100%" primitiveUnits="userSpaceOnUse">
-            <feGaussianBlur x={nodeStrokeWidth / 2} y={nodeStrokeWidth / 2} width={width - nodeStrokeWidth / 2} height={height - nodeStrokeWidth / 2} stdDeviation="5" in="SourceGraphic" result="blurSquares" />
-            <feComponentTransfer in="blurSquares" result="opaqueBlur">
-              <feFuncA type="linear" intercept="1" />
-            </feComponentTransfer>
-            <feBlend mode="normal" in="opaqueBlur" in2="SourceGraphic" />
-          </filter>
-        </defs>
-        <g id="entire_node" fill="none" stroke={nodeColor} strokeWidth={portStrokeWidth} >
-          <g id="ports" strokeWidth={portStrokeWidth} filter="url(#blurry)" width={width}>
-            <rect rx={5} stroke="none" fill={backgroundColor} fillOpacity={1}
-              width={width} height={height} />
-            <InputPorts ports={inputs} />
-            <g id="output" transform={`translate(${getPortXPosition(0)},${height})`}>
-              <IOPort port={output} />
-            </g>
-          </g>
-          <rect rx={5} strokeWidth={nodeStrokeWidth} fill={backgroundColor} fillOpacity={.7}
-            strokeOpacity={1}
-            width={width} height={height} />
-        </g>
-      </SVGContainer>
-    </div>
-    <div style={{ width: width, height: height, position: "absolute", }} id="nodeContent">
-      <NodeContent nodeShape={shape} />
-    </div>
-  </HTMLContainer>
-})
-
-const InputPorts = track(({ ports }: { ports: Port[] }) => {
-  return <g id="inputs">
-    {ports.map((port, i) =>
-      <g key={port.name} transform={`translate(${getPortXPosition(i)})`}>
-        <IOPort port={port} />
-      </g>
-    )}
-  </g>
-})
 
 
-const IOPort = track(({ port }: { port: Port }) => {
-  const editor = useEditor()
-  const { dataType } = port
-  const isDarkMode = useIsDarkMode()
-  const ref = useRef(null)
-  const isHover = useHover(ref)
-  const hoverDiameter = portDiameter + portSpacing / 4
 
-
-  const theme = getDefaultColorTheme({ isDarkMode: isDarkMode })
-  const color = theme[portColorMap[dataType]].solid
-
-
-  return <g id="portOuterBound">
-    <circle
-      ref={ref}
-      style={{ pointerEvents: "all" }}
-      stroke="none" fill="none" r={hoverDiameter / 2}
-      onPointerDown={(e) => {
-        if (e.button == 2) {
-          console.log("port pointer right down")
-          editor.setCurrentTool("wire")
-        }
-        else if (e.button == 0) {
-          console.log("port pointer left")
-          editor.setCurrentTool("wire")
-        }
-      }}
-    />
-    <g stroke={color} fill={color} strokeLinecap="butt" fillOpacity={isHover ? .7 : .2}>
-      return <circle r={portDiameter / 2} />
-    </g>
-    <text
-      textAnchor="end"
-      strokeWidth="0"
-      fill={theme["grey"].solid}
-      y={portDiameter * 0.2 * (port.ioType === "in" ? -1 : 2)}
-      x={-portDiameter * 2 / 4}>
-      {displayPortValue(port)}
-    </text>
-  </g>
-})
-
-function displayPortValue(port: Port) {
-  if (port.value === undefined) {
-    return ""
-  }
-  switch (port.dataType) {
-    case "number": {
-      const value = port.value as number
-      return parseFloat(value.toPrecision(12))
-    }
-    default: "..."
-  }
-}
-
-function getPortXPosition(portIndex: number) {
-  return (portStartOffset + portDiameter / 2) + (portIndex * (portDiameter + portSpacing))
-}

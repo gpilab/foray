@@ -1,21 +1,12 @@
 import {
-  CubicBezier2d,
-  DefaultColorStyle,
-  Editor,
-  Mat,
+  CubicBezier2d, DefaultColorStyle, Editor, Mat,
   RecordPropsType, SVGContainer, ShapeUtil, TLBaseShape,
-  TLDefaultColorStyle,
-  TLOnBeforeUpdateHandler,
-  Vec,
-  VecLike,
-  getDefaultColorTheme,
-  lerp,
-  track,
-  useEditor,
-  useIsDarkMode,
+  TLDefaultColorStyle, TLOnBeforeUpdateHandler, Vec, VecLike,
+  lerp, track, useEditor,
 } from 'tldraw'
 import { WireBinding } from './WireBindingUtil'
 import { NodeShape, NodeShapeUtil } from '../node/nodeShapeUtil'
+import { useTheme } from '../util/useTheme'
 
 export const wireShapeProps = {
   color: DefaultColorStyle,
@@ -150,9 +141,8 @@ type LineProps = {
 }
 
 const LineComponent = track(({ wireShape, start, end, strokeWidth, debug = false, isSelected = false }: LineProps) => {
-  const isDarkMode = useIsDarkMode()
-  const theme = getDefaultColorTheme({ isDarkMode: isDarkMode })
-  const colorVal = theme["grey"].solid
+  const theme = useTheme()
+  const colorVal = theme["grey"]
 
   const startToEnd = Vec.Sub(end, start).toJson()
   const center = Vec.Div(startToEnd, 2).add(start).toJson()

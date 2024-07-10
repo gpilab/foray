@@ -38,6 +38,17 @@ export const singleOutput = <T extends PortDataTypeLabel>(dataType: T): {
     }
   }
 }
+export const singleInput = <T extends PortDataTypeLabel>(dataType: T): {
+  a: { name: "a", ioType: "in", dataType: T, value?: PortTypeMap[T] },
+} => {
+  return {
+    a: {
+      name: "a" as const,
+      ioType: "in" as const,
+      dataType: dataType,
+    }
+  }
+}
 
 export const binaryOpInputs = <T extends PortDataTypeLabel>(dataType: T): {
   a: { name: "a", ioType: "in", dataType: T, value?: PortTypeMap[T] },

@@ -5,7 +5,6 @@ import {
   T,
   TLBaseShape,
   TLOnResizeHandler,
-  getDefaultColorTheme,
   LABEL_FONT_SIZES,
   DefaultSizeStyle,
   HTMLContainer,
@@ -13,11 +12,12 @@ import {
   useEditor,
   Vec,
   RecordPropsType,
-} from "tldraw";
-import "katex/dist/katex.min.css";
-import { BlockMath } from "react-katex";
-import { createRef, useEffect } from "react";
-import { MathSrcInputBox } from "./MathSrcInputBox";
+} from "tldraw"
+import "katex/dist/katex.min.css"
+import { BlockMath } from "react-katex"
+import { createRef, useEffect } from "react"
+import { MathSrcInputBox } from "./MathSrcInputBox"
+import { useTheme } from "../util/useTheme"
 
 const mathTextShapeProps = {
   text: T.string,
@@ -28,23 +28,23 @@ const mathTextShapeProps = {
   w: T.number,
   // Shape height
   h: T.number,
-};
+}
 
-export type MathTextShapeProps = RecordPropsType<typeof mathTextShapeProps>;
+export type MathTextShapeProps = RecordPropsType<typeof mathTextShapeProps>
 
-export type MathTextShape = TLBaseShape<"math-text", MathTextShapeProps>;
+export type MathTextShape = TLBaseShape<"math-text", MathTextShapeProps>
 
 export class MathTextShapeUtil extends ShapeUtil<MathTextShape> {
-  static override type = "math-text" as const;
-  static override props = mathTextShapeProps;
+  static override type = "math-text" as const
+  static override props = mathTextShapeProps
   // TODO handle migration
 
-  override isAspectRatioLocked = (_shape: MathTextShape) => true;
-  override canResize = (_shape: MathTextShape) => true;
-  //override canBind = (_shape: MathTextShape) => true;
-  override canEdit = (_shape: MathTextShape) => true;
+  override isAspectRatioLocked = (_shape: MathTextShape) => true
+  override canResize = (_shape: MathTextShape) => true
+  //override canBind = (_shape: MathTextShape) => true
+  override canEdit = (_shape: MathTextShape) => true
 
-  static initialText = "a^2+b^2 = c^2";
+  static initialText = "a^2+b^2 = c^2"
 
   getDefaultProps(): MathTextShape["props"] {
     return {
@@ -54,7 +54,7 @@ export class MathTextShapeUtil extends ShapeUtil<MathTextShape> {
       h: 60,
       scale: 1,
       color: "red",
-    };
+    }
   }
 
   getGeometry(shape: MathTextShape) {
@@ -66,33 +66,33 @@ export class MathTextShapeUtil extends ShapeUtil<MathTextShape> {
       // make shape editable with a single click if it is already selected
       // causes problems if enabled when the shape is editable
       isLabel: true,
-    });
+    })
   }
 
   indicator(shape: MathTextShape) {
-    return <rect width={shape.props.w} height={shape.props.h} />;
+    return <rect width={shape.props.w} height={shape.props.h} />
   }
 
   override onResize: TLOnResizeHandler<MathTextShape> = (shape, info) => {
-    const { initialBounds, scaleX, scaleY, newPoint } = info;
+    const { initialBounds, scaleX, scaleY, newPoint } = info
 
     const scaleDelta = Math.max(
       0.01,
       (Math.abs(scaleX) + Math.abs(scaleY)) / 2,
-    );
+    )
 
     // Compute the offset (if flipped X or flipped Y)
-    const offset = new Vec(0, 0);
+    const offset = new Vec(0, 0)
 
     if (scaleX < 0) {
-      offset.x = -(initialBounds.width * scaleDelta);
+      offset.x = -(initialBounds.width * scaleDelta)
     }
     if (scaleY < 0) {
-      offset.y = -(initialBounds.height * scaleDelta);
+      offset.y = -(initialBounds.height * scaleDelta)
     }
 
     // Apply the offset to the new point
-    const { x, y } = Vec.Add(newPoint, offset.rot(shape.rotation));
+    const { x, y } = Vec.Add(newPoint, offset.rot(shape.rotation))
 
     const next = {
       x,
@@ -100,57 +100,54 @@ export class MathTextShapeUtil extends ShapeUtil<MathTextShape> {
       props: {
         scale: scaleDelta * shape.props.scale,
       },
-    };
+    }
     return {
       id: shape.id,
       type: shape.type,
       ...next,
-    };
-  };
+    }
+  }
 
   override onBeforeCreate: TLOnBeforeCreateHandler<MathTextShape> = () => {
     //this.focusTextBox(true)
-  };
+  }
 
   component(shape: MathTextShape) {
     const {
       props: { text, color, size_style, scale, w, h },
-    } = shape;
+    } = shape
 
-    const theme = getDefaultColorTheme({
-      isDarkMode: this.editor.user.getIsDarkMode(),
-    });
-
-    const editor = useEditor();
-    const isEditing = editor.getEditingShapeId() == shape.id;
+    const theme = useTheme()
+    const editor = useEditor()
+    const isEditing = editor.getEditingShapeId() == shape.id
 
     //used to determine what the rendered equation size is after it is rendered
-    const mathTextRef = createRef<HTMLDivElement>();
-    const inputRef = createRef<HTMLInputElement>();
+    const mathTextRef = createRef<HTMLDivElement>()
+    const inputRef = createRef<HTMLInputElement>()
 
     // set focus appropriately
     useEffect(() => {
-      focusInput();
-    }, [editor, isEditing]);
+      focusInput()
+    }, [editor, isEditing])
 
     function focusInput(selectAll = false) {
       if (isEditing) {
-        const input = inputRef.current;
-        if (input == null) return;
+        const input = inputRef.current
+        if (input == null) return
 
-        input.focus();
+        input.focus()
         if (text == MathTextShapeUtil.initialText || selectAll) {
-          input.select();
+          input.select()
         }
       }
     }
 
     //check for updated size
     useEffect(() => {
-      if (!mathTextRef.current) return;
+      if (!mathTextRef.current) return
 
-      const renderedWidth = mathTextRef.current.offsetWidth * scale;
-      const renderedHeight = mathTextRef.current.offsetHeight * scale;
+      const renderedWidth = mathTextRef.current.offsetWidth * scale
+      const renderedHeight = mathTextRef.current.offsetHeight * scale
 
       if (renderedWidth != w || renderedHeight != h) {
         this.editor.updateShape<MathTextShape>({
@@ -160,9 +157,9 @@ export class MathTextShapeUtil extends ShapeUtil<MathTextShape> {
             w: renderedWidth,
             h: renderedHeight,
           },
-        });
+        })
       }
-    }, [text, scale, size_style, w, h]);
+    }, [text, scale, size_style, w, h])
 
     return (
       <HTMLContainer>
@@ -176,7 +173,7 @@ export class MathTextShapeUtil extends ShapeUtil<MathTextShape> {
 
         <HTMLContainer
           style={{
-            color: theme[color].solid,
+            color: theme[color],
             fontSize: LABEL_FONT_SIZES[size_style],
             transform: `scale(${scale})`,
           }}
@@ -195,6 +192,6 @@ export class MathTextShapeUtil extends ShapeUtil<MathTextShape> {
           </div>
         </HTMLContainer>
       </HTMLContainer>
-    );
+    )
   }
 }

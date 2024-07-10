@@ -1,6 +1,7 @@
-import { LABEL_FONT_SIZES, TLShapeId, getDefaultColorTheme, stopEventPropagation, useEditor } from "tldraw"
+import { LABEL_FONT_SIZES, TLShapeId, stopEventPropagation, useEditor } from "tldraw"
 import { MathTextShape } from "./MathShapeUtil"
 import { Ref } from "react"
+import { useTheme } from "../util/useTheme"
 
 export const MathSrcInputBox = function MathSrcInputBox({
   id,
@@ -21,7 +22,7 @@ export const MathSrcInputBox = function MathSrcInputBox({
 
   if (!shape) return null
 
-  const theme = getDefaultColorTheme({ isDarkMode: editor.user.getIsDarkMode() })
+  const theme = useTheme()
 
   const color = shape.props.color
   const font_height = LABEL_FONT_SIZES['m']
@@ -69,7 +70,7 @@ export const MathSrcInputBox = function MathSrcInputBox({
           height: 'auto',
           //width: 'fitContent',
           width: Math.max(5, text.length + 3) + 'ch',
-          color: theme[color].solid,
+          color: theme[color],
           fontSize: font_height,
           backgroundColor: 'transparent',
           border: 'none',
