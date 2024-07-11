@@ -2,8 +2,14 @@ import { useState } from "react"
 import { track, useEditor } from "tldraw"
 import { useTheme } from "../util/useTheme"
 
-export const NumericInput = track((props: { value: number, setValue: (value: number) => void, validator?: (value: string) => boolean }) => {
-  const { value, setValue, validator = () => (true) } = props
+export const NumericInput = track((
+  props: {
+    value: number,
+    setValue: (value: number) => void,
+    validator?: (value: string) => boolean
+    textAlign: "start" | "end" | "center"
+  }) => {
+  const { value, setValue, validator = () => (true), textAlign } = props
   const editor = useEditor()
   const theme = useTheme()
 
@@ -13,7 +19,7 @@ export const NumericInput = track((props: { value: number, setValue: (value: num
   const handleOnChange: React.ChangeEventHandler<HTMLInputElement> = (e) => {
     const amount = e.target.value
     setUnvalidatedState(amount)
-    if (amount.match(/^-{0,1}\d*(\.\d*)?$/)) {
+    if (amount !== "" && amount.match(/^-{0,1}\d*(\.\d*)?$/)) {
       if (validator(amount)) {
         setInputError(false)
         setValue(parseFloat(amount))
@@ -30,7 +36,7 @@ export const NumericInput = track((props: { value: number, setValue: (value: num
         width: "100%",
         fontSize: "20px",
         pointerEvents: "all",
-        textAlign: "center",
+        textAlign: textAlign,
         border: "none",
         color: theme.black,
         textDecoration: inputError ? "underline" : "",

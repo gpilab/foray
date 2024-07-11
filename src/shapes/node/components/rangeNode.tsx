@@ -18,24 +18,28 @@ export const RangeNode = track((props: { updateNode: (updatedProps: Partial<Node
   }
 
   return <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center" }}>
-    <RangeInput >
+    <RangeInput>
       start
       <NumericInput value={config.start} setValue={
-        (value: number) => updateConfig({ start: value })
-      } />
-    </RangeInput >
-    <RangeInput >
+        (value: number) => updateConfig({ start: value })}
+        textAlign="center"
+      />
+    </RangeInput>
+    <RangeInput>
       end
       <NumericInput value={config.end} setValue={
-        (value: number) => updateConfig({ end: value })
-      } />
-    </RangeInput >
-    <RangeInput >
+        (value: number) => updateConfig({ end: value })}
+        textAlign="center"
+      />
+    </RangeInput>
+    <RangeInput>
       step
       <NumericInput value={config.step} setValue={
         (value: number) => updateConfig({ step: value })
-      } validator={(input) => parseFloat(input) > 0} />
-    </RangeInput >
+      } validator={(input) => parseFloat(input) > 0}
+        textAlign="center"
+      />
+    </RangeInput>
   </div >
 })
 

@@ -201,8 +201,6 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
   static getNearestPortFromPoint(shape: NodeShape, ioType: "in" | "out" | "all", relativePoint: VecLike) {
     const portLocations = ioType != "all" ? this.portLocations(ioType, shape) : this.portLocations("in", shape).concat(this.portLocations("out", shape))
 
-    console.log(relativePoint)
-    console.log(portLocations)
 
     const nearestLocation = portLocations.find((portLocation) =>
       portLocation.geometry.hitTestPoint(Vec.From(relativePoint)))

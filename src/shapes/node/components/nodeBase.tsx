@@ -33,17 +33,27 @@ export const NodeBase = track(({ shape }: { shape: NodeShape }) => {
       </g>
     </SVGContainer>
 
-    <div style={{ width: width, height: height, position: "absolute", }} id="nodeContent">
+    <div style={{ width: width, height: height, position: "absolute", fontSize: "20px" }} id="nodeContent">
       <NodeContent nodeShape={shape} />
     </div>
 
-    <SVGContainer>
-      <rect id="cover_node_frame" rx={5}
-        width={width}
-        height={height}
-        stroke={theme[color]}
+    <SVGContainer
+    >
+      <g
         strokeWidth={nodeStrokeWidth}
-        fill={"none"} />
+      >
+        <rect id="cover_node_frame" rx={5}
+          width={width}
+          height={height}
+          stroke={theme["black"]}
+          fill={"none"} />
+        <rect id="cover_node_frame" rx={5}
+          width={width}
+          height={height}
+          stroke={theme[color]}
+          strokeOpacity={.7}
+          fill={"none"} />
+      </g>
     </SVGContainer>
   </HTMLContainer >
 })

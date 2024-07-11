@@ -1,3 +1,4 @@
+import { PI } from "tldraw"
 import { range } from "../util/array"
 import { createNodeDef, NodeType } from "./nodeType"
 import { binaryOpInputs, singleInput, singleOutput } from "./portDefinition"
@@ -16,20 +17,16 @@ export const addNodeDefinition = createNodeDef({
 
 const subtractDef = createNodeDef({
   state: {
+    ...addNodeDefinition.state,
     type: "Subtract",
-    inputs: binaryOpInputs("number"),
-    output: singleOutput("number"),
-    config: {}
   },
   compute: ({ a, b }) => a - b
 })
 
 const multiplyDef = createNodeDef({
   state: {
+    ...addNodeDefinition.state,
     type: "Multiply",
-    inputs: binaryOpInputs("number"),
-    output: singleOutput("number"),
-    config: {}
   },
   compute: ({ a, b }) => a * b
 })
@@ -44,7 +41,7 @@ const constantDef = createNodeDef({
   compute: (_, config) => config.value
 })
 
-export const arrayNodes = ["Range", "Sin", "Plot"] as const //, "Cos"] as const
+export const arrayNodes = ["Range", "cos", "sin", "sinc", "Plot", "ArrayAdd", "ArrayMult"] as const
 
 export const rangeDef = createNodeDef({
   state: {
@@ -65,12 +62,61 @@ export const rangeDef = createNodeDef({
 
 export const sinDef = createNodeDef({
   state: {
-    type: "Sin",
+    type: "sin",
     inputs: singleInput("numberArray"),
+    output: singleOutput("numberArray"),
+    config: { amplitude: 1, phaseOffset: 0, frequency: 4 }
+  },
+  compute: ({ a }, { amplitude, phaseOffset, frequency }) => a.map(e =>
+    amplitude * Math.sin(e * frequency + phaseOffset)
+  )
+})
+
+export const cosDef = createNodeDef({
+  state: {
+    ...sinDef.state,
+    type: "cos",
+  },
+  compute: ({ a }, { amplitude, phaseOffset, frequency }) => a.map(e =>
+    amplitude * Math.cos(e * frequency + phaseOffset)
+  )
+})
+
+export const sincDef = createNodeDef({
+  state: {
+    ...sinDef.state,
+    type: "sinc",
+  },
+  compute: ({ a }, { amplitude, phaseOffset, frequency }) => a.map(e => {
+    const x = e * frequency + phaseOffset
+
+    if (x == 0) {
+      return amplitude * 1
+    }
+
+    return amplitude * Math.sin(PI * x) / (PI * x)
+  }
+  )
+})
+
+export const arrayAddDef = createNodeDef({
+  state: {
+    type: "ArrayAdd",
+    inputs: binaryOpInputs("numberArray"),
     output: singleOutput("numberArray"),
     config: {}
   },
-  compute: ({ a }) => a.map(e => Math.sin(e))
+  compute: ({ a, b }) => a.map((e, i) => e + b[i])
+})
+
+export const arrayMultiplyDef = createNodeDef({
+  state: {
+    type: "ArrayMult",
+    inputs: binaryOpInputs("numberArray"),
+    output: singleOutput("numberArray"),
+    config: {}
+  },
+  compute: ({ a, b }) => a.map((e, i) => e * b[i])
 })
 
 export const plotDef = createNodeDef({
@@ -89,7 +135,11 @@ export const nodeDefaultDefinitions = {
   "Multiply": multiplyDef,
   "Constant": constantDef,
   "Range": rangeDef,
-  "Sin": sinDef,
+  "sin": sinDef,
+  "cos": cosDef,
+  "sinc": sincDef,
+  "ArrayAdd": arrayAddDef,
+  "ArrayMult": arrayMultiplyDef,
   "Plot": plotDef,
 }
 

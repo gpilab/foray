@@ -5,6 +5,7 @@ import { PlotNode } from "./plotNode";
 import { RangeNode } from "./rangeNode";
 import { useTheme } from "../../util/useTheme";
 import { createContext, useContext } from "react";
+import { TrigNode } from "./trigNode";
 
 
 export type NodeConfig = {
@@ -48,6 +49,10 @@ export const NodeContent = track((props: { nodeShape: NodeShape }) => {
           return <PlotNode />
         case ("Range"):
           return <RangeNode updateNode={updateNode} />
+        case ("sin"):
+        case ("sinc"):
+        case ("cos"):
+          return <TrigNode updateNode={updateNode} />
         default:
           return <DefaultNode />
       }

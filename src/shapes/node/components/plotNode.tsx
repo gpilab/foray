@@ -8,26 +8,24 @@ import { useTheme } from "../../util/useTheme"
 export const PlotNode = track(
   () => {
     const theme = useTheme()
-    const { width, height, inputs } = useNodeConfig()
+    const { inputs, color } = useNodeConfig()
     const value = inputs.a.value as number[]
-    const worldWidth = width / 100 + 1
-    const worldHeight = worldWidth * height / width
 
 
-    const dataWidth = 20
+    const dataWidth = 4
+    const dataHeight = 3
     const x = linspace(-dataWidth / 2, dataWidth / 2, value?.length)
 
     return <SVGContainer >
       <svg id="plot-svg"
-        viewBox={`${-worldWidth / 2} ${-worldHeight / 2} ${worldWidth} ${worldHeight}`}
-        strokeWidth={worldWidth / 80}
+        viewBox={`${-dataWidth / 2} ${-dataHeight / 2} ${dataWidth} ${dataHeight}`}
+        strokeWidth={.03}
       >
-        <g strokeWidth={worldWidth / 200} >
-          <Plot color={theme.black} worldWidth={dataWidth} worldHeight={dataWidth * height / width} />
+        <g strokeWidth={.005} >
+          <Plot color={theme.black} scale={1} />
         </g>
         {value === undefined ? ""
-          :
-          <g stroke={theme.blue}
+          : <g stroke={theme[color] ?? theme["blue"]}
             transform="scale(1,-1)"
             fill={"none"}
             strokeLinejoin="round">

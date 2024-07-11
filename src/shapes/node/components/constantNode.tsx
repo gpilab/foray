@@ -10,6 +10,6 @@ export const ConstantNode = track((props: { updateNode: (updatedProps: Partial<N
   const updateConfig = (value: number) => { updateNode({ config: { value } }) }
 
   return <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center" }}>
-    <NumericInput value={output.out.value} setValue={updateConfig} />
+    <NumericInput value={output.out.value} setValue={updateConfig} textAlign="center" />
   </div>
 })
