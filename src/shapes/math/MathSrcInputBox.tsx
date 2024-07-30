@@ -1,7 +1,7 @@
 import { LABEL_FONT_SIZES, TLShapeId, stopEventPropagation, useEditor } from "tldraw"
 import { MathTextShape } from "./MathShapeUtil"
 import { Ref } from "react"
-import { useTheme } from "../util/useTheme"
+import { useTheme } from "../../util/useTheme"
 
 export const MathSrcInputBox = function MathSrcInputBox({
   id,

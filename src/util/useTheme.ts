@@ -5,7 +5,8 @@ export const useTheme = () => {
   return {
     id: theme.id,
     background: theme.background,
-    text: theme.text,
+    text: theme.id == "dark" ? "#cccccc" : "#444444",//theme.text,
+    "text-high-contrast": theme.id == "dark" ? "#dddddd" : "#333333",//theme.text,
     black: theme.black.solid,
     white: theme.white.solid,
     grey: theme.grey.solid,

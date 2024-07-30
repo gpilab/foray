@@ -14,14 +14,13 @@ import { checkAllPortsPopulated, Config, nodeCompute, NodeInputs, NodeOutputs, N
 import { nodeUIConfig } from './nodeConstants'
 import { NodeBase } from './components/nodeBase'
 
-
 /// tldraw types
 /// requried for tldraw to properly perform 
 /// validation when serializing shapes
 
 const TLBasePort = {
   name: T.string,
-  dataType: T.literalEnum("boolean", "number", "numberArray"),
+  dataType: T.literalEnum("boolean", "number", "numberArray", "string"),
   value: T.optional(T.any)
 }
 
@@ -99,17 +98,28 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
       //TODO keep bindings that still fulfill data type
       //delete all old bindings
       this.editor.deleteBindings(this.editor.getBindingsInvolvingShape(prev))
-
       //compute output for the new nodeType
-      const newOutput = this.computeNodeValue(next.props.nodeType, inputs, output, config)
-      return { ...next, props: { ...next.props, inputs, output: newOutput, config } }
+      const newOutputPromise = this.computeNodeValue(next.props.nodeType, inputs, output, config)
+      // return { ...next, props: { ...next.props, inputs, output: newOutput, config } }
+      newOutputPromise.then((out) => {
+        this.editor.updateShape({ ...next, props: { ...next.props, inputs, output: out, config } })
+      }).catch((onrejected) => {
+        console.log("got rejected")
+        //TODO set node to an error state with useful info for user
+        throw onrejected
+      })
     }
 
     //handle updates to inputs
     if (JSON.stringify(next.props.inputs) !== JSON.stringify(prev.props.inputs)
       || JSON.stringify(next.props.config) !== JSON.stringify(prev.props.config)) {
-      const newOutput = this.computeNodeValue(next.props.nodeType, next.props.inputs, next.props.output, next.props.config)
-      return { ...next, props: { ...next.props, output: newOutput } }
+      const newOutputPromise = this.computeNodeValue(next.props.nodeType, next.props.inputs, next.props.output, next.props.config)
+      newOutputPromise.then((out) => {
+        this.editor.updateShape({ ...next, props: { ...next.props, output: out } })
+      }).catch((onrejected) => {
+        console.log("got rejected")
+        throw onrejected
+      })
     }
     return next
   }
@@ -127,7 +137,7 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
     }
   }
 
-  computeNodeValue(nodeType: NodeType, inputs: NodeInputs, output: NodeOutputs, config: Config) {
+  async computeNodeValue(nodeType: NodeType, inputs: NodeInputs, output: NodeOutputs, config: Config) {
     //don't compute if there are any undefined inputs
     if (checkAllPortsPopulated(inputs)) {
       const populatedInputs = inputs
@@ -137,7 +147,7 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
         output: output,
         config: config,
       }
-      const nextValue = nodeCompute(node)
+      const nextValue = await nodeCompute(node)
       return { "out": { ...output["out"], value: nextValue } }
     } else {
       console.log(`Encountered undefined port value when calculating output for node: ${nodeType}`)

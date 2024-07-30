@@ -1,4 +1,4 @@
-import { useNodeConfig } from "../node/components/NodeContent"
+import { useNodeConfig } from "../shapes/node/components/NodeContent"
 import { linspace } from "./array"
 
 type Point = { x: number, y: number }

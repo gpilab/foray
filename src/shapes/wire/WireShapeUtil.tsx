@@ -6,7 +6,7 @@ import {
 } from 'tldraw'
 import { WireBinding } from './WireBindingUtil'
 import { NodeShape, NodeShapeUtil } from '../node/nodeShapeUtil'
-import { useTheme } from '../util/useTheme'
+import { useTheme } from '../../util/useTheme'
 
 export const wireShapeProps = {
   color: DefaultColorStyle,

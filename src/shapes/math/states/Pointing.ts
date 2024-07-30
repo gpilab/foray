@@ -1,4 +1,4 @@
-import { StateNode, TLEventHandlers, BaseBoxShapeTool, createShapeId, TLBaseBoxShape, Vec } from "tldraw"
+import { StateNode, TLEventHandlers, createShapeId, TLBaseBoxShape, Vec } from "tldraw"
 
 export class Pointing extends StateNode {
   static override id = 'pointing'
@@ -36,7 +36,7 @@ export class Pointing extends StateNode {
 
     this.editor.mark(this.markId)
 
-    const shapeType = (this.parent as BaseBoxShapeTool)!.shapeType as TLBaseBoxShape['type']
+    const shapeType = (this.parent).shapeType as string
 
     const id = createShapeId()
 
@@ -52,7 +52,7 @@ export class Pointing extends StateNode {
     ])
 
     const shape = this.editor.getShape<TLBaseBoxShape>(id)!
-    const { w, h } = this.editor.getShapeUtil(shape).getDefaultProps() as TLBaseBoxShape['props']
+    const { w, h } = this.editor.getShapeUtil(shape).getDefaultProps()
     const delta = new Vec(w / 2, h / 2)
 
     const parentTransform = this.editor.getShapeParentTransform(shape)

@@ -17,7 +17,7 @@ import "katex/dist/katex.min.css"
 import { BlockMath } from "react-katex"
 import { createRef, useEffect } from "react"
 import { MathSrcInputBox } from "./MathSrcInputBox"
-import { useTheme } from "../util/useTheme"
+import { useTheme } from "../../util/useTheme"
 
 const mathTextShapeProps = {
   text: T.string,

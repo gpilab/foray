@@ -1,7 +1,8 @@
 import { PI } from "tldraw"
-import { range } from "../util/array"
 import { createNodeDef, NodeType } from "./nodeType"
 import { binaryOpInputs, singleInput, singleOutput } from "./portDefinition"
+import { invoke } from "@tauri-apps/api"
+import { range } from "../../util/array"
 
 export const algebraNodes = ["Add", "Subtract", "Multiply", "Constant"] as const
 
@@ -41,7 +42,8 @@ const constantDef = createNodeDef({
   compute: (_, config) => config.value
 })
 
-export const arrayNodes = ["Range", "cos", "sin", "sinc", "Plot", "ArrayAdd", "ArrayMult"] as const
+export const arrayNodes = ["Range", "cos", "sin", "sinc", "fft", "Plot", "ArrayAdd", "ArrayMult", "helloBackend"] as const
+
 
 export const rangeDef = createNodeDef({
   state: {
@@ -119,6 +121,35 @@ export const arrayMultiplyDef = createNodeDef({
   compute: ({ a, b }) => a.map((e, i) => e * b[i])
 })
 
+export const helloBackend = createNodeDef({
+  state: {
+    type: "helloBackend",
+    inputs: {},
+    output: singleOutput("string"),
+    config: {}
+  },
+  compute: async () => {
+    console.log("about to call async")
+    const value = await invoke<string>('hello_backend')
+    console.log("just called async")
+    console.log(value)
+    return value
+  }
+})
+export const fftDef = createNodeDef({
+  state: {
+    type: "fft",
+    inputs: singleInput("numberArray"),
+    output: singleOutput("numberArray"),
+    config: {}
+  },
+  compute: async ({ a }) => {
+    const val = await invoke<number[]>('fft', { signal: a })
+    console.log(Math.max(...val))
+    return val
+  }
+})
+
 export const plotDef = createNodeDef({
   state: {
     type: "Plot",
@@ -138,9 +169,11 @@ export const nodeDefaultDefinitions = {
   "sin": sinDef,
   "cos": cosDef,
   "sinc": sincDef,
+  "fft": fftDef,
   "ArrayAdd": arrayAddDef,
   "ArrayMult": arrayMultiplyDef,
   "Plot": plotDef,
+  "helloBackend": helloBackend
 }
 
 export const getDefaultNodeDefinition = (nodeType: NodeType) => {

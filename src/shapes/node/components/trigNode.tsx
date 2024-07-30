@@ -19,33 +19,39 @@ export const TrigNode = track((props: { updateNode: (updatedProps: Partial<NodeS
     })
   }
 
-  return <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "stretch", justifyContent: "space-around" }}>
+  return <div style={{
+    height: "100%",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "stretch",
+    justifyContent: "space-around"
+  }}>
     <div style={{ padding: "5px" }} >
-      <BlockMath math={`A *\\rm{${type}}(f x+\\phi)`} />
+      <BlockMath math={`A *{\\rm{${type}}}(f x+\\phi)`} />
     </div>
-    <div style={{ width: "100%", display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "flex-end", paddingLeft: "5px" }}>
+    <div style={{
+      width: "100%",
+      display: "flex",
+      flexDirection: "row",
+      alignItems: "center",
+      paddingLeft: "5px"
+    }}>
       <TrigInput>
-        <div style={{ color: "grey" }}>
-          <BlockMath math="A" />
-        </div>
+        <BlockMath math="A:" />
         <NumericInput value={config.amplitude} setValue={
           (value: number) => updateConfig({ amplitude: value })}
           textAlign="start"
         />
       </TrigInput>
       <TrigInput>
-        <div style={{ color: "grey" }}>
-          <BlockMath math="f" />
-        </div>
+        <BlockMath math="f:" />
         <NumericInput value={config.frequency} setValue={
           (value: number) => updateConfig({ frequency: value })}
           textAlign="start"
         />
       </TrigInput>
       <TrigInput>
-        <div style={{ color: "grey" }}>
-          <BlockMath math="\phi" />
-        </div>
+        <BlockMath math="\phi:" />
         <NumericInput value={config.phaseOffset} setValue={
           (value: number) => updateConfig({ phaseOffset: value })}
           textAlign="start"

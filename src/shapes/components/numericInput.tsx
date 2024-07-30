@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { track, useEditor } from "tldraw"
-import { useTheme } from "../util/useTheme"
+import { useTheme } from "../../util/useTheme"
 
 export const NumericInput = track((
   props: {
@@ -30,15 +30,15 @@ export const NumericInput = track((
   }
 
 
-  return < div style={{ padding: "5px" }}>
+  return < div style={{ padding: "5px", paddingBottom: "9px" }}>
     <div>
       < input style={{
         width: "100%",
-        fontSize: "20px",
+        fontSize: "22px",
         pointerEvents: "all",
         textAlign: textAlign,
         border: "none",
-        color: theme.black,
+        color: theme["text-high-contrast"],
         textDecoration: inputError ? "underline" : "",
         backgroundColor: unvalidatedValue?.toString().length < 1 ? theme.red : "transparent",
         textDecorationColor: inputError ? theme.red : theme.text,

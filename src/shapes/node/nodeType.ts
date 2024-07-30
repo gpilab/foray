@@ -1,13 +1,17 @@
-import { algebraNodes, arrayNodes, nodeDefaultDefinitions } from "./nodeDefinitions";
-import { InPort, OutPort, PortDataType, binaryOpInputs, singleOutput } from "./portDefinition"
+import {
+  algebraNodes, arrayNodes,
+  nodeDefaultDefinitions
+} from "./nodeDefinitions";
+import {
+  InPort, OutPort, PortDataType,
+  binaryOpInputs, singleOutput
+} from "./portDefinition"
 
 export const nodeTypes = [
   ...algebraNodes,
   ...arrayNodes]
 
 export type NodeType = typeof nodeTypes[number]
-
-
 
 /**
  * A node's inputs are a set of named `InPort`s
@@ -32,7 +36,6 @@ type PopulatedInputs = Populated<NodeInputs>
 
 /**
  * Node's can have arbitrary configuration dictionaries
- * TODO doesn `unknown` make sense here?
  */
 export type Config = Record<string, unknown>
 
@@ -77,7 +80,7 @@ type NodeCompute<
   C extends Config
 > = (inputs: InputValues<I>,
   config: C
-) => O["out"]["value"]
+) => Promise<O["out"]["value"]> | O["out"]["value"]
 
 
 type NodeDefinition<
@@ -124,12 +127,12 @@ addTest
  * operates on just inputs, and this function operates on the whole state.
  * Maybe both should work on the full state object?)
  */
-export const nodeCompute = <T extends PopulatedNodeState>(nodeState: T) => {
+export const nodeCompute = async <T extends PopulatedNodeState>(nodeState: T) => {
   const { type, inputs, config } = nodeState
   const compute = nodeDefaultDefinitions[type].compute as NodeCompute<T["inputs"], T["output"], T["config"]>
 
   const inputVals = flattenInputs(inputs) as InputValues<T["inputs"]>
-  const outputValue = compute(inputVals, config)
+  const outputValue = await compute(inputVals, config)
   return outputValue
 }
 

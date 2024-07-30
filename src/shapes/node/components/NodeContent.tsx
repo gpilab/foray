@@ -3,7 +3,7 @@ import { NodeShape, NodeShapeProps } from "../nodeShapeUtil";
 import { ConstantNode } from "./constantNode";
 import { PlotNode } from "./plotNode";
 import { RangeNode } from "./rangeNode";
-import { useTheme } from "../../util/useTheme";
+import { useTheme } from "../../../util/useTheme";
 import { createContext, useContext } from "react";
 import { TrigNode } from "./trigNode";
 

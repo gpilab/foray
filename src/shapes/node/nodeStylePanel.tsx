@@ -4,7 +4,7 @@ import {
   useEditor, useRelevantStyles
 } from "tldraw"
 import { nodeTypes } from "./nodeType"
-import { useTheme } from "../util/useTheme"
+import { useTheme } from "../../util/useTheme"
 
 
 /**

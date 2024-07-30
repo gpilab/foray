@@ -1,4 +1,5 @@
 import {
+  DefaultColorThemePalette,
   DefaultToolbar, DefaultToolbarContent,
   TLUiAssetUrlOverrides,
   TLUiComponents, TLUiOverrides, Tldraw,
@@ -15,18 +16,23 @@ import { NodeStylePanel } from './shapes/node/nodeStylePanel'
 import { MathTextShapeUtil } from './shapes/math/MathShapeUtil'
 import { MathShapeTool } from './shapes/math/MathShapeTool'
 
+DefaultColorThemePalette.darkMode.background = "#00000000"
+DefaultColorThemePalette.lightMode.background = "#ffffff00"
+
 export default function GPI() {
   return (
-    <Tldraw
-      persistenceKey="basicTldrawGraph"
-      inferDarkMode
-      shapeUtils={[WireShapeUtil, NodeShapeUtil, MathTextShapeUtil]}
-      bindingUtils={[WireBindingUtil]}
-      tools={[WireTool, MathShapeTool]}
-      overrides={overrides}
-      components={components}
-      assetUrls={customAssetURLs}
-    />
+    <div className="tldraw__editor">
+      <Tldraw
+        persistenceKey="basicTldrawGraph"
+        inferDarkMode
+        shapeUtils={[WireShapeUtil, NodeShapeUtil, MathTextShapeUtil]}
+        bindingUtils={[WireBindingUtil]}
+        tools={[WireTool, MathShapeTool]}
+        overrides={overrides}
+        components={components}
+        assetUrls={customAssetURLs}
+      />
+    </div>
   )
 }
 
