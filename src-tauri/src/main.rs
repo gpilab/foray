@@ -27,8 +27,6 @@ fn main() {
 
 #[tauri::command]
 fn fft(signal: Vec<f32>) -> Vec<f32> {
-    // Normalize the input signal
-
     // Convert the normalized signal to complex numbers
     let mut input: Vec<Complex<f32>> = signal
         .into_iter()
@@ -42,9 +40,13 @@ fn fft(signal: Vec<f32>) -> Vec<f32> {
 
     // Calculate magnitudes of the FFT output
     let res: Vec<f32> = input.iter().map(|c| c.norm()).collect();
+    let len = res.len();
 
     let max_value = res.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-    res.into_iter().map(|x| x / max_value).collect()
+    res.into_iter()
+        .map(|x| x / max_value)
+        .take(len / 2)
+        .collect()
 }
 #[tauri::command]
 fn greet(name: &str) -> String {

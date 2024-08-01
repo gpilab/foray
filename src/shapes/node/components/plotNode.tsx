@@ -7,28 +7,33 @@ import { useTheme } from "../../../util/useTheme"
 
 export const PlotNode = track(
   () => {
+    console.log("Rendering Plot Node")
     const theme = useTheme()
-    const { inputs, color } = useNodeConfig()
-    const value = inputs.a.value as number[]
+    const { inputs, color, showPlotGrid } = useNodeConfig()
+    const value = inputs.a?.value as number[] | undefined
 
     const dataWidth = 4
     const dataHeight = 3
-    const x = linspace(-dataWidth / 2, dataWidth / 2, value?.length)
 
     return <SVGContainer >
       <svg id="plot-svg"
         viewBox={`${-dataWidth / 2} ${-dataHeight / 2} ${dataWidth} ${dataHeight}`}
         strokeWidth={.03}
       >
-        <g strokeWidth={.005} >
-          <Plot color={theme.black} scale={1} />
-        </g>
-        {value === undefined ? ""
+        {showPlotGrid &&
+          <g strokeWidth={.005} >
+            <Plot color={theme.black} scale={1} />
+          </g>
+        }
+        {value === undefined ? <g></g>
           : <g stroke={theme[color] ?? theme["blue"]}
             transform="scale(1,-1)"
             fill={"none"}
             strokeLinejoin="round">
-            <PolyLine points={value.map((y, i) => ({ x: x[i], y: y }))} />
+            <PolyLine points={value.map((y, i) => ({
+              x: linspace(-dataWidth / 2, dataWidth / 2, value?.length)[i],
+              y: y
+            }))} />
           </g>
         }
       </svg>

@@ -6,6 +6,7 @@ import { RangeNode } from "./rangeNode";
 import { useTheme } from "../../../util/useTheme";
 import { createContext, useContext } from "react";
 import { TrigNode } from "./trigNode";
+import { BlockMath } from "react-katex";
 
 
 export type NodeConfig = {
@@ -62,14 +63,24 @@ export const NodeContent = track((props: { nodeShape: NodeShape }) => {
 
 
 const DefaultNode = track(() => {
-  const nodeType = useNodeConfig().nodeType
+  const { nodeType, config } = useNodeConfig()
+  const { formula } = config
   const theme = useTheme()
   const infoColor = theme.grey
 
-  return <div style={{ width: "100%", height: "100%", display: "flex", justifyContent: "end" }}>
-    <div style={{ color: infoColor, padding: "5px" }}>
-      {nodeType}
-    </div>
+  return <div style={{ width: "100%", height: "100%", }}>
+    {formula !== undefined
+      ? <div style={{ height: "100%", display: "flex", justifyContent: "center", alignItems: "center" }}>
+        <BlockMath math={formula} />
+      </div>
+      :
+      <div style={{
+        color: infoColor, padding: "5px",
+        display: "flex", justifyContent: "end"
+      }}>
+        {nodeType}
+      </div>
+    }
   </div>
 })
 

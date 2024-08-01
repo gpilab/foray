@@ -115,11 +115,12 @@ export class WireBindingUtil extends BindingUtil<WireBinding> {
     // artificial delay for testing 
     window.setTimeout(() => {
       this.updatePort(childNodeId, childInPort.name, parentOutPort.value)
-    }, 100)
+    }, 0)
   }
 
   /**
    * Update a node's port value
+   * WARNING, seems like this can cause some race conditions
   */
   private updatePort(nodeId: TLShapeId, portName: string, portValue: PortDataType | undefined) {
     // grab a new object to make sure we have the most up-to-date shape
@@ -143,13 +144,13 @@ export class WireBindingUtil extends BindingUtil<WireBinding> {
    * Perform any necessary cleanup after a binding is deleted
   */
   onAfterDelete(options: BindingOnDeleteOptions<WireBinding>): void {
-    const { fromId, toId } = options.binding
+    const { fromId } = options.binding
     const { terminal, portName } = options.binding.props
     console.log("after delete binding", options)
     this.editor.deleteShape(fromId)
-    if (terminal == "end") {
+    if (terminal == "start" && portName == "out") {
       //clear the connected child node port
-      this.updatePort(toId, portName, undefined)
+      this.updatePort(fromId, portName, undefined)
     }
 
   }

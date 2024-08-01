@@ -7,12 +7,13 @@ import {
 } from 'tldraw'
 
 import { TLBaseShape } from 'tldraw'
-import { nodeTypeStyle } from './nodeStylePanel'
-import { Port } from './portDefinition'
+import { nodeTypeStyle, showPlotGridStyle } from './nodeStylePanel'
+import { InPort, Port } from './portDefinition'
 import { addNodeDefinition, getDefaultNodeDefinition } from './nodeDefinitions'
 import { checkAllPortsPopulated, Config, nodeCompute, NodeInputs, NodeOutputs, NodeType } from './nodeType'
 import { nodeUIConfig } from './nodeConstants'
 import { NodeBase } from './components/nodeBase'
+import { WireBinding } from '../wire/WireBindingUtil'
 
 /// tldraw types
 /// requried for tldraw to properly perform 
@@ -42,9 +43,11 @@ const nodeShapeProps = {
 
   // Node behaviour props
   nodeType: nodeTypeStyle,
+  showPlotGrid: showPlotGridStyle,
   inputs: T.dict(T.string, TLInPort),
   output: T.object({ "out": TLOutPort }),
   config: T.dict(T.string, T.any),
+  inFlightCalc: T.boolean
 }
 
 export const defaultNodeProps: NodeShapeProps = {
@@ -53,8 +56,10 @@ export const defaultNodeProps: NodeShapeProps = {
   inputs: addNodeDefinition.state.inputs,
   output: addNodeDefinition.state.output,
   nodeType: "Add",
+  showPlotGrid: false,
   config: {},
-  color: "black"
+  color: "black",
+  inFlightCalc: false
 }
 const { portStartOffset, portDiameter, portSpacing, nodeStrokeWidth } = nodeUIConfig
 
@@ -89,37 +94,82 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
   //especially when multiple changes need to be made
   //TODO make sure ports with multiple children upate correctly! i.e. one change doesn't overwrite the other
   override onBeforeUpdate: TLOnBeforeUpdateHandler<NodeShape> = (prev: NodeShape, next: NodeShape) => {
-    //handle updates to port type
+    // If we just got back the new computed output, just return that
+    if (prev.props.inFlightCalc && !next.props.inFlightCalc) {
+      return next
+    }
+    // handle when the port type is updated
     if (prev.props.nodeType != next.props.nodeType) {
-      console.log("setting ports to default")
-      const { inputs, output, config } = getDefaultNodeDefinition(next.props.nodeType).state
-      console.log("config: ", config)
+      const { inputs, output, config
+      } = getDefaultNodeDefinition(next.props.nodeType).state
+      const defaultInputs = inputs as Record<string, InPort>
 
-      //TODO keep bindings that still fulfill data type
-      //delete all old bindings
-      this.editor.deleteBindings(this.editor.getBindingsInvolvingShape(prev))
+
+      const validPortNames = Object.keys(defaultInputs).filter(
+        portName =>
+          defaultInputs[portName].dataType == prev.props.inputs[portName]?.dataType)      // if input is the same data type, copy it over
+      const mergedInput = Object.keys(defaultInputs).reduce((merged: Record<string, InPort>, portName) => {
+        merged[portName] = {
+          ...defaultInputs[portName],
+          value: prev.props.inputs[portName]?.value
+        }
+        return merged
+      }, {})
+
+      //Delete any bindings that don't have a matching name/data type
+      const bindings = this.editor.getBindingsInvolvingShape<WireBinding>(prev)
+      const invalidBindings = bindings.filter(b => !validPortNames.concat(
+        output.out.dataType == next.props.output.out.dataType ? ["out"] : []
+      ).includes(b.props.portName))
+      this.editor.deleteBindings(invalidBindings)
+
       //compute output for the new nodeType
-      const newOutputPromise = this.computeNodeValue(next.props.nodeType, inputs, output, config)
-      // return { ...next, props: { ...next.props, inputs, output: newOutput, config } }
-      newOutputPromise.then((out) => {
-        this.editor.updateShape({ ...next, props: { ...next.props, inputs, output: out, config } })
-      }).catch((onrejected) => {
-        console.log("got rejected")
-        //TODO set node to an error state with useful info for user
-        throw onrejected
-      })
+      this.computeNodeValue(next.props.nodeType, mergedInput, output, config)
+        .then((out) => {
+          this.editor.updateShape({
+            ...next,
+            props: {
+              ...next.props,
+              inputs: mergedInput, output: out, config, inFlightCalc: false
+            }
+          })
+        }).catch((onrejected) => {
+          console.log("got rejected")
+          //TODO set node to an error state with useful info for user
+          throw onrejected
+        })
+      //return what we can for now. The callback will update the new value when it's done
+      return {
+        ...next,
+        props: {
+          ...next.props,
+          inputs: mergedInput, output, config, inFlightCalc: true
+        }
+      }
     }
 
     //handle updates to inputs
     if (JSON.stringify(next.props.inputs) !== JSON.stringify(prev.props.inputs)
       || JSON.stringify(next.props.config) !== JSON.stringify(prev.props.config)) {
-      const newOutputPromise = this.computeNodeValue(next.props.nodeType, next.props.inputs, next.props.output, next.props.config)
-      newOutputPromise.then((out) => {
-        this.editor.updateShape({ ...next, props: { ...next.props, output: out } })
-      }).catch((onrejected) => {
-        console.log("got rejected")
-        throw onrejected
-      })
+
+      console.log("updating input to type:", next.props.nodeType, prev.props.nodeType)
+
+      this.computeNodeValue(next.props.nodeType, next.props.inputs, next.props.output, next.props.config)
+        .then((out) => {
+          this.editor.updateShape({
+            ...next,
+            props: {
+              ...next.props,
+              output: out, inFlightCalc: false
+            }
+          })
+        }).catch((onrejected) => {
+          console.log("got rejected")
+          throw onrejected
+        })
+      return {
+        ...next, props: { ...next.props, inFlightCalc: true }
+      }
     }
     return next
   }

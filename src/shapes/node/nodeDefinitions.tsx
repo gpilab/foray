@@ -42,7 +42,7 @@ const constantDef = createNodeDef({
   compute: (_, config) => config.value
 })
 
-export const arrayNodes = ["Range", "cos", "sin", "sinc", "fft", "Plot", "ArrayAdd", "ArrayMult", "helloBackend"] as const
+export const arrayNodes = ["Range", "cos", "sin", "sinc", "fft", "Plot", "ArrayAdd", "ArrayMult"] as const
 
 
 export const rangeDef = createNodeDef({
@@ -69,9 +69,10 @@ export const sinDef = createNodeDef({
     output: singleOutput("numberArray"),
     config: { amplitude: 1, phaseOffset: 0, frequency: 4 }
   },
-  compute: ({ a }, { amplitude, phaseOffset, frequency }) => a.map(e =>
-    amplitude * Math.sin(e * frequency + phaseOffset)
-  )
+  compute: ({ a }, { amplitude, phaseOffset, frequency }) =>
+    a.map(e =>
+      amplitude * Math.sin(e * frequency + phaseOffset)
+    )
 })
 
 export const cosDef = createNodeDef({
@@ -79,9 +80,10 @@ export const cosDef = createNodeDef({
     ...sinDef.state,
     type: "cos",
   },
-  compute: ({ a }, { amplitude, phaseOffset, frequency }) => a.map(e =>
-    amplitude * Math.cos(e * frequency + phaseOffset)
-  )
+  compute: ({ a }, { amplitude, phaseOffset, frequency }) =>
+    a.map(e =>
+      amplitude * Math.cos(e * frequency + phaseOffset)
+    )
 })
 
 export const sincDef = createNodeDef({
@@ -89,16 +91,17 @@ export const sincDef = createNodeDef({
     ...sinDef.state,
     type: "sinc",
   },
-  compute: ({ a }, { amplitude, phaseOffset, frequency }) => a.map(e => {
-    const x = e * frequency + phaseOffset
+  compute: ({ a }, { amplitude, phaseOffset, frequency }) =>
+    a.map(e => {
+      const x = e * frequency + phaseOffset
 
-    if (x == 0) {
-      return amplitude * 1
+      if (x == 0) {
+        return amplitude * 1
+      }
+
+      return amplitude * Math.sin(PI * x) / (PI * x)
     }
-
-    return amplitude * Math.sin(PI * x) / (PI * x)
-  }
-  )
+    )
 })
 
 export const arrayAddDef = createNodeDef({
@@ -106,7 +109,7 @@ export const arrayAddDef = createNodeDef({
     type: "ArrayAdd",
     inputs: binaryOpInputs("numberArray"),
     output: singleOutput("numberArray"),
-    config: {}
+    config: { formula: "\\textbf{+}" }
   },
   compute: ({ a, b }) => a.map((e, i) => e + b[i])
 })
@@ -116,32 +119,17 @@ export const arrayMultiplyDef = createNodeDef({
     type: "ArrayMult",
     inputs: binaryOpInputs("numberArray"),
     output: singleOutput("numberArray"),
-    config: {}
+    config: { formula: "\\times" }
   },
   compute: ({ a, b }) => a.map((e, i) => e * b[i])
 })
 
-export const helloBackend = createNodeDef({
-  state: {
-    type: "helloBackend",
-    inputs: {},
-    output: singleOutput("string"),
-    config: {}
-  },
-  compute: async () => {
-    console.log("about to call async")
-    const value = await invoke<string>('hello_backend')
-    console.log("just called async")
-    console.log(value)
-    return value
-  }
-})
 export const fftDef = createNodeDef({
   state: {
     type: "fft",
     inputs: singleInput("numberArray"),
     output: singleOutput("numberArray"),
-    config: {}
+    config: { formula: "\\mathcal{F}\\{f(x)\\}" },
   },
   compute: async ({ a }) => {
     const val = await invoke<number[]>('fft', { signal: a })
@@ -173,7 +161,6 @@ export const nodeDefaultDefinitions = {
   "ArrayAdd": arrayAddDef,
   "ArrayMult": arrayMultiplyDef,
   "Plot": plotDef,
-  "helloBackend": helloBackend
 }
 
 export const getDefaultNodeDefinition = (nodeType: NodeType) => {

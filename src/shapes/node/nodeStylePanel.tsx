@@ -17,6 +17,10 @@ export const nodeTypeStyle = StyleProp.defineEnum('gpi:node_type', {
   defaultValue: "Add",
   values: nodeTypes
 })
+export const showPlotGridStyle = StyleProp.defineEnum('gpi:show_plot_grid', {
+  defaultValue: true,
+  values: [true, false]
+})
 
 export type NodeTypeStyle = T.TypeOf<typeof nodeTypeStyle>
 
@@ -28,12 +32,13 @@ export function NodeStylePanel() {
     return null
   }
 
-  const rating = styles.get(nodeTypeStyle)
+  const nodeType = styles.get(nodeTypeStyle)
+  const showPlotGrid = styles.get(showPlotGridStyle)
 
   return (
     <DefaultStylePanel>
       <DefaultStylePanelContent styles={styles} />
-      {rating !== undefined && (
+      {nodeType !== undefined && (
         <div style={{
           padding: "5px",
           paddingBottom: "10px"
@@ -47,18 +52,36 @@ export function NodeStylePanel() {
               borderRadius: "8px",
               borderColor: theme.grey
             }}
-            value={rating.type === 'mixed' ? '' : rating.value}
+            value={nodeType.type === 'mixed' ? '' : nodeType.value}
             onChange={(e) => {
-              editor.mark('changing rating')
+              editor.mark('changing nodeType')
               const value = nodeTypeStyle.validate(e.currentTarget.value)
               editor.setStyleForSelectedShapes(nodeTypeStyle, value)
             }}
           >
-            {rating.type === 'mixed' ? <option value="">Mixed</option> : null}
+            {nodeType.type === 'mixed' ? <option value="">Mixed</option> : null}
             {nodeTypes.map(n =>
               <option key={n} value={n}>{n}</option>
             )}
           </select>
+        </div>
+      )
+      }
+      {showPlotGrid !== undefined && showPlotGrid.type !== 'mixed' && (
+        <div style={{ padding: "5px" }}>
+          <label>
+            <input type="checkbox"
+              checked={showPlotGrid.value}
+
+              onChange={() => {
+                editor.mark('changing nodeType')
+                const value = showPlotGridStyle.validate(!showPlotGrid.value)
+                editor.setStyleForSelectedShapes(showPlotGridStyle, value)
+              }}
+            />
+
+            Show Grid
+          </label>
         </div>
       )
       }
