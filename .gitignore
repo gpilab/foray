@@ -22,3 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# python
+__pycache__/
+.pytest_cache/
+.nox/
+
+# rust
+target/
