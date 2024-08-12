@@ -1,0 +1,18 @@
+[package]
+name = "gpipy"
+version = "0.1.0"
+description = "GPI's rust-> python -> rust interface for"
+edition = "2021"
+authors = ["John Christensen"]
+
+[lib]
+name = "gpipy"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+#!!! Important - DO NOT ENABLE extension-module FEATURE HERE!!!
+pyo3 = { version="0.21.2"}
+
+[features]
+# instead extension-module feature for pyo3 is enabled conditionally when we want to build a standalone extension module to test our plugins without "main" program
+extension-module = ["pyo3/extension-module"]

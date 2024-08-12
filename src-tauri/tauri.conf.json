@@ -17,6 +17,17 @@
         "scope":["https://*"]
       }
     },
+     "cli": {
+      "description": "// command description that's shown on help",
+      "longDescription": "// command long description that's shown on help",
+      "beforeHelp": " // content to show before the help text",
+      "afterHelp": " // content to show after the help text",
+      "args": [], 
+      "subcommands": {
+        "subcommand-name": {
+        }
+      }
+    },
     "bundle": {
       "active": true,
       "category": "DeveloperTool",
