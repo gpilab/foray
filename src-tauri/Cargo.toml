@@ -5,7 +5,7 @@ description = "Graphical programming for scientific computation"
 authors = ["John Christensen"]
 license = "MIT"
 repository = ""
-default-run = "app"
+default-run = "GPI"
 edition = "2021"
 rust-version = "1.60"
 
