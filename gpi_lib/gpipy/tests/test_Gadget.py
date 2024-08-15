@@ -5,18 +5,5 @@ import pytest
 def gadget():
     import gpipy as pa
 
-    g = pa.Gadget()
+    g = pa.GpiNode(0, 0, 0, {})
     return g
-
-
-def test_creation(gadget):
-    pass
-
-
-def test_property(gadget):
-    gadget.prop = 42
-    assert gadget.prop == 42
-
-
-def test_push(gadget):
-    gadget.push(42)

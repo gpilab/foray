@@ -1,76 +1,89 @@
 use gpipy::gpipy as pyModule;
-use gpipy::GpiNode;
+pub use gpipy::Value;
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use std::path::Path;
 
-pub fn run_plugin() -> Result<(), Box<dyn std::error::Error>> {
+pub fn initialize_gpipy(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     //"export" our API module to the python runtime
     pyo3::append_to_inittab!(pyModule);
     //spawn runtime
     pyo3::prepare_freethreaded_python();
 
-    let path = Path::new("./python_plugin/");
-
     Python::with_gil(|py| {
         //add the current directory to import path of Python
-        #[allow(deprecated)]
-        let syspath: &PyList = py.import("sys")?.getattr("path")?.extract()?;
+        //#[allow(deprecated)]
+        let syspath: &PyList = py.import_bound("sys")?.getattr("path")?.extract()?;
         syspath.insert(0, &path)?;
-        //println!("Import path is: {:?}", syspath);
+        Ok(())
+    })
+}
 
-        // load python_plugin/gadget_init_plugin.py
-        println!("importing first module...");
-        let plugin = PyModule::import_bound(py, "gpi_node_1")?;
-        println!("importing second module...");
-        let plugin2 = PyModule::import_bound(py, "gadget_init_plugin")?;
+pub fn reload_node(node_type: &str) {
+    Python::with_gil(|py| {
+        let _ = py.run_bound(
+            &format!(
+                r#"
+import importlib
+import {0}
+importlib.reload({0})
+"#,
+                node_type
+            ),
+            None,
+            None,
+        );
+    });
+}
+
+pub fn gpipy_compute(
+    node_type: &str,
+    inputs: Vec<Value>,
+) -> Result<Value, Box<dyn std::error::Error>> {
+    Python::with_gil(|py| {
+        // This won't re-import the node, `reload_node` needs to be used
+        let node_module = match PyModule::import_bound(py, node_type) {
+            Ok(module) => module,
+            Err(e) => panic!("Failed to import ${node_type}: ${e}"),
+        };
+
+        //        py_run!(
+        //            py,
+        //            inputs,
+        //            &format!(
+        //                "from {node_type} import In
+        //print(In.__annotations__['a'].__name__)"
+        //            )
+        //        );
+        //let input_types: String = match node_module.getattr("In") {
+        //    Ok(in_enum) => in_enum
+        //        .getattr("__annotations__['a'].__name__")
+        //        .unwrap()
+        //        .extract()
+        //        .unwrap(),
+        //    Err(e) => panic!("Failed to find `In` inside ${node_type}: {e}"),
+        //};
+        //println!("expected input type for 'a': {input_types}");
 
         //// INIT
-        // and call start function there, which will return a python reference to an object
-        let gpi_node_init = plugin.getattr("start")?.call0()?;
-        let _gadget_init = plugin2.getattr("start")?.call0()?;
-
-        //now we extract (i.e. mutably borrow) the rust struct from python object
-        {
-            //this scope will have mutable access to the returned object, which will be dropped on
-            //scope exit so Python can access it again.
-            let mut gpi_node_init_rs: PyRefMut<'_, GpiNode> = gpi_node_init.extract()?;
-            // we can now modify it as if it was a native rust struct
-            // which includes access to rust-only fields that are not visible to python
-            gpi_node_init_rs.a = 3;
-            gpi_node_init_rs.b = 4;
-
-            println!(
-                "\nGPI node inputs - a: {:?},b: {:?}",
-                gpi_node_init_rs.a, gpi_node_init_rs.b
-            );
-        }
+        //let node_rs = GpiNode {
+        //    inputs,
+        //    out: Value::Integer(0),
+        //    config: HashMap::new(),
+        //};
 
         //// COMPUTE
-        println!("passing to python ...");
-        let gadget = plugin.getattr("compute")?.call1((gpi_node_init,))?;
-        println!("...returned from python");
-
-        // mutably borrow again in a new scope
-        {
-            //this scope will have mutable access to the gadget instance, which will be dropped on
-            //scope exit so Python can access it again.
-            let mut gpi_node_rs: PyRefMut<'_, GpiNode> = gadget.extract()?;
-            // we can now modify it as if it was a native rust struct
-            //which includes access to rust-only fields that are not visible to python
-            println!(
-                "Output calculated from python GPI node (a+b): {:?}",
-                gpi_node_rs.out
-            );
-            //gpi_node_rs.rustonly.clear();
-            gpi_node_rs.out = gpi_node_rs.out * 2
-        }
-
-        //any modifications we make to rust object are reflected on Python object as well
-        let res: usize = gadget.getattr("out")?.extract()?;
-        println!("After doubling output in rust: {res}");
-
-        //// VIEW
-        Ok(())
+        let compute_output: Value = match node_module.getattr("compute") {
+            Ok(compute_fn) => match compute_fn.call1((inputs,)) {
+                Ok(out_py) => match out_py.extract::<Value>() {
+                    Ok(out_value) => out_value,
+                    Err(e) => panic!("Failed to interperet  ${node_type}'s `compute` output: ${e}"),
+                },
+                Err(e) => panic!("Failed to run `compute` in ${node_type}: ${e}"),
+            },
+            Err(e) => panic!("Failed to run `compute` in ${node_type}: ${e}"),
+        };
+        Ok(compute_output)
+        //// TODO: VIEW
     })
 }

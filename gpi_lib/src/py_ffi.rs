@@ -39,9 +39,11 @@ pub fn create_py_array() {}
 mod test {
     use super::*;
     use numpy::PyArrayMethods;
+    use pyo3::prepare_freethreaded_python;
 
     #[test]
     fn ffi() {
+        prepare_freethreaded_python();
         Python::with_gil(|py| {
             let arr = unsafe {
                 let py_arr = PyArray2::<i32>::new_bound(py, [100, 100], false);
@@ -65,6 +67,7 @@ mod test {
     }
     #[test]
     fn py1<'a>() {
+        prepare_freethreaded_python();
         let _ = Python::with_gil(|py| {
             let np = py.import_bound("numpy")?;
             let globals = [("np", np)].into_py_dict_bound(py);

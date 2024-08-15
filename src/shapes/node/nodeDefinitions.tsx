@@ -4,7 +4,7 @@ import { binaryOpInputs, singleInput, singleOutput } from "./portDefinition"
 import { invoke } from "@tauri-apps/api"
 import { range } from "../../util/array"
 
-export const algebraNodes = ["Add", "Subtract", "Multiply", "Constant"] as const
+export const algebraNodes = ["Add", "Subtract", "Multiply", "Constant", "pyAdd"] as const
 
 export const addNodeDefinition = createNodeDef({
   state: {
@@ -42,7 +42,20 @@ const constantDef = createNodeDef({
   compute: (_, config) => config.value
 })
 
-export const arrayNodes = ["Range", "cos", "sin", "sinc", "fft", "Plot", "ArrayAdd", "ArrayMult"] as const
+export const pyAddDef = createNodeDef({
+  state: {
+    type: "pyAdd",
+    inputs: binaryOpInputs("number"),
+    output: singleOutput("number"),
+    config: { formula: "+ (py)" },
+  },
+  compute: async ({ a, b }) => {
+    const val = await invoke<number>('py_add', { a: a, b: b })
+    return val
+  }
+})
+
+export const arrayNodes = ["Range", "cos", "sin", "sinc", "fft", "Plot", "ArrayAdd", "ArrayMult", "PyAddArray"] as const
 
 
 export const rangeDef = createNodeDef({
@@ -138,6 +151,19 @@ export const fftDef = createNodeDef({
   }
 })
 
+export const pyAddArrayDef = createNodeDef({
+  state: {
+    type: "pyAddArray",
+    inputs: binaryOpInputs("numberArray"),
+    output: singleOutput("numberArray"),
+    config: { formula: "+ (py array)" },
+  },
+  compute: async ({ a, b }) => {
+    const val = await invoke<number[]>('py_add_array', { a: a, b: b })
+    return val
+  }
+})
+
 export const plotDef = createNodeDef({
   state: {
     type: "Plot",
@@ -161,6 +187,8 @@ export const nodeDefaultDefinitions = {
   "ArrayAdd": arrayAddDef,
   "ArrayMult": arrayMultiplyDef,
   "Plot": plotDef,
+  "pyAdd": pyAddDef,
+  "PyAddArray": pyAddArrayDef,
 }
 
 export const getDefaultNodeDefinition = (nodeType: NodeType) => {

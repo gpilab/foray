@@ -1,60 +1,42 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use rustfft::{num_complex::Complex, FftPlanner};
+use std::path::PathBuf;
+
+use gpi_lib::pyo;
+use tauri::api::cli::Matches;
+
+mod commands;
 
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
-            let matches = app.get_cli_matches();
-            match matches {
-                Ok(matches) => {
-                    if let Some(_help) = matches.args.get("help") {
-                        println!("help called");
-                        return Ok(());
-                    }
-                    println!("{:?}", matches)
-                }
-                Err(_) => {}
-            }
+            parse_cli(app.get_cli_matches().unwrap());
+            initialize_python();
+            // TODO: use path supplied from config, or have core nodes already installed in python
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![greet, fft, hello_backend])
+        .invoke_handler(tauri::generate_handler![
+            commands::greet,
+            commands::fft,
+            commands::hello_backend,
+            commands::py_add,
+            commands::py_add_array,
+            commands::dynamic_command
+        ])
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
 
-#[tauri::command]
-fn fft(signal: Vec<f32>) -> Vec<f32> {
-    // Convert the normalized signal to complex numbers
-    let mut input: Vec<Complex<f32>> = signal
-        .into_iter()
-        .map(|x| Complex { re: x, im: 0.0 })
-        .collect();
-
-    // Plan and compute the FFT
-    let mut planner = FftPlanner::new();
-    let fft = planner.plan_fft_forward(input.len());
-    fft.process(&mut input);
-
-    // Calculate magnitudes of the FFT output
-    let res: Vec<f32> = input.iter().map(|c| c.norm()).collect();
-    let len = res.len();
-
-    let max_value = res.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-    res.into_iter()
-        .map(|x| x / max_value)
-        .take(len / 2)
-        .collect()
+fn parse_cli(matches: Matches) {
+    if let Some(_help) = matches.args.get("help") {
+        println!("help called");
+    }
 }
 
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}!", name)
-}
-
-#[tauri::command]
-fn hello_backend() -> String {
-    "Hello from the backend!".to_string()
+fn initialize_python() {
+    let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    d.push("../gpi_lib/python_plugin/");
+    let _ = pyo::initialize_gpipy(&d);
 }

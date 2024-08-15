@@ -1,5 +1,5 @@
 [package]
-name = "app"
+name = "gpi_lib"
 edition = "2021"
 authors = ["John Christensen"]
 
