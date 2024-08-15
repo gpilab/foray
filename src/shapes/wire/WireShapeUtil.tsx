@@ -40,12 +40,6 @@ export class WireShapeUtil extends ShapeUtil<WireShape> {
   override hideRotateHandle = () => true
   override canResize = () => false
 
-  override onBeforeUpdate: TLOnBeforeUpdateHandler<WireShape> = (_prev, next) => {
-    // workaround to prevent the wire from blowing in some group resizing scenarios
-    // wire rendering only depends start and end shapes, so we don't actually need x,y to update
-    return { ...next, x: 0, y: 0 }
-  }
-
 
   override getGeometry(wireShape: WireShape) {
     return WireGeometry(WireShapeUtil.getWireStartEnd(wireShape, this.editor)

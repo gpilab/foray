@@ -74,6 +74,13 @@ export class WireBindingUtil extends BindingUtil<WireBinding> {
       //the parentNode has changed, propogate changes
       this.propogate(options.binding.fromId)
     }
+    // force a re-render of the wire
+    this.editor.updateShape({
+      id: options.binding.fromId,
+      type: "wire",
+      x: options.shapeAfter.x,
+      y: options.shapeAfter.y
+    })
   }
 
   private propogate(wireShapeId: TLShapeId) {
