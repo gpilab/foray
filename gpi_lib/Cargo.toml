@@ -7,3 +7,5 @@ authors = ["John Christensen"]
 numpy = "0.21.0"
 pyo3 = {version="0.21.2"}
 gpipy={path="gpipy"}
+serde = "1.0.208"
+anyhow = "1.0.86"

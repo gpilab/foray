@@ -70,6 +70,7 @@
     "macOSPrivateApi": true,
     "windows": [
       {
+        "focus": false,
         "titleBarStyle": "Overlay",
         "fullscreen": false,
         "title": "gpi-v2",

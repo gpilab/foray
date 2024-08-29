@@ -12,22 +12,30 @@ mod test {
     static INIT: Once = Once::new();
     fn initialize() {
         INIT.call_once(|| {
-            let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-            d.push("python_plugin/");
-            let _ = initialize_gpipy(&d);
+            //let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+            //d.push("python_plugin/");
+            let _ = initialize_gpipy(&get_path("python_plugin/"));
         });
+    }
+    /// gets a path object from a string representing apath relative
+    /// to `gpi_lib/`
+    fn get_path(relative_path: &str) -> PathBuf {
+        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        d.push(relative_path);
+        d
     }
 
     #[test]
     fn add_int() {
         initialize();
 
-        let _resut = match gpipy_compute("add_int", vec![Value::Integer(1), Value::Integer(3)]) {
+        let _result = match gpipy_compute("add_int", vec![Value::Integer(1), Value::Integer(3)]) {
             Ok(Value::Integer(res)) => res,
             Ok(_) => panic!("Unexpected return value from python"),
             Err(e) => panic!("Failed in Python: {}", e),
         };
-        assert!(matches!(Value::Integer(4), _result));
+        assert_eq!(4, _result);
+        assert_ne!(1, _result);
     }
 
     #[test]
@@ -52,9 +60,7 @@ mod test {
     #[test]
     fn load_numpy() {
         initialize();
-        let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        d.push("tests/simple.npy");
-        let npy_path_in = Value::String(d.to_str().unwrap().into());
+        let npy_path_in = Value::String(get_path("tests/simple.npy").to_str().unwrap().into());
 
         let result = gpipy_compute("read_np", vec![npy_path_in]);
         let val = match result {
@@ -64,6 +70,35 @@ mod test {
         };
         let _expected = vec![1.0, 2.0, 3.0];
         assert!(do_vecs_match(&val, &_expected));
+    }
+    #[test]
+    fn load_numpy_2d() {
+        initialize();
+        let npy_path_in = Value::String(get_path("tests/2dArray.npy").to_str().unwrap().into());
+
+        let result = gpipy_compute("read_np", vec![npy_path_in]);
+        let val = match result {
+            Ok(Value::Vec2(val)) => val,
+            Ok(_) => panic!("Unexpected return value from python"),
+            Err(e) => panic!("Failed in Python: {}", e),
+        };
+        let _expected = vec![vec![1.0, 2.0], vec![3.0, 4.0]];
+
+        assert!(do_vecs_match(&val, &_expected));
+    }
+    #[test]
+    fn load_numpy_4d() {
+        initialize();
+        let npy_path_in = Value::String(get_path("tests/t2vol.npy").to_str().unwrap().into());
+
+        let result = gpipy_compute("read_np", vec![npy_path_in]);
+        let val = match result {
+            Ok(Value::Vec4(val)) => val,
+            Ok(_) => panic!("Unexpected return value from python"),
+            Err(e) => panic!("Failed in Python: {}", e),
+        };
+        let dim = (val.len(), val[0].len(), val[0][0].len(), val[0][0][0].len());
+        assert_eq!(dim, (3, 436, 436, 2));
     }
 
     fn do_vecs_match<T: PartialEq>(a: &Vec<T>, b: &Vec<T>) -> bool {

@@ -83,7 +83,7 @@ type NodeCompute<
 ) => Promise<O["out"]["value"]> | O["out"]["value"]
 
 
-type NodeDefinition<
+export type NodeDefinition<
   I extends NodeInputs,
   O extends NodeOutputs,
   C extends Config

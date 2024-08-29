@@ -5,10 +5,11 @@ import GPI from './gpi'
 import { TitleBar } from './util/titleBar'
 import { os } from '@tauri-apps/api'
 
+
 const platform = window.__TAURI__ ? await os.platform() : "web"
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <div>
+    <div className='app'>
       {platform != "web"
         ? <div id="tauri-frame"
           style={{

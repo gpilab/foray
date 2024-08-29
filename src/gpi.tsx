@@ -15,24 +15,51 @@ import { NodeShapeUtil } from './shapes/node/nodeShapeUtil'
 import { NodeStylePanel } from './shapes/node/nodeStylePanel'
 import { MathTextShapeUtil } from './shapes/math/MathShapeUtil'
 import { MathShapeTool } from './shapes/math/MathShapeTool'
+import { invoke } from '@tauri-apps/api'
 
 DefaultColorThemePalette.darkMode.background = "#00000000"
 DefaultColorThemePalette.lightMode.background = "#ffffff00"
 
+
+
+import { NodeDefinition } from './shapes/node/nodeType'
+import React, { useState } from 'react'
+import { parse_nodes, SerializedPython } from './util/parse_tauri'
+
+type GPIState = {
+  NodeDefinitions: NodeDefinition<any, any, any>[]
+}
+const initGPIState: GPIState = {
+  NodeDefinitions: []
+}
+export const GPIContext = React.createContext(initGPIState)
+
+
 export default function GPI() {
+  const [gpiState, setGpiState] = useState(initGPIState)
   return (
-    <div className="tldraw__editor">
-      <Tldraw
-        persistenceKey="basicTldrawGraph"
-        inferDarkMode
-        shapeUtils={[WireShapeUtil, NodeShapeUtil, MathTextShapeUtil]}
-        bindingUtils={[WireBindingUtil]}
-        tools={[WireTool, MathShapeTool]}
-        overrides={overrides}
-        components={components}
-        assetUrls={customAssetURLs}
-      />
-    </div>
+    <GPIContext.Provider value={gpiState}>
+      <div className="tldraw__editor">
+        <Tldraw
+          persistenceKey="basicTldrawGraph"
+          inferDarkMode
+          shapeUtils={[WireShapeUtil, NodeShapeUtil, MathTextShapeUtil]}
+          bindingUtils={[WireBindingUtil]}
+          tools={[WireTool, MathShapeTool]}
+          overrides={overrides}
+          components={components}
+          assetUrls={customAssetURLs}
+          onMount={() => {
+            invoke<SerializedPython[]>('get_python_nodes').then(
+              parse_nodes).then(nodes => setGpiState({ ...gpiState, NodeDefinitions: nodes })
+              ).catch((e) => {
+                console.error("Failed to load nodes", e)
+              })
+
+          }}
+        />
+      </div>
+    </GPIContext.Provider >
   )
 }
 

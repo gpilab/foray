@@ -1,10 +1,10 @@
 import { PI } from "tldraw"
-import { createNodeDef, NodeType } from "./nodeType"
-import { binaryOpInputs, singleInput, singleOutput } from "./portDefinition"
+import { Config, createNodeDef, NodeInputs, NodeOutputs, NodeType } from "./nodeType"
+import { binaryOpInputs, PortDataType, singleInput, singleOutput } from "./portDefinition"
 import { invoke } from "@tauri-apps/api"
 import { range } from "../../util/array"
 
-export const algebraNodes = ["Add", "Subtract", "Multiply", "Constant", "pyAdd"] as const
+export const algebraNodes = ["Add", "Subtract", "Multiply", "Constant", "pyAdd", "DynamicNode"] as const
 
 export const addNodeDefinition = createNodeDef({
   state: {
@@ -153,7 +153,7 @@ export const fftDef = createNodeDef({
 
 export const pyAddArrayDef = createNodeDef({
   state: {
-    type: "pyAddArray",
+    type: "PyAddArray",
     inputs: binaryOpInputs("numberArray"),
     output: singleOutput("numberArray"),
     config: { formula: "+ (py array)" },
@@ -174,6 +174,58 @@ export const plotDef = createNodeDef({
   compute: ({ a }) => a
 })
 
+
+
+
+export const createDynamicNode = (config: Config,
+  inputs: NodeInputs,
+  output: NodeOutputs) => {
+
+  return createNodeDef({
+    state: {
+      type: "DynamicNode",
+      inputs,
+      output,
+      config
+    },
+    compute: async ({ a, b }) => {
+      const dynamic_message = {
+        message: {
+          node_type: a,
+          inputs: b
+        }
+      }
+      /// list of input `Values` to pass to `node_type`'s python "compute" function
+      const val = await invoke<PortDataType>('dynamic_command', dynamic_message)
+      return val
+    }
+
+  })
+}
+
+
+export const defaultDynamicNodeDef = createNodeDef({
+  state: {
+    type: "DynamicNode",
+    inputs: binaryOpInputs("number"),
+    output: singleOutput("number"),
+    config: {}
+  },
+  compute: async ({ a, b }) => {
+    const dynamic_message = {
+      message: {
+        node_type: "add_int",
+        inputs: [{ Integer: a }, { Integer: b }]
+      }
+    }
+    console.log(dynamic_message)
+    /// list of input `Values` to pass to `node_type`'s python "compute" function
+    const val = await invoke<{ Integer: number }>('dynamic_command', dynamic_message)
+    console.log("value", val)
+    return val.Integer
+  }
+})
+
 export const nodeDefaultDefinitions = {
   "Add": addNodeDefinition,
   "Subtract": subtractDef,
@@ -189,6 +241,7 @@ export const nodeDefaultDefinitions = {
   "Plot": plotDef,
   "pyAdd": pyAddDef,
   "PyAddArray": pyAddArrayDef,
+  "DynamicNode": defaultDynamicNodeDef,
 }
 
 export const getDefaultNodeDefinition = (nodeType: NodeType) => {

@@ -1,5 +1,8 @@
 import { TLDefaultColorStyle } from "tldraw"
 
+export const PortTypeLabels = ["number", "string", "boolean", "numberArray"] as const
+export type PortDataTypeLabel = typeof PortTypeLabels[number]
+
 export type PortTypeMap = {
   "number": number
   "string": string
@@ -7,8 +10,11 @@ export type PortTypeMap = {
   "numberArray": number[]
 }
 
-export type PortDataTypeLabel = keyof PortTypeMap
 export type PortDataType = PortTypeMap[PortDataTypeLabel]
+
+export function isPortDataTypeLabel(maybeLabel: unknown): maybeLabel is PortDataTypeLabel {
+  return PortTypeLabels.includes(maybeLabel as PortDataTypeLabel)
+}
 
 export const portColorMap: Record<PortDataTypeLabel, TLDefaultColorStyle> = {
   "number": "violet",

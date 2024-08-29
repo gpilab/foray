@@ -19,6 +19,12 @@ pub fn initialize_gpipy(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     })
 }
 
+pub fn initialize_default() {
+    let mut path = std::env::current_dir().unwrap();
+    path.push("python_plugin");
+    let _ = initialize_gpipy(&path);
+}
+
 pub fn reload_node(node_type: &str) {
     Python::with_gil(|py| {
         let _ = py.run_bound(
@@ -84,6 +90,31 @@ pub fn gpipy_compute(
             Err(e) => panic!("Failed to run `compute` in ${node_type}: ${e}"),
         };
         Ok(compute_output)
+        //// TODO: VIEW
+    })
+}
+pub fn gpipy_config(
+    node_type: &str,
+) -> Result<(Vec<String>, Vec<String>), Box<dyn std::error::Error>> {
+    Python::with_gil(|py| {
+        // This won't re-import the node, `reload_node` needs to be used
+        let node_module = match PyModule::import_bound(py, node_type) {
+            Ok(module) => module,
+            Err(e) => panic!("Failed to import ${node_type}: ${e}"),
+        };
+
+        //// get config
+        let config = match node_module.getattr("config") {
+            Ok(compute_fn) => match compute_fn.call0() {
+                Ok(out_py) => match out_py.extract::<(Vec<String>, Vec<String>)>() {
+                    Ok(out_value) => out_value,
+                    Err(e) => panic!("Failed to interperet  ${node_type}'s `compute` output: ${e}"),
+                },
+                Err(e) => panic!("Failed to run `compute` in ${node_type}: ${e}"),
+            },
+            Err(e) => panic!("Failed to run `compute` in ${node_type}: ${e}"),
+        };
+        Ok(config)
         //// TODO: VIEW
     })
 }

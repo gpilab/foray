@@ -10,6 +10,7 @@ name = "gpipy"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+numpy = "0.21.0"
 #!!! Important - DO NOT ENABLE extension-module FEATURE HERE!!!
 pyo3 = { version="0.21.2"}
 serde = {version="1.0.207", features=["serde_derive"]}

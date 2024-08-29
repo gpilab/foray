@@ -6,7 +6,8 @@ use std::path::PathBuf;
 use gpi_lib::pyo;
 use tauri::api::cli::Matches;
 
-mod commands;
+mod from_ui;
+mod rust_node;
 
 fn main() {
     tauri::Builder::default()
@@ -17,12 +18,11 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            commands::greet,
-            commands::fft,
-            commands::hello_backend,
-            commands::py_add,
-            commands::py_add_array,
-            commands::dynamic_command
+            rust_node::fft,
+            rust_node::py_add,
+            rust_node::py_add_array,
+            from_ui::run_node,
+            from_ui::get_python_nodes
         ])
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .run(tauri::generate_context!())
