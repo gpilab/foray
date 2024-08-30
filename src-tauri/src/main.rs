@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use gpi_lib::pyo;
+use gpipy::pyo;
 use tauri::api::cli::Matches;
 
 mod from_ui;
@@ -37,6 +37,6 @@ fn parse_cli(matches: Matches) {
 
 fn initialize_python() {
     let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    d.push("../gpi_lib/python_plugin/");
+    d.push("../gpipy/python_plugin/");
     let _ = pyo::initialize_gpipy(&d);
 }

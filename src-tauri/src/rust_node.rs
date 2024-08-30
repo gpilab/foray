@@ -1,4 +1,4 @@
-use gpi_lib::pyo::{gpipy_compute, Value};
+use gpipy::{pyo::gpipy_compute, python_node::Value};
 use rustfft::{num_complex::Complex, FftPlanner};
 
 #[tauri::command]

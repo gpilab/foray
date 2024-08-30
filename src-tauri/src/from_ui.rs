@@ -1,9 +1,6 @@
 use std::path::PathBuf;
 
-use gpi_lib::{
-    node::PythonNode,
-    pyo::{gpipy_compute, Value},
-};
+use gpipy::{node::PythonNode, pyo::gpipy_compute, python_node::Value};
 
 use serde::Deserialize;
 use tauri::api::dir::read_dir;
@@ -33,7 +30,7 @@ pub fn run_node(message: RunNodeMessage) -> Value {
 #[tauri::command]
 pub fn get_python_nodes() -> Vec<PythonNode> {
     let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    d.push("../gpi_lib/python_plugin/");
+    d.push("../gpipy/python_plugin/");
 
     read_dir(d.clone(), true)
         .unwrap()
@@ -60,13 +57,13 @@ pub fn get_python_nodes() -> Vec<PythonNode> {
 mod test {
     use std::path::PathBuf;
 
-    use gpi_lib::pyo::initialize_gpipy;
+    use gpipy::pyo::initialize_gpipy;
 
     use super::*;
     #[test]
     fn add_int() {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        d.push("../gpi_lib/python_plugin/");
+        d.push("../gpipy/python_plugin/");
         let _ = initialize_gpipy(&d);
         let _result = match gpipy_compute("add_int", vec![Value::Integer(1), Value::Integer(3)]) {
             Ok(Value::Integer(res)) => res,

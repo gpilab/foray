@@ -6,7 +6,7 @@ version = 3
 name = "GPI"
 version = "0.1.0"
 dependencies = [
- "gpi_lib",
+ "gpipy",
  "notify",
  "rustfft",
  "serde",
@@ -1505,20 +1505,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "gpi_lib"
+name = "gpipy"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "gpipy",
- "numpy",
- "pyo3",
- "serde",
-]
-
-[[package]]
-name = "gpipy"
-version = "0.1.0"
-dependencies = [
  "numpy",
  "pyo3",
  "serde",

@@ -21,7 +21,7 @@ tauri = { version = "1.7.0", features = [ "cli", "macos-private-api", "api-all"]
 tauri-plugin-window-state = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 # window-vibrancy = { version =" 0.4"}
 rustfft = "6.2.0"
-gpi_lib = {path = "../gpi_lib/"}
+gpipy = {path = "../gpipy/"}
 notify = "6.1.1"
 
 

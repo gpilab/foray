@@ -1,0 +1,14 @@
+[package]
+name = "gpipy"
+edition = "2021"
+authors = ["John Christensen"]
+
+[lib]
+name = "gpipy"
+
+[dependencies]
+numpy = "0.21.0"
+pyo3 = {version="0.21.2"}
+serde = {version="1.0.207", features=["serde_derive"]}
+anyhow = "1.0.86"
+
