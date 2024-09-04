@@ -1,22 +1,26 @@
-use gpipy::{pyo::gpipy_compute, python_node::Value};
+use gpipy::{
+    pyo::gpipy_compute,
+    python_node::{PortValue, PrimitiveValue},
+};
 use rustfft::{num_complex::Complex, FftPlanner};
 
 #[tauri::command]
 pub fn py_add(a: i32, b: i32) -> i32 {
-    let res = gpipy_compute("add_int", vec![Value::Integer(a), Value::Integer(b)]).unwrap();
+    let res = gpipy_compute("add_int", vec![a.into(), b.into()]).unwrap();
     match res {
-        Value::Integer(v) => v,
+        PortValue::Primitive(PrimitiveValue::Integer(v)) => v,
         _ => panic!("Unexpected return value from python"),
     }
 }
 
 #[tauri::command]
-pub fn py_add_array(a: Vec<f32>, b: Vec<f32>) -> Vec<f32> {
-    let res = gpipy_compute("add_int_array", vec![Value::Vec1(a), Value::Vec1(b)]).unwrap();
-    match res {
-        Value::Vec1(v) => v,
-        _ => panic!("Unexpected return value from python!"),
-    }
+pub fn py_add_array(a: PortValue, b: PortValue) -> PortValue {
+    let res = gpipy_compute("add_int_array", vec![a.into(), b.into()]).unwrap();
+    //match res {
+    //    PortValue::Vec1(v) => v,
+    //    _ => panic!("Unexpected return value from python!"),
+    //}
+    res
 }
 
 #[tauri::command]

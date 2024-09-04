@@ -1,4 +1,5 @@
-use crate::python_node::{gpipy as pyModule, Value};
+use crate::python_node::{gpipy as pyModule, PyPortValue, PyPrimitiveValue};
+use gpi_framework::port::{PortValue, PrimitiveValue};
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 use std::path::Path;
@@ -45,8 +46,11 @@ importlib.reload({0})
 /// Run a python node's compute function
 pub fn gpipy_compute(
     node_type: &str,
-    inputs: Vec<Value>,
-) -> Result<Value, Box<dyn std::error::Error>> {
+    inputs: Vec<PortValue<PrimitiveValue>>,
+) -> Result<PyPortValue, Box<dyn std::error::Error>> {
+    let py_inputs = inputs.into_iter().map(|input| match input {
+        PortValue::Vec1(val) => PyPortValue(val),
+    });
     Python::with_gil(|py| {
         // This won't re-import the node, `reload_node` needs to be used
         let node_module = match PyModule::import_bound(py, node_type) {
@@ -55,9 +59,9 @@ pub fn gpipy_compute(
         };
 
         //// COMPUTE
-        let compute_output: Value = match node_module.getattr("compute") {
+        let compute_output: PyPortValue = match node_module.getattr("compute") {
             Ok(compute_fn) => match compute_fn.call1((inputs,)) {
-                Ok(out_py) => match out_py.extract::<Value>() {
+                Ok(out_py) => match out_py.extract::<PyPortValue>() {
                     Ok(out_value) => out_value,
                     Err(e) => panic!("Failed to interperet  ${node_type}'s `compute` output: ${e}"),
                 },

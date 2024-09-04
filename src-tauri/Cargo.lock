@@ -1505,10 +1505,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "gpi_framework"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "gpipy"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "gpi_framework",
  "numpy",
  "pyo3",
  "serde",

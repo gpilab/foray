@@ -2,9 +2,10 @@
 mod test {
     use std::path::PathBuf;
 
+    use gpi_framework::port::{PortValue, PrimitiveValue};
     use gpipy::{
         pyo::{gpipy_compute, initialize_gpipy},
-        python_node::Value,
+        python_node::{PyPortValue, PyPrimitiveValue},
     };
 
     use std::sync::Once;
@@ -29,8 +30,14 @@ mod test {
     fn add_int() {
         initialize();
 
-        let _result = match gpipy_compute("add_int", vec![Value::Integer(1), Value::Integer(3)]) {
-            Ok(Value::Integer(res)) => res,
+        let _result = match gpipy_compute(
+            "add_int",
+            vec![
+                PortValue::Primitive(PrimitiveValue::Integer(1)),
+                PortValue::Primitive(PrimitiveValue::Integer(3)),
+            ],
+        ) {
+            Ok(PortValue::Primitive(PyPrimitiveValue::Integer(res))) => res,
             Ok(_) => panic!("Unexpected return value from python"),
             Err(e) => panic!("Failed in Python: {}", e),
         };
@@ -44,57 +51,84 @@ mod test {
         let result = gpipy_compute(
             "add_int_array",
             vec![
-                Value::Vec1(vec![1.0, 2.0, 3.0]),
-                Value::Vec1(vec![1.0, 2.0, 3.0]),
+                PortValue::Vec1(vec![
+                    PrimitiveValue::Real(1.0),
+                    PrimitiveValue::Real(2.0),
+                    PrimitiveValue::Real(3.0),
+                ]),
+                PortValue::Vec1(vec![
+                    PrimitiveValue::Real(1.0),
+                    PrimitiveValue::Real(2.0),
+                    PrimitiveValue::Real(3.0),
+                ]),
             ],
         );
 
         let val = match result {
-            Ok(Value::Vec1(v)) => v,
+            Ok(PortValue::Vec1(v)) => v,
             Ok(_) => panic!("Unexpected return value from python"),
             Err(e) => panic!("Failed in Python: {}", e),
         };
-        assert!(do_vecs_match(&val, &vec![2.0, 4.0, 6.0]))
+        assert!(do_vecs_match(
+            &val,
+            &vec![
+                PrimitiveValue::Real(2.0),
+                PrimitiveValue::Real(4.0),
+                PrimitiveValue::Real(6.0)
+            ]
+        ))
     }
 
     #[test]
     fn load_numpy() {
         initialize();
-        let npy_path_in = Value::String(get_path("tests/simple.npy").to_str().unwrap().into());
+        let npy_path_in = PortValue::Primitive(PrimitiveValue::String(
+            get_path("tests/simple.npy").to_str().unwrap().into(),
+        ));
 
         let result = gpipy_compute("read_np", vec![npy_path_in]);
         let val = match result {
-            Ok(Value::Vec1(val)) => val,
+            Ok(PortValue::Vec1(val)) => val,
             Ok(_) => panic!("Unexpected return value from python"),
             Err(e) => panic!("Failed in Python: {}", e),
         };
-        let _expected = vec![1.0, 2.0, 3.0];
+        let _expected = vec![
+            PrimitiveValue::Real(1.),
+            PrimitiveValue::Real(2.),
+            PrimitiveValue::Real(3.),
+        ];
         assert!(do_vecs_match(&val, &_expected));
     }
     #[test]
     fn load_numpy_2d() {
         initialize();
-        let npy_path_in = Value::String(get_path("tests/2dArray.npy").to_str().unwrap().into());
+        let npy_path_in = PortValue::Primitive(PrimitiveValue::String(
+            get_path("tests/2dArray.npy").to_str().unwrap().into(),
+        ));
 
         let result = gpipy_compute("read_np", vec![npy_path_in]);
         let val = match result {
-            Ok(Value::Vec2(val)) => val,
-            Ok(_) => panic!("Unexpected return value from python"),
+            Ok(PortValue::Vec2(val)) => val,
+            Ok(e) => panic!("Unexpected return value from python. {:?}", e),
             Err(e) => panic!("Failed in Python: {}", e),
         };
-        let _expected = vec![vec![1.0, 2.0], vec![3.0, 4.0]];
+        let _expected = vec![
+            vec![PrimitiveValue::Real(1.0), PrimitiveValue::Real(2.0)],
+            vec![PrimitiveValue::Real(3.0), PrimitiveValue::Real(4.0)],
+        ];
 
         assert!(do_vecs_match(&val, &_expected));
     }
     #[test]
     fn load_numpy_4d() {
         initialize();
-        let npy_path_in = Value::String(get_path("tests/t2vol.npy").to_str().unwrap().into());
-
+        let npy_path_in = PortValue::Primitive(PrimitiveValue::String(
+            get_path("tests/t2vol.npy").to_str().unwrap().into(),
+        ));
         let result = gpipy_compute("read_np", vec![npy_path_in]);
         let val = match result {
-            Ok(Value::Vec4(val)) => val,
-            Ok(_) => panic!("Unexpected return value from python"),
+            Ok(PortValue::Vec4(val)) => val,
+            Ok(e) => panic!("Unexpected return value from python. {:?}", e),
             Err(e) => panic!("Failed in Python: {}", e),
         };
         let dim = (val.len(), val[0].len(), val[0][0].len(), val[0][0][0].len());

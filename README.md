@@ -16,8 +16,9 @@ Multi-select, copy/paste, and layout tools are all available
 TODO:
 [ ] - Node UI interactions that make editing paramters quick and easy
 [ ] - Detailed node configuration editing
-[ ] - make any python node defined automatically appear in the UI
-[ ] - debugging/logging information surface to the user
+[s] - make any python node defined automatically appear in the UI
+  [ ] - Define port types that match across UI/Rust/Python
+[ ] - debugging/logging information surfaced to the user
 [ ] - indication of when nodes fire, and how long they run
 [ ] - export network as a file
 
@@ -43,8 +44,8 @@ TODO:
 ### Python API
 
 TODO:
-[ ] - init function
-[ ] - compute function
+[s] - init function
+[s] - compute function
 [ ] - view function
 
 
