@@ -1,0 +1,74 @@
+.gpi-ui-layout {
+	margin: 0;
+	padding: 0;
+	height: 100vh;
+	width: 100vw;
+	padding: 150px;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-end;
+	/* Centers the popup horizontally */
+	align-items: center;
+	/* Aligns the popup at the bottom */
+	position: absolute;
+}
+
+
+.node-select-frame {
+	width: 60%;
+	max-width: 800px;
+	max-height: 300px;
+	/* resize based on content*/
+	height: auto;
+	width: auto;
+	background-color: white;
+	border-radius: 5px;
+	z-index: 600;
+	padding: 5px;
+	box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+	overflow-y: scroll;
+	left: 25%;
+	position: absolute;
+}
+
+@supports (scrollbar-color: auto) {
+	.scrollbox {
+		.node-select-frame {
+			scrollbar-color: aquamarine cornflowerblue;
+		}
+	}
+}
+
+/* Otherwise, use `::-webkit-scrollbar-*` pseudo-elements */
+@supports selector(::-webkit-scrollbar) {
+	.node-select-frame::-webkit-scrollbar {
+		width: 5px;
+	}
+
+	.node-select-frame::-webkit-scrollbar-thumb {
+		background: grey;
+		border-radius: 3px;
+	}
+}
+
+
+.grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+	gap: 4px;
+	padding: 5px;
+}
+
+.grid-item {
+	padding: 1px;
+	border: 1px solid #ccc;
+	border-radius: 3px;
+	cursor: pointer;
+	text-align: center;
+	background-color: #f9f9f9;
+	transition: background-color 0.1s ease;
+}
+
+.grid-item:hover {
+	background-color: #e0e0e0;
+}

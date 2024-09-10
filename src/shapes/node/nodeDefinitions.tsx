@@ -5,11 +5,11 @@ import { invoke } from "@tauri-apps/api"
 import { range } from "../../util/array"
 import { GPI_Nodes } from "../../gpi"
 
-export const algebraNodes = ["Add", "Subtract", "Multiply", "Constant", "pyAdd", "DynamicNode"] as const
+export const algebraNodes = ["_Add", "_Subtract", "_Multiply", "_Constant", "_pyAdd", "_DynamicNode"] as const
 
 export const addNodeDefinition = createNodeDef({
   state: {
-    type: "Add",
+    type: "_Add",
     inputs: binaryOpInputs("Real"),
     output: singleOutput("Real"),
     config: {}
@@ -20,7 +20,7 @@ export const addNodeDefinition = createNodeDef({
 const subtractDef = createNodeDef({
   state: {
     ...addNodeDefinition.state,
-    type: "Subtract",
+    type: "_Subtract",
   },
   compute: ({ a, b }) => a.value - b.value
 })
@@ -28,14 +28,14 @@ const subtractDef = createNodeDef({
 const multiplyDef = createNodeDef({
   state: {
     ...addNodeDefinition.state,
-    type: "Multiply",
+    type: "_Multiply",
   },
   compute: ({ a, b }) => a.value * b.value
 })
 
 const constantDef = createNodeDef({
   state: {
-    type: "Constant",
+    type: "_Constant",
     inputs: {},
     output: singleOutput("Real"),
     config: { value: 10 }
@@ -45,7 +45,7 @@ const constantDef = createNodeDef({
 
 export const pyAddDef = createNodeDef({
   state: {
-    type: "pyAdd",
+    type: "_pyAdd",
     inputs: binaryOpInputs("Real"),
     output: singleOutput("Real"),
     config: { formula: "+ (py)" },
@@ -59,12 +59,12 @@ export const pyAddDef = createNodeDef({
   }
 })
 
-export const arrayNodes = ["Range", "cos", "sin", "sinc", "fft", "Plot", "ArrayAdd", "ArrayMult", "PyAddArray"] as const
+export const arrayNodes = ["_Range", "_cos", "_sin", "_sinc", "_fft", "_Plot", "_ArrayAdd", "_ArrayMult", "_PyAddArray"] as const
 
 
 export const rangeDef = createNodeDef({
   state: {
-    type: "Range",
+    type: "_Range",
     inputs: {},
     output: singleOutput("Vec"),
     config: {
@@ -81,7 +81,7 @@ export const rangeDef = createNodeDef({
 
 export const sinDef = createNodeDef({
   state: {
-    type: "sin",
+    type: "_sin",
     inputs: singleInput("Vec"),
     output: singleOutput("Vec"),
     config: { amplitude: 1, phaseOffset: 0, frequency: 4 }
@@ -95,7 +95,7 @@ export const sinDef = createNodeDef({
 export const cosDef = createNodeDef({
   state: {
     ...sinDef.state,
-    type: "cos",
+    type: "_cos",
   },
   compute: ({ a }, { amplitude, phaseOffset, frequency }) =>
     a.value.map(e =>
@@ -106,7 +106,7 @@ export const cosDef = createNodeDef({
 export const sincDef = createNodeDef({
   state: {
     ...sinDef.state,
-    type: "sinc",
+    type: "_sinc",
   },
   compute: ({ a }, { amplitude, phaseOffset, frequency }) =>
     a.value.map(e => {
@@ -123,7 +123,7 @@ export const sincDef = createNodeDef({
 
 export const arrayAddDef = createNodeDef({
   state: {
-    type: "ArrayAdd",
+    type: "_ArrayAdd",
     inputs: binaryOpInputs("Vec"),
     output: singleOutput("Vec"),
     config: { formula: "\\textbf{+}" }
@@ -133,7 +133,7 @@ export const arrayAddDef = createNodeDef({
 
 export const arrayMultiplyDef = createNodeDef({
   state: {
-    type: "ArrayMult",
+    type: "_ArrayMult",
     inputs: binaryOpInputs("Vec"),
     output: singleOutput("Vec"),
     config: { formula: "\\times" }
@@ -143,7 +143,7 @@ export const arrayMultiplyDef = createNodeDef({
 
 export const fftDef = createNodeDef({
   state: {
-    type: "fft",
+    type: "_fft",
     inputs: singleInput("Vec"),
     output: singleOutput("Vec"),
     config: { formula: "\\mathcal{F}\\{f(x)\\}" },
@@ -157,7 +157,7 @@ export const fftDef = createNodeDef({
 
 export const pyAddArrayDef = createNodeDef({
   state: {
-    type: "PyAddArray",
+    type: "_PyAddArray",
     inputs: binaryOpInputs("Vec"),
     output: singleOutput("Vec"),
     config: { formula: "+ (py array)" },
@@ -178,7 +178,7 @@ export const pyAddArrayDef = createNodeDef({
 
 export const plotDef = createNodeDef({
   state: {
-    type: "Plot",
+    type: "_Plot",
     inputs: singleInput("Vec"),
     output: singleOutput("Vec"),
     config: {}
@@ -233,7 +233,7 @@ export const createDynamicNode = (type: string, config: Config,
 
 export const defaultDynamicNodeDef = createNodeDef({
   state: {
-    type: "DynamicNode",
+    type: "_DynamicNode",
     inputs: binaryOpInputs("Real"),
     output: singleOutput("Real"),
     config: {}
@@ -255,21 +255,21 @@ export const defaultDynamicNodeDef = createNodeDef({
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const nodeDefaultDefinitions: { [type: string]: NodeDefinition<any, any, any> } = {
-  "Add": addNodeDefinition,
-  "Subtract": subtractDef,
-  "Multiply": multiplyDef,
-  "Constant": constantDef,
-  "Range": rangeDef,
-  "sin": sinDef,
-  "cos": cosDef,
-  "sinc": sincDef,
-  "fft": fftDef,
-  "ArrayAdd": arrayAddDef,
-  "ArrayMult": arrayMultiplyDef,
-  "Plot": plotDef,
-  "pyAdd": pyAddDef,
-  "PyAddArray": pyAddArrayDef,
-  "DynamicNode": defaultDynamicNodeDef,
+  "_Add": addNodeDefinition,
+  "_Subtract": subtractDef,
+  "_Multiply": multiplyDef,
+  "_Constant": constantDef,
+  "_Range": rangeDef,
+  "_sin": sinDef,
+  "_cos": cosDef,
+  "_sinc": sincDef,
+  "_fft": fftDef,
+  "_ArrayAdd": arrayAddDef,
+  "_ArrayMult": arrayMultiplyDef,
+  "_Plot": plotDef,
+  "_pyAdd": pyAddDef,
+  "_PyAddArray": pyAddArrayDef,
+  "_DynamicNode": defaultDynamicNodeDef,
 }
 
 export const getDefaultNodeDefinition = (nodeType: string) => {
@@ -281,7 +281,7 @@ export const getDefaultNodeDefinition = (nodeType: string) => {
   }
   const node = GPI_Nodes.find(n => n.state.type == nodeType)
   if (node === undefined) {
-    throw "Node not found!" + JSON.stringify(node)
+    throw "Node not found!" + nodeType
   }
   console.log("using dynamic node from python", node)
   return node

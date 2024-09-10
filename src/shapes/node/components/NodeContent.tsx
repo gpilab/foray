@@ -45,15 +45,15 @@ export const NodeContent = track((props: { nodeShape: NodeShape }) => {
   return <NodeConfigContext.Provider value={nodeConfig}>
     {(() => {
       switch (nodeType) {
-        case ("Constant"):
+        case ("_Constant"):
           return <ConstantNode updateNode={updateNode} />
-        case ("Plot"):
+        case ("_Plot"):
           return <PlotNode />
-        case ("Range"):
+        case ("_Range"):
           return <RangeNode updateNode={updateNode} />
-        case ("sin"):
-        case ("sinc"):
-        case ("cos"):
+        case ("_sin"):
+        case ("_sinc"):
+        case ("_cos"):
           return <TrigNode updateNode={updateNode} />
         default:
           return <DefaultNode />

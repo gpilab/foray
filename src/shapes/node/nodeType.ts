@@ -71,7 +71,7 @@ const addState: NodeState<{
   },
   b: { name: "b", ioType: "in", dataType: "Real", value?: number }
 }, Record<"out", OutPort>, Record<string, never>>
-  = createNodeState("Add", binaryOpInputs("Real"), singleOutput("Real"), {})
+  = createNodeState("_Add", binaryOpInputs("Real"), singleOutput("Real"), {})
 
 
 //type InputValues<I extends NodeInputs> = Record<keyof Populated<I>, Populated<I>[keyof Populated<I>]["value"]>
@@ -132,7 +132,7 @@ addTest
 export const nodeCompute = async <T extends PopulatedNodeState>(nodeState: T) => {
   const { type, inputs, config } = nodeState
   console.log("Calling compute for node: ", { type, inputs, config })
-  const compute = getDefaultNodeDefinition(type).compute as NodeCompute<Populated<NodeInputs>, T["output"], T["config"]>
+  const compute = getDefaultNodeDefinition(type).compute
 
   //const inputVals = flattenInputs(inputs) as InputValues<T["inputs"]>
   const outputValue = await compute(inputs, config)

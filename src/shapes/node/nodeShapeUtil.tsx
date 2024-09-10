@@ -2,12 +2,13 @@ import {
   Circle2d, DefaultColorStyle, Geometry2d,
   Group2d, HTMLContainer, RecordPropsType,
   Rectangle2d, ShapeUtil, T,
+  TLOnBeforeCreateHandler,
   TLOnBeforeUpdateHandler, TLOnResizeHandler, TLShapeUtilFlag,
   Vec, VecLike
 } from 'tldraw'
 
 import { TLBaseShape } from 'tldraw'
-import { nodeTypeStyle, showPlotGridStyle } from './nodeStylePanel'
+import { showPlotGridStyle } from './nodeStylePanel'
 import { InPort, Port, PortTypeLabels } from './portDefinition'
 import { addNodeDefinition, getDefaultNodeDefinition } from './nodeDefinitions'
 import { checkAllPortsPopulated, Config, nodeCompute, NodeInputs, NodeOutputs } from './nodeType'
@@ -42,7 +43,7 @@ const nodeShapeProps = {
   color: DefaultColorStyle,
 
   // Node behaviour props
-  nodeType: nodeTypeStyle,
+  nodeType: T.string,
   showPlotGrid: showPlotGridStyle,
   inputs: T.dict(T.string, TLInPort),
   output: T.object({ "out": TLOutPort }),
@@ -55,7 +56,7 @@ export const defaultNodeProps: NodeShapeProps = {
   height: 100,
   inputs: addNodeDefinition.state.inputs,
   output: addNodeDefinition.state.output,
-  nodeType: "Add",
+  nodeType: "_Add",
   showPlotGrid: false,
   config: {},
   color: "black",
@@ -88,6 +89,39 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
     //using spread so that props aren't considered readonly.
     //tldraw needs to make changes to this object
     return { ...defaultNodeProps }
+  }
+
+  onBeforeCreate: TLOnBeforeCreateHandler<NodeShape> = (next) => {
+    //TODO: this is a mess...
+    const { inputs, output, config
+    } = getDefaultNodeDefinition(next.props.nodeType).state
+    const defaultInputs = inputs as Record<string, InPort>
+
+
+    //compute output for the new nodeType
+    this.computeNodeValue(next.props.nodeType, defaultInputs, output, config)
+      .then((out) => {
+        this.editor.updateShape({
+          ...next,
+          props: {
+            ...next.props,
+            inputs: defaultInputs, output: out, config, inFlightCalc: false
+          }
+        })
+      }).catch((onrejected) => {
+        console.log("got rejected")
+        //TODO set node to an error state with useful info for user
+        throw onrejected
+      })
+    //return what we can for now. The callback will update the new value when it's done
+    return {
+      ...next,
+      props: {
+        ...next.props,
+        inputs: defaultInputs, output, config, inFlightCalc: true
+      }
+
+    }
   }
 
   //TODO Make this more like a reducer, so that we make sure we are handling all possible state changes

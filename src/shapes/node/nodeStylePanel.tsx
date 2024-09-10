@@ -16,7 +16,7 @@ import { useContext } from "react"
  * i.e. adjusting visual settings on multiple "Plot" components
  */
 export const nodeTypeStyle = StyleProp.defineEnum('gpi:node_type', {
-  defaultValue: "Add",
+  defaultValue: "_Add",
   values: ["read_np", "reduce", "add_int", "add_int_array"].concat(nodeTypes)
 })
 

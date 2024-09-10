@@ -25,6 +25,10 @@ DefaultColorThemePalette.lightMode.background = "#ffffff00"
 import { NodeDefinition } from './shapes/node/nodeType'
 import React, { useState } from 'react'
 import { parse_nodes, SerializedPythonNode } from './util/parse_tauri'
+import { GPI_UI } from './ui/gpi_ui'
+import { nodeDefaultDefinitions } from './shapes/node/nodeDefinitions'
+//import { NodeSelect } from './ui/NodeSelect'
+//import { GPI_UI } from './ui/gpi_ui'
 
 type GPIState = {
   NodeDefinitions: NodeDefinition<any, any, any>[]
@@ -55,15 +59,18 @@ export default function GPI() {
             invoke<SerializedPythonNode[]>('get_python_nodes').then(
               parse_nodes).then(nodes => {
                 // Trying out just having this be global state
-                GPI_Nodes = nodes
-                setGpiState({ ...gpiState, NodeDefinitions: nodes })
+                const all_nodes = nodes.concat(Object.values(nodeDefaultDefinitions))
+                GPI_Nodes = all_nodes
+                setGpiState({ ...gpiState, NodeDefinitions: all_nodes })
               }
               ).catch((e) => {
                 console.error("Failed to load nodes", e)
               })
 
           }}
-        />
+        >
+          <GPI_UI />
+        </Tldraw>
       </div>
     </GPIContext.Provider >
   )

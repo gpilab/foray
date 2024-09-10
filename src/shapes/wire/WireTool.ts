@@ -11,7 +11,7 @@ export class WireTool extends StateNode {
   static override children = () => [Idle, ConnectingNodes]
 }
 
-class Idle extends StateNode {
+export class Idle extends StateNode {
   static override id = 'idle'
 
   override onEnter = () => {
@@ -19,11 +19,7 @@ class Idle extends StateNode {
   }
 
   override onCancel = () => {
-    if (this.editor.getInstanceState().isToolLocked) {
-      this.parent.transition('idle')
-    } else {
-      this.editor.setCurrentTool('select.idle')
-    }
+    this.editor.setCurrentTool('select.idle')
   }
   override onComplete = () => {
     if (this.editor.getInstanceState().isToolLocked) {

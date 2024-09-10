@@ -1,7 +1,7 @@
 import {
   CubicBezier2d, DefaultColorStyle, Editor, Mat,
   RecordPropsType, SVGContainer, ShapeUtil, TLBaseShape,
-  TLDefaultColorStyle, TLOnBeforeUpdateHandler, Vec, VecLike,
+  TLDefaultColorStyle, Vec, VecLike,
   lerp, track, useEditor,
 } from 'tldraw'
 import { WireBinding } from './WireBindingUtil'

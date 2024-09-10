@@ -113,21 +113,20 @@ const IOPort = track(({ port }: { port: Port }) => {
 })
 
 function displayPortValue(port: Port) {
-  console.log(`Displaying port ${JSON.stringify(port)}`)
   if (port.value === undefined) {
     return ""
   }
   switch (port.dataType) {
     case "Integer": {
-      const value = port.value
+      const value = port.value as number
       return value
     }
     case "Real": {
-      const value = port.value
+      const value = port.value as number
       return parseFloat(value.toPrecision(12))
     }
     case "String": {
-      return port.value
+      return port.value as string
     }
     default: "..."
   }
