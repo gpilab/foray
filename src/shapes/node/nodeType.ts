@@ -1,9 +1,9 @@
 import {
   algebraNodes, arrayNodes,
-  nodeDefaultDefinitions
+  getDefaultNodeDefinition,
 } from "./nodeDefinitions";
 import {
-  InPort, OutPort, PortDataType,
+  InPort, OutPort,
   binaryOpInputs, singleOutput
 } from "./portDefinition"
 
@@ -47,7 +47,7 @@ export type Config = Record<string, unknown>
  * will always be the same
  */
 export type NodeState<I extends NodeInputs, O extends NodeOutputs, C extends Config> = {
-  type: NodeType,
+  type: string,
   inputs: I,
   output: O,
   config: C,
@@ -66,19 +66,21 @@ function createNodeState<
 
 
 const addState: NodeState<{
-  a: { name: "a", ioType: "in", dataType: "number", value?: number },
-  b: { name: "b", ioType: "in", dataType: "number", value?: number }
+  a: {
+    name: "a", ioType: "in", dataType: "Real", value?: number
+  },
+  b: { name: "b", ioType: "in", dataType: "Real", value?: number }
 }, Record<"out", OutPort>, Record<string, never>>
-  = createNodeState("Add", binaryOpInputs("number"), singleOutput("number"), {})
+  = createNodeState("Add", binaryOpInputs("Real"), singleOutput("Real"), {})
 
 
-type InputValues<I extends NodeInputs> = Record<keyof Populated<I>, Populated<I>[keyof Populated<I>]["value"]>
-
+//type InputValues<I extends NodeInputs> = Record<keyof Populated<I>, Populated<I>[keyof Populated<I>]["value"]>
+//
 type NodeCompute<
   I extends NodeInputs,
   O extends NodeOutputs,
   C extends Config
-> = (inputs: InputValues<I>,
+> = (inputs: Populated<I>,
   config: C
 ) => Promise<O["out"]["value"]> | O["out"]["value"]
 
@@ -98,15 +100,15 @@ export function createNodeDef<
   C extends Config>
   (def: {
     state: NodeState<I, O, C>,
-    compute: NodeCompute<Populated<I>, O, C>
+    compute: NodeCompute<I, O, C>
   }): NodeDefinition<I, O, C> {
   return def
 }
 
 type addType = typeof addState
 const addCompute: NodeCompute<addType["inputs"], addType["output"], addType["config"]>
-  = (inputs: Record<"a" | "b", number>, _config: Record<string, never>) => {
-    return inputs.a + inputs.a
+  = (inputs, _config: Record<string, never>) => {
+    return inputs.a.value + inputs.b.value
   }
 
 const addTest: NodeDefinition<addType["inputs"], addType["output"], addType["config"]>
@@ -129,11 +131,19 @@ addTest
  */
 export const nodeCompute = async <T extends PopulatedNodeState>(nodeState: T) => {
   const { type, inputs, config } = nodeState
-  const compute = nodeDefaultDefinitions[type].compute as NodeCompute<T["inputs"], T["output"], T["config"]>
+  console.log("Calling compute for node: ", { type, inputs, config })
+  const compute = getDefaultNodeDefinition(type).compute as NodeCompute<Populated<NodeInputs>, T["output"], T["config"]>
 
-  const inputVals = flattenInputs(inputs) as InputValues<T["inputs"]>
-  const outputValue = await compute(inputVals, config)
-  return outputValue
+  //const inputVals = flattenInputs(inputs) as InputValues<T["inputs"]>
+  const outputValue = await compute(inputs, config)
+  //TODO: make work for arbitary named outputs
+  //
+  if (outputValue["out"] != undefined) {
+    return outputValue["out"]
+  }
+  else {
+    return outputValue
+  }
 }
 
 /**
@@ -148,10 +158,10 @@ export const checkAllPortsPopulated = (ports: Record<string, InPort>)
 /**
  * make these types better/ create a cleaner way of iterating of inputs
  */
-function flattenInputs(inputs: Populated<NodeInputs>): Record<string, PortDataType> {
-  return Object.entries(inputs).reduce<Record<string, PortDataType>>((acc, [label, port]) => {
-    acc[label] = port.value
-    return acc
-  }, {})
-}
-
+//function flattenInputs(inputs: Populated<NodeInputs>): Record<string, PortDataType> {
+//  return Object.entries(inputs).reduce<Record<string, PortDataType>>((acc, [label, port]) => {
+//    acc[label] = port.value
+//    return acc
+//  }, {})
+//}
+//

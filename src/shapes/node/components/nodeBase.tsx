@@ -12,7 +12,9 @@ const { portDiameter, portSpacing, nodeStrokeWidth, portStrokeWidth } = nodeUICo
 
 export const NodeBase = track(({ shape }: { shape: NodeShape }) => {
   const theme = useTheme()
-  const { inputs, output, width, height, color } = shape.props
+  const { nodeType, inputs, output, width, height, color } = shape.props
+
+  console.log(`Rendering node ${nodeType}`)
 
   const backgroundColor = theme.id == "dark" ? "#000000dd" : "#ffffffdd"
   return <HTMLContainer>
@@ -111,15 +113,20 @@ const IOPort = track(({ port }: { port: Port }) => {
 })
 
 function displayPortValue(port: Port) {
+  console.log(`Displaying port ${JSON.stringify(port)}`)
   if (port.value === undefined) {
     return ""
   }
   switch (port.dataType) {
-    case "number": {
-      const value = port.value as number
+    case "Integer": {
+      const value = port.value
+      return value
+    }
+    case "Real": {
+      const value = port.value
       return parseFloat(value.toPrecision(12))
     }
-    case "string": {
+    case "String": {
       return port.value
     }
     default: "..."

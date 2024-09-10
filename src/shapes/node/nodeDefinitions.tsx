@@ -1,19 +1,20 @@
 import { PI } from "tldraw"
-import { Config, createNodeDef, NodeInputs, NodeOutputs, NodeType } from "./nodeType"
-import { binaryOpInputs, PortDataType, singleInput, singleOutput } from "./portDefinition"
+import { Config, createNodeDef, NodeDefinition, NodeInputs, NodeOutputs, } from "./nodeType"
+import { binaryOpInputs, PortDataType, PortDataTypeLabel, singleInput, singleOutput } from "./portDefinition"
 import { invoke } from "@tauri-apps/api"
 import { range } from "../../util/array"
+import { GPI_Nodes } from "../../gpi"
 
 export const algebraNodes = ["Add", "Subtract", "Multiply", "Constant", "pyAdd", "DynamicNode"] as const
 
 export const addNodeDefinition = createNodeDef({
   state: {
     type: "Add",
-    inputs: binaryOpInputs("number"),
-    output: singleOutput("number"),
+    inputs: binaryOpInputs("Real"),
+    output: singleOutput("Real"),
     config: {}
   },
-  compute: ({ a, b }) => a + b
+  compute: ({ a, b }) => a.value + b.value
 })
 
 const subtractDef = createNodeDef({
@@ -21,7 +22,7 @@ const subtractDef = createNodeDef({
     ...addNodeDefinition.state,
     type: "Subtract",
   },
-  compute: ({ a, b }) => a - b
+  compute: ({ a, b }) => a.value - b.value
 })
 
 const multiplyDef = createNodeDef({
@@ -29,14 +30,14 @@ const multiplyDef = createNodeDef({
     ...addNodeDefinition.state,
     type: "Multiply",
   },
-  compute: ({ a, b }) => a * b
+  compute: ({ a, b }) => a.value * b.value
 })
 
 const constantDef = createNodeDef({
   state: {
     type: "Constant",
     inputs: {},
-    output: singleOutput("number"),
+    output: singleOutput("Real"),
     config: { value: 10 }
   },
   compute: (_, config) => config.value
@@ -45,13 +46,16 @@ const constantDef = createNodeDef({
 export const pyAddDef = createNodeDef({
   state: {
     type: "pyAdd",
-    inputs: binaryOpInputs("number"),
-    output: singleOutput("number"),
+    inputs: binaryOpInputs("Real"),
+    output: singleOutput("Real"),
     config: { formula: "+ (py)" },
   },
   compute: async ({ a, b }) => {
-    const val = await invoke<number>('py_add', { a: a, b: b })
-    return val
+    const message = { "a": { "Real": a }, "b": { "Real": b } }
+    console.log("sending message to py_add:", message)
+    const val = await invoke<{ Real: number }>('py_add', message)
+    console.log("received from py_add:", val)
+    return val.Real
   }
 })
 
@@ -62,7 +66,7 @@ export const rangeDef = createNodeDef({
   state: {
     type: "Range",
     inputs: {},
-    output: singleOutput("numberArray"),
+    output: singleOutput("Vec"),
     config: {
       start: -10,
       end: 10,
@@ -78,12 +82,12 @@ export const rangeDef = createNodeDef({
 export const sinDef = createNodeDef({
   state: {
     type: "sin",
-    inputs: singleInput("numberArray"),
-    output: singleOutput("numberArray"),
+    inputs: singleInput("Vec"),
+    output: singleOutput("Vec"),
     config: { amplitude: 1, phaseOffset: 0, frequency: 4 }
   },
   compute: ({ a }, { amplitude, phaseOffset, frequency }) =>
-    a.map(e =>
+    a.value.map(e =>
       amplitude * Math.sin(e * frequency + phaseOffset)
     )
 })
@@ -94,7 +98,7 @@ export const cosDef = createNodeDef({
     type: "cos",
   },
   compute: ({ a }, { amplitude, phaseOffset, frequency }) =>
-    a.map(e =>
+    a.value.map(e =>
       amplitude * Math.cos(e * frequency + phaseOffset)
     )
 })
@@ -105,7 +109,7 @@ export const sincDef = createNodeDef({
     type: "sinc",
   },
   compute: ({ a }, { amplitude, phaseOffset, frequency }) =>
-    a.map(e => {
+    a.value.map(e => {
       const x = e * frequency + phaseOffset
 
       if (x == 0) {
@@ -120,28 +124,28 @@ export const sincDef = createNodeDef({
 export const arrayAddDef = createNodeDef({
   state: {
     type: "ArrayAdd",
-    inputs: binaryOpInputs("numberArray"),
-    output: singleOutput("numberArray"),
+    inputs: binaryOpInputs("Vec"),
+    output: singleOutput("Vec"),
     config: { formula: "\\textbf{+}" }
   },
-  compute: ({ a, b }) => a.map((e, i) => e + b[i])
+  compute: ({ a, b }) => a.value.map((e, i) => e + b.value[i])
 })
 
 export const arrayMultiplyDef = createNodeDef({
   state: {
     type: "ArrayMult",
-    inputs: binaryOpInputs("numberArray"),
-    output: singleOutput("numberArray"),
+    inputs: binaryOpInputs("Vec"),
+    output: singleOutput("Vec"),
     config: { formula: "\\times" }
   },
-  compute: ({ a, b }) => a.map((e, i) => e * b[i])
+  compute: ({ a, b }) => a.value.map((e, i) => e * b.value[i])
 })
 
 export const fftDef = createNodeDef({
   state: {
     type: "fft",
-    inputs: singleInput("numberArray"),
-    output: singleOutput("numberArray"),
+    inputs: singleInput("Vec"),
+    output: singleOutput("Vec"),
     config: { formula: "\\mathcal{F}\\{f(x)\\}" },
   },
   compute: async ({ a }) => {
@@ -154,50 +158,73 @@ export const fftDef = createNodeDef({
 export const pyAddArrayDef = createNodeDef({
   state: {
     type: "PyAddArray",
-    inputs: binaryOpInputs("numberArray"),
-    output: singleOutput("numberArray"),
+    inputs: binaryOpInputs("Vec"),
+    output: singleOutput("Vec"),
     config: { formula: "+ (py array)" },
   },
   compute: async ({ a, b }) => {
-    const val = await invoke<number[]>('py_add_array', { a: a, b: b })
-    return val
+    const message = {
+      message: {
+        node_type: 'add_int_array',
+        inputs: [{ "Vec": a }, { "Vec": b }]
+      }
+    }
+    console.log("sending message to run_node:", message)
+    const val = await invoke<{ "Vec": number[] }>('run_node', message)
+    console.log(" received from run_node:", message)
+    return val.Vec
   }
 })
 
 export const plotDef = createNodeDef({
   state: {
     type: "Plot",
-    inputs: singleInput("numberArray"),
-    output: singleOutput("numberArray"),
+    inputs: singleInput("Vec"),
+    output: singleOutput("Vec"),
     config: {}
   },
-  compute: ({ a }) => a
+  compute: ({ a }) => a.value
 })
 
 
 
 
-export const createDynamicNode = (config: Config,
+export const createDynamicNode = (type: string, config: Config,
   inputs: NodeInputs,
   output: NodeOutputs) => {
+  console.log("creating node:", { type, inputs, output, config })
 
   return createNodeDef({
     state: {
-      type: "DynamicNode",
+      type: type,
       inputs,
       output,
       config
     },
-    compute: async ({ a, b }) => {
+    compute: async (input_values) => {
+
+      //format inputs as {"name:{"data_type":value}} 
+      const input_formatted =
+        Object.entries(input_values)
+          .reduce<Record<string, Record<string, PortDataType>>>((acc, [name, port]) => {
+            return {
+              ...acc,
+              [name]: { [port.dataType]: port.value }
+            }
+          }, {})
+
       const dynamic_message = {
         message: {
-          node_type: a,
-          inputs: b
+          node_type: type,
+          inputs: input_formatted
         }
       }
+      console.log("using python node!:", dynamic_message)
       /// list of input `Values` to pass to `node_type`'s python "compute" function
-      const val = await invoke<PortDataType>('dynamic_command', dynamic_message)
-      return val
+      const out = await invoke<Record<"out", Record<PortDataTypeLabel, PortDataType>>>('run_node', dynamic_message)
+      console.log("dynamic python value", out)
+      const value = out["out"][output.out.dataType]
+      return value
     }
 
   })
@@ -207,8 +234,8 @@ export const createDynamicNode = (config: Config,
 export const defaultDynamicNodeDef = createNodeDef({
   state: {
     type: "DynamicNode",
-    inputs: binaryOpInputs("number"),
-    output: singleOutput("number"),
+    inputs: binaryOpInputs("Real"),
+    output: singleOutput("Real"),
     config: {}
   },
   compute: async ({ a, b }) => {
@@ -218,15 +245,16 @@ export const defaultDynamicNodeDef = createNodeDef({
         inputs: [{ Integer: a }, { Integer: b }]
       }
     }
-    console.log(dynamic_message)
+    console.log("using dynamic node!:", dynamic_message)
     /// list of input `Values` to pass to `node_type`'s python "compute" function
-    const val = await invoke<{ Integer: number }>('dynamic_command', dynamic_message)
-    console.log("value", val)
+    const val = await invoke<{ Integer: number }>('run_node', dynamic_message)
+    console.log("dynamic node value", val)
     return val.Integer
   }
 })
 
-export const nodeDefaultDefinitions = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const nodeDefaultDefinitions: { [type: string]: NodeDefinition<any, any, any> } = {
   "Add": addNodeDefinition,
   "Subtract": subtractDef,
   "Multiply": multiplyDef,
@@ -244,7 +272,18 @@ export const nodeDefaultDefinitions = {
   "DynamicNode": defaultDynamicNodeDef,
 }
 
-export const getDefaultNodeDefinition = (nodeType: NodeType) => {
-  return nodeDefaultDefinitions[nodeType]
+export const getDefaultNodeDefinition = (nodeType: string) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const built_in = nodeDefaultDefinitions[nodeType] as NodeDefinition<any, any, any> | undefined
+  if (built_in) {
+    console.log("using builtin node", built_in)
+    return built_in
+  }
+  const node = GPI_Nodes.find(n => n.state.type == nodeType)
+  if (node === undefined) {
+    throw "Node not found!" + JSON.stringify(node)
+  }
+  console.log("using dynamic node from python", node)
+  return node
 }
 

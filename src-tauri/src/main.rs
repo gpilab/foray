@@ -19,8 +19,8 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             rust_node::fft,
-            rust_node::py_add,
-            rust_node::py_add_array,
+            //rust_node::py_add,
+            //rust_node::py_add_array,
             from_ui::run_node,
             from_ui::get_python_nodes
         ])
@@ -37,6 +37,6 @@ fn parse_cli(matches: Matches) {
 
 fn initialize_python() {
     let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    d.push("../gpipy/python_plugin/");
+    d.push("../nodes/");
     let _ = pyo::initialize_gpipy(&d);
 }

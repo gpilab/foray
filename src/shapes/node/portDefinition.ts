@@ -1,13 +1,19 @@
 import { TLDefaultColorStyle } from "tldraw"
 
-export const PortTypeLabels = ["number", "string", "boolean", "numberArray"] as const
+export const PortTypeLabels = ["Vec", "Struct", "Integer", "Real", "Complex", "String", "Flag"] as const
 export type PortDataTypeLabel = typeof PortTypeLabels[number]
 
+
+export type VecContain = number | string | boolean | object
+
 export type PortTypeMap = {
-  "number": number
-  "string": string
-  "boolean": boolean
-  "numberArray": number[]
+  "Vec": number[]
+  "Real": number
+  "Complex": { real: number, imaginar: number }
+  "Integer": number
+  "String": string
+  "Flag": boolean
+  "Struct": Record<string, VecContain>
 }
 
 export type PortDataType = PortTypeMap[PortDataTypeLabel]
@@ -17,11 +23,13 @@ export function isPortDataTypeLabel(maybeLabel: unknown): maybeLabel is PortData
 }
 
 export const portColorMap: Record<PortDataTypeLabel, TLDefaultColorStyle> = {
-  "number": "violet",
-  "numberArray": "blue",
-  "string": "green",
-  "boolean": "yellow",
-
+  "Vec": "light-violet",
+  "Struct": "violet",
+  "String": "blue",
+  "Complex": "green",
+  "Real": "yellow",
+  "Integer": "orange",
+  "Flag": "red"
 }
 
 export type Port<K extends PortDataTypeLabel = PortDataTypeLabel> = {
@@ -82,13 +90,13 @@ export const binaryOpInputs = <T extends PortDataTypeLabel>(dataType: T): {
 
 let testIn: InPort
 //@ts-expect-error bad type example
-testIn = { name: "tin", ioType: "out", dataType: "number" }
+testIn = { name: "tin", ioType: "out", dataType: "Real" }
 //@ts-expect-no-error
-testIn = { name: "tin", ioType: "in", dataType: "number" }
+testIn = { name: "tin", ioType: "in", dataType: "Real" }
 
 let testOut: OutPort
 //@ts-expect-error bad type example
-testOut = { name: "tout", ioType: "in", dataType: "number" }
+testOut = { name: "tout", ioType: "in", dataType: "Real" }
 //@ts-expect-no-error
-testOut = { name: "tout", ioType: "out", dataType: "number" }
+testOut = { name: "tout", ioType: "out", dataType: "Real" }
 

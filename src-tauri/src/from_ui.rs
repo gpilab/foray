@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 
-use gpipy::{node::PythonNode, pyo::gpipy_compute, python_node::PortValue};
+use gpipy::{
+    node::{NodeInputValue, NodeOutputValue, PythonNode},
+    pyo::gpipy_compute,
+};
 
 use serde::Deserialize;
 use tauri::api::dir::read_dir;
@@ -10,12 +13,11 @@ pub struct RunNodeMessage<'a> {
     /// name of the python node module. i.e. "add_int"
     node_type: &'a str,
     /// list of input `Values` to pass to `node_type`'s python "compute" function
-    inputs: Vec<PortValue>,
-    //output: Vec<Value>,
+    inputs: NodeInputValue, //output: Vec<Value>,
 }
 
 #[tauri::command]
-pub fn run_node(message: RunNodeMessage) -> PortValue {
+pub fn run_node(message: RunNodeMessage) -> NodeOutputValue {
     println!(
         "node type: {}, inputs: {:?}",
         message.node_type, message.inputs
@@ -30,7 +32,7 @@ pub fn run_node(message: RunNodeMessage) -> PortValue {
 #[tauri::command]
 pub fn get_python_nodes() -> Vec<PythonNode> {
     let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    d.push("../gpipy/python_plugin/");
+    d.push("../nodes/");
 
     read_dir(d.clone(), true)
         .unwrap()
@@ -55,21 +57,29 @@ pub fn get_python_nodes() -> Vec<PythonNode> {
 
 #[cfg(test)]
 mod test {
-    use std::path::PathBuf;
+    use std::{collections::HashMap, path::PathBuf};
 
-    use gpipy::{pyo::initialize_gpipy, python_node::PrimitiveValue};
+    use gpipy::{port::PortValue, pyo::initialize_gpipy};
 
     use super::*;
     #[test]
     fn add_int() {
         let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        d.push("../gpipy/python_plugin/");
+        d.push("../nodes/");
+
+        let inputs = NodeInputValue(HashMap::from([
+            ("a".into(), PortValue::Integer(1)),
+            ("b".into(), PortValue::Integer(3)),
+        ]));
+
         let _ = initialize_gpipy(&d);
-        let _result = match gpipy_compute("add_int", vec![1.into(), 3.into()]) {
-            Ok(PortValue::Primitive(res)) => res,
-            Ok(_) => panic!("Unexpected return value from python"),
+        let _result = match gpipy_compute("add_int", inputs) {
+            Ok(res) => res,
+            //Ok(_) => panic!("Unexpected return value from python"),
             Err(e) => panic!("Failed in Python: {}", e),
         };
-        assert_eq!(PrimitiveValue::Integer(4), _result);
+        let expected_output =
+            NodeOutputValue(HashMap::from([("out".into(), PortValue::Integer(4))]));
+        assert_eq!(expected_output, _result);
     }
 }

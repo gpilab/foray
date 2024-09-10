@@ -90,7 +90,10 @@ function TitlebarButton(props: TitleBarProps) {
       backgroundColor: isHover ? "#ffffff11" : "",
       borderRadius: "8px",
     }}
-    onClick={() => action}
+    onClick={() => {
+      console.log("title bar button action ran!")
+      action()?.then(() => { }, () => { console.error("title button action failed???") })
+    }}
   >
     <img src={icon} alt={alt} />
   </div>

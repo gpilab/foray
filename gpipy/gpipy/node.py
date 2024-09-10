@@ -51,4 +51,4 @@ def get_node_outputs(abs_node_path: str):
 
 
 if __name__ == "__main__":
-    get_local_nodes("./python_plugin/")
+    get_local_nodes("../nodes/")

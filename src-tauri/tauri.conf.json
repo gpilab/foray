@@ -72,6 +72,7 @@
       {
         "focus": false,
         "titleBarStyle": "Overlay",
+        "decorations": false,
         "fullscreen": false,
         "title": "gpi-v2",
         "hiddenTitle": true,

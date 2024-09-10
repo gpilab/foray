@@ -34,6 +34,7 @@ export const NodeContent = track((props: { nodeShape: NodeShape }) => {
 
 
   const updateNode = (updatedProps: Partial<NodeShapeProps>) => {
+    console.log("updating node with props...", updatedProps)
     editor.updateShape({
       id: nodeShape.id,
       type: "node",

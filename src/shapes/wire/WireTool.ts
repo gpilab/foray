@@ -56,6 +56,11 @@ class Idle extends StateNode {
   override onPointerDown: TLEventHandlers['onPointerDown'] = (_info) => {
     const target = getShapeAtCursor(this.editor)
 
+
+    if (target?.type === undefined) {
+      //TODO: create node selection popup
+      //create_node_popup()
+    }
     if (target?.type !== "node") {
       return
     }

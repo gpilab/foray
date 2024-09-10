@@ -1,27 +1,23 @@
-use gpipy::{
-    pyo::gpipy_compute,
-    python_node::{PortValue, PrimitiveValue},
-};
 use rustfft::{num_complex::Complex, FftPlanner};
 
-#[tauri::command]
-pub fn py_add(a: i32, b: i32) -> i32 {
-    let res = gpipy_compute("add_int", vec![a.into(), b.into()]).unwrap();
-    match res {
-        PortValue::Primitive(PrimitiveValue::Integer(v)) => v,
-        _ => panic!("Unexpected return value from python"),
-    }
-}
-
-#[tauri::command]
-pub fn py_add_array(a: PortValue, b: PortValue) -> PortValue {
-    let res = gpipy_compute("add_int_array", vec![a.into(), b.into()]).unwrap();
-    //match res {
-    //    PortValue::Vec1(v) => v,
-    //    _ => panic!("Unexpected return value from python!"),
-    //}
-    res
-}
+//#[tauri::command]
+//pub fn py_add(a: PortValue, b: PortValue) -> PortValue {
+//    let res = gpipy_compute("add_int", hash![a.into(), b.into()]);
+//    match res {
+//        Ok(pv) => pv,
+//        Err(e) => panic!("Unexpected return value from python! {}", e),
+//    }
+//}
+//
+//#[tauri::command]
+//pub fn py_add_array(a: PortValue, b: PortValue) -> PortValue {
+//    let res = gpipy_compute("add_int_array", vec![a.into(), b.into()]);
+//
+//    match res {
+//        Ok(pv) => pv,
+//        Err(e) => panic!("Unexpected return value from python! {}", e),
+//    }
+//}
 
 #[tauri::command]
 pub fn fft(signal: Vec<f32>) -> Vec<f32> {

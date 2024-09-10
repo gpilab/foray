@@ -5,6 +5,8 @@ import {
 } from "tldraw"
 import { nodeTypes } from "./nodeType"
 import { useTheme } from "../../util/useTheme"
+import { GPIContext } from "../../gpi"
+import { useContext } from "react"
 
 
 /**
@@ -15,8 +17,9 @@ import { useTheme } from "../../util/useTheme"
  */
 export const nodeTypeStyle = StyleProp.defineEnum('gpi:node_type', {
   defaultValue: "Add",
-  values: nodeTypes
+  values: ["read_np", "reduce", "add_int", "add_int_array"].concat(nodeTypes)
 })
+
 export const showPlotGridStyle = StyleProp.defineEnum('gpi:show_plot_grid', {
   defaultValue: true,
   values: [true, false]
@@ -31,6 +34,9 @@ export function NodeStylePanel() {
   if (!styles) {
     return null
   }
+  const nodes = useContext(GPIContext).NodeDefinitions;
+
+  const nodeList = nodes.map(n => n.state.type).concat(nodeTypes)
 
   const nodeType = styles.get(nodeTypeStyle)
   const showPlotGrid = styles.get(showPlotGridStyle)
@@ -60,7 +66,7 @@ export function NodeStylePanel() {
             }}
           >
             {nodeType.type === 'mixed' ? <option value="">Mixed</option> : null}
-            {nodeTypes.map(n =>
+            {nodeList.map(n =>
               <option key={n} value={n}>{n}</option>
             )}
           </select>

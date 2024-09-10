@@ -8,9 +8,9 @@ import {
 
 import { TLBaseShape } from 'tldraw'
 import { nodeTypeStyle, showPlotGridStyle } from './nodeStylePanel'
-import { InPort, Port } from './portDefinition'
+import { InPort, Port, PortTypeLabels } from './portDefinition'
 import { addNodeDefinition, getDefaultNodeDefinition } from './nodeDefinitions'
-import { checkAllPortsPopulated, Config, nodeCompute, NodeInputs, NodeOutputs, NodeType } from './nodeType'
+import { checkAllPortsPopulated, Config, nodeCompute, NodeInputs, NodeOutputs } from './nodeType'
 import { nodeUIConfig } from './nodeConstants'
 import { NodeBase } from './components/nodeBase'
 import { WireBinding } from '../wire/WireBindingUtil'
@@ -21,7 +21,7 @@ import { WireBinding } from '../wire/WireBindingUtil'
 
 const TLBasePort = {
   name: T.string,
-  dataType: T.literalEnum("boolean", "number", "numberArray", "string"),
+  dataType: T.literalEnum(...PortTypeLabels),
   value: T.optional(T.any)
 }
 
@@ -100,6 +100,7 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
     }
     // handle when the port type is updated
     if (prev.props.nodeType != next.props.nodeType) {
+      console.log("Port Type updated! Getting default node definition")
       const { inputs, output, config
       } = getDefaultNodeDefinition(next.props.nodeType).state
       const defaultInputs = inputs as Record<string, InPort>
@@ -187,7 +188,7 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
     }
   }
 
-  async computeNodeValue(nodeType: NodeType, inputs: NodeInputs, output: NodeOutputs, config: Config) {
+  async computeNodeValue(nodeType: string, inputs: NodeInputs, output: NodeOutputs, config: Config) {
     //don't compute if there are any undefined inputs
     if (checkAllPortsPopulated(inputs)) {
       const populatedInputs = inputs
@@ -231,16 +232,18 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
     const { inputs, output } = shape.props
     const radius = portDiameter / 2 + portSpacing / 2 // we add some extra padding here, to give a larger hitbox
     if (ioType === "in") {
-      return Object.values(inputs).map((port, i) => ({
-        port,
-        geometry: new Circle2d({
-          radius: radius,
-          isFilled: true,
-          x: getPortXPosition(i) - radius,
-          y: -radius
+      return Object.values(inputs)
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((port, i) => ({
+          port,
+          geometry: new Circle2d({
+            radius: radius,
+            isFilled: true,
+            x: getPortXPosition(i) - radius,
+            y: -radius
+          })
         })
-      })
-      )
+        )
     } else {
       return [{
         port: output["out"],

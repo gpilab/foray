@@ -24,7 +24,7 @@ DefaultColorThemePalette.lightMode.background = "#ffffff00"
 
 import { NodeDefinition } from './shapes/node/nodeType'
 import React, { useState } from 'react'
-import { parse_nodes, SerializedPython } from './util/parse_tauri'
+import { parse_nodes, SerializedPythonNode } from './util/parse_tauri'
 
 type GPIState = {
   NodeDefinitions: NodeDefinition<any, any, any>[]
@@ -33,6 +33,7 @@ const initGPIState: GPIState = {
   NodeDefinitions: []
 }
 export const GPIContext = React.createContext(initGPIState)
+export let GPI_Nodes: NodeDefinition<any, any, any>[] = []
 
 
 export default function GPI() {
@@ -50,8 +51,13 @@ export default function GPI() {
           components={components}
           assetUrls={customAssetURLs}
           onMount={() => {
-            invoke<SerializedPython[]>('get_python_nodes').then(
-              parse_nodes).then(nodes => setGpiState({ ...gpiState, NodeDefinitions: nodes })
+            //// Initialize python nodes from server
+            invoke<SerializedPythonNode[]>('get_python_nodes').then(
+              parse_nodes).then(nodes => {
+                // Trying out just having this be global state
+                GPI_Nodes = nodes
+                setGpiState({ ...gpiState, NodeDefinitions: nodes })
+              }
               ).catch((e) => {
                 console.error("Failed to load nodes", e)
               })
@@ -96,6 +102,7 @@ const overrides: TLUiOverrides = {
 }
 
 const components: TLUiComponents = {
+
   StylePanel: NodeStylePanel,
   Toolbar: (...props) => {
     const tools = useTools()
