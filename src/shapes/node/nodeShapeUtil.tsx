@@ -9,7 +9,7 @@ import {
 
 import { TLBaseShape } from 'tldraw'
 import { showPlotGridStyle } from './nodeStylePanel'
-import { InPort, Port, PortTypeLabels } from './portDefinition'
+import { InPort, Port } from './portDefinition'
 import { addNodeDefinition, getDefaultNodeDefinition } from './nodeDefinitions'
 import { checkAllPortsPopulated, Config, nodeCompute, NodeInputs, NodeOutputs } from './nodeType'
 import { nodeUIConfig } from './nodeConstants'
@@ -20,9 +20,12 @@ import { WireBinding } from '../wire/WireBindingUtil'
 /// requried for tldraw to properly perform 
 /// validation when serializing shapes
 
+const TLPortValue = T.any
+
+
 const TLBasePort = {
   name: T.string,
-  dataType: T.literalEnum(...PortTypeLabels),
+  dataType: TLPortValue,//T.literalEnum(...PortTypeLabels),
   value: T.optional(T.any)
 }
 
@@ -78,11 +81,11 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
   static override props = nodeShapeProps
 
   override canResize: TLShapeUtilFlag<NodeShape> = () => true
-  override hideResizeHandles = () => false
+  //override hideResizeHandles = () => false
   override canEdit: TLShapeUtilFlag<NodeShape> = () => false
   override isAspectRatioLocked: TLShapeUtilFlag<NodeShape> = () => false
-  override hideSelectionBoundsBg = () => true
-  override hideSelectionBoundsFg = () => true
+  //override hideSelectionBoundsBg = () => true
+  //override hideSelectionBoundsFg = () => true
   override hideRotateHandle = () => true
 
   getDefaultProps(): NodeShapeProps {

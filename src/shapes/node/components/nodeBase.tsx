@@ -83,7 +83,12 @@ const IOPort = track(({ port }: { port: Port }) => {
   const isHover = useHover(ref)
 
   const theme = useTheme()
-  const color = theme[portColorMap[dataType]]
+  const port_empty = port.value == undefined
+  const stroke_color = theme[portColorMap[dataType]]
+  const [fill_color, fill_opacity] = (port_empty && port.ioType === "in")
+    ? [theme["red"], .6]
+    : [stroke_color, .2]
+  const stroke_opacity = .8
   const paddedDiameter = portDiameter + portSpacing / 4
 
   return <g id="portOuterBound"
@@ -96,9 +101,12 @@ const IOPort = track(({ port }: { port: Port }) => {
     />
 
     <circle r={portDiameter / 2}
-      stroke={color} fill={color}
-      fillOpacity={isHover ? .7 : .1}
-      strokeOpacity={isHover ? 1 : .7}
+      stroke={stroke_color} fill={fill_color}
+      fillOpacity={
+        isHover
+          ? .9 : fill_opacity
+      }
+      strokeOpacity={isHover ? 1 : stroke_opacity}
     />
 
     <text
@@ -113,20 +121,21 @@ const IOPort = track(({ port }: { port: Port }) => {
 })
 
 function displayPortValue(port: Port) {
+  console.log(JSON.stringify(port))
   if (port.value === undefined) {
     return ""
   }
-  switch (port.dataType) {
+  switch (port.value[0]) {
     case "Integer": {
-      const value = port.value as number
+      const value = port.value[1] as number
       return value
     }
     case "Real": {
-      const value = port.value as number
+      const value = port.value[1] as number
       return parseFloat(value.toPrecision(12))
     }
     case "String": {
-      return port.value as string
+      return port.value[1] as string
     }
     default: "..."
   }

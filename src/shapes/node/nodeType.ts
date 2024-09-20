@@ -1,15 +1,14 @@
 import {
-  algebraNodes, arrayNodes,
+
   getDefaultNodeDefinition,
 } from "./nodeDefinitions";
 import {
   InPort, OutPort,
+  PortDataType,
   binaryOpInputs, singleOutput
 } from "./portDefinition"
 
-export const nodeTypes = [
-  ...algebraNodes,
-  ...arrayNodes]
+export const nodeTypes = ["_Add"]
 
 export type NodeType = typeof nodeTypes[number]
 
@@ -67,9 +66,9 @@ function createNodeState<
 
 const addState: NodeState<{
   a: {
-    name: "a", ioType: "in", dataType: "Real", value?: number
+    name: "a", ioType: "in", dataType: "Real", value?: PortDataType
   },
-  b: { name: "b", ioType: "in", dataType: "Real", value?: number }
+  b: { name: "b", ioType: "in", dataType: "Real", value?: PortDataType }
 }, Record<"out", OutPort>, Record<string, never>>
   = createNodeState("_Add", binaryOpInputs("Real"), singleOutput("Real"), {})
 
@@ -108,7 +107,7 @@ export function createNodeDef<
 type addType = typeof addState
 const addCompute: NodeCompute<addType["inputs"], addType["output"], addType["config"]>
   = (inputs, _config: Record<string, never>) => {
-    return inputs.a.value + inputs.b.value
+    return ["Integer", (inputs.a.value[1] as number) + (inputs.b.value[1] as number)]
   }
 
 const addTest: NodeDefinition<addType["inputs"], addType["output"], addType["config"]>

@@ -1,4 +1,3 @@
-import gpirs
 from gpy import PortType
 
 

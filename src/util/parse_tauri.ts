@@ -32,6 +32,9 @@ export function parse_nodes(local_python_nodes: SerializedPythonNode[]) {
 function parseInPorts(port_types: serializedPort): NodeInputs {
   return Object.entries(port_types).reduce<NodeInputs>(
     (obj: NodeInputs, [name, input]): NodeInputs => {
+      if (!isPortDataTypeLabel(input)) {
+        input = Object.keys(input)[0] as PortDataTypeLabel
+      }
       if (isPortDataTypeLabel(input)) {
         obj[name] = {
           name: name,
@@ -40,7 +43,7 @@ function parseInPorts(port_types: serializedPort): NodeInputs {
         }
       }
       else {
-        console.warn(`Encountered unexpected input type: ${input as string}
+        console.warn(`Encountered unexpected input type: ${JSON.stringify(input)}
 Expected input types: ${PortTypeLabels.toString()}`)
       }
       return obj
@@ -51,7 +54,11 @@ function parseOutPorts(port_types: serializedPort): NodeOutputs {
   if (Object.entries(port_types).length != 1) {
     console.error("Multiple outputs not supported yet!")
   }
-  const port_type = port_types["out"]
+  let port_type = port_types["out"]
+
+  if (!isPortDataTypeLabel(port_type)) {
+    port_type = Object.keys(port_type)[0] as PortDataTypeLabel
+  }
   if (isPortDataTypeLabel(port_type)) {
     return {
       out: {
@@ -61,9 +68,9 @@ function parseOutPorts(port_types: serializedPort): NodeOutputs {
       }
     }
   } else {
-    console.warn(`Encountered unexpected output type: ${port_type as string}
+    console.warn(`Encountered unexpected output type: ${JSON.stringify(port_type)}
 Expected output types: ${PortTypeLabels.toString()}`)
   }
   // TODO: handle error ports, display to user?
-  return singleOutput("Real")
+  return singleOutput(["Real"])
 }

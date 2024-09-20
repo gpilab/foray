@@ -10,16 +10,24 @@ type Complex = [number, number]
 //// Primitive
 
 export const PortTypeLabels = ["Integer", "Real", "Complex", "String", "Flag", "Array", "Struct"] as const
-export type PortDataTypeLabel = typeof PortTypeLabels[number]
+//export type PortDataTypeLabel = typeof PortTypeLabels[number]
+export type PortDataTypeLabel =
+  | ["Integer"]
+  | ["Real"]
+  | ["Complex"]
+  | ["String"]
+  | ["Flag"]
+  | ["Struct", Record<string, PortDataTypeLabel>]
+  | ["Array", PortDataTypeLabel]
 
-export type PortTypeMap =
+export type PortDataType =
   | ["Integer", number]
   | ["Real", number]
   | ["Complex", Complex]
   | ["String", string]
   | ["Flag", Boolean]
-  | ["Struct", Record<PortDataTypeLabel, [PortTypeMap[1]]>]
-  | ["Array", PortTypeMap[1][]]
+  | ["Struct", Record<string, [PortDataType[1]]>]
+  | ["Array", PortDataType[1][]]
 
 //export type PortTypeMap = {
 //  "Integer": number
@@ -110,10 +118,11 @@ export type PortTypeMap =
 //export type PortDataType = PortTypeMap[PortDataTypeLabel]
 
 export function isPortDataTypeLabel(maybeLabel: unknown): maybeLabel is PortDataTypeLabel {
-  return PortTypeLabels.includes(maybeLabel as PortDataTypeLabel)
+  console.log("maybe label?", maybeLabel)
+  return PortTypeLabels.includes(maybeLabel)
 }
 
-export const portColorMap: Record<PortDataTypeLabel, TLDefaultColorStyle> = {
+export const portColorMap: Record<PortDataTypeLabel[0], TLDefaultColorStyle> = {
   "Struct": "violet",
   "String": "blue",
   "Complex": "green",
@@ -127,7 +136,7 @@ export type Port<K extends PortDataTypeLabel = PortDataTypeLabel> = {
   name: string
   ioType: "in" | "out"
   dataType: K
-  value?: PortTypeMap
+  value?: PortDataType
 }
 
 
@@ -135,7 +144,7 @@ export type InPort<K extends PortDataTypeLabel = PortDataTypeLabel> = Port<K> & 
 export type OutPort<K extends PortDataTypeLabel = PortDataTypeLabel> = Port<K> & { ioType: "out" }
 
 export const singleOutput = <T extends PortDataTypeLabel>(dataType: T): {
-  out: { name: "out", ioType: "out", dataType: T, value?: PortTypeMap },
+  out: { name: "out", ioType: "out", dataType: T, value?: PortDataType },
 } => {
   return {
     out: {
@@ -146,7 +155,7 @@ export const singleOutput = <T extends PortDataTypeLabel>(dataType: T): {
   }
 }
 export const singleInput = <T extends PortDataTypeLabel>(dataType: T): {
-  a: { name: "a", ioType: "in", dataType: T, value?: PortTypeMap[T] },
+  a: { name: "a", ioType: "in", dataType: T, value?: PortDataType },
 } => {
   return {
     a: {
@@ -158,8 +167,8 @@ export const singleInput = <T extends PortDataTypeLabel>(dataType: T): {
 }
 
 export const binaryOpInputs = <T extends PortDataTypeLabel>(dataType: T): {
-  a: { name: "a", ioType: "in", dataType: T, value?: PortTypeMap[T] },
-  b: { name: "b", ioType: "in", dataType: T, value?: PortTypeMap[T] }
+  a: { name: "a", ioType: "in", dataType: T, value?: PortDataType },
+  b: { name: "b", ioType: "in", dataType: T, value?: PortDataType }
 } => {
   return {
     a: {
@@ -181,13 +190,13 @@ export const binaryOpInputs = <T extends PortDataTypeLabel>(dataType: T): {
 
 let testIn: InPort
 //@ts-expect-error bad type example
-testIn = { name: "tin", ioType: "out", dataType: "Real" }
+testIn = { name: "tin", ioType: "out", dataType: ["Real"] }
 //@ts-expect-no-error
-testIn = { name: "tin", ioType: "in", dataType: "Real" }
+testIn = { name: "tin", ioType: "in", dataType: ["Real"] }
 
 let testOut: OutPort
 //@ts-expect-error bad type example
-testOut = { name: "tout", ioType: "in", dataType: "Real" }
+testOut = { name: "tout", ioType: "in", dataType: ["Real"] }
 //@ts-expect-no-error
-testOut = { name: "tout", ioType: "out", dataType: "Real" }
+testOut = { name: "tout", ioType: "out", dataType: ["Real"] }
 
