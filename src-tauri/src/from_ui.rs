@@ -1,6 +1,6 @@
-use std::path::PathBuf;
+use std::{error::Error, path::PathBuf};
 
-use gpipy::{
+use gpirs::{
     node::{NodeInputValue, NodeOutputValue, PythonNode},
     pyo::gpipy_compute,
 };
@@ -17,7 +17,7 @@ pub struct RunNodeMessage<'a> {
 }
 
 #[tauri::command]
-pub fn run_node(message: RunNodeMessage) -> NodeOutputValue {
+pub fn run_node(message: RunNodeMessage) -> Result<NodeOutputValue, String> {
     println!(
         "node type: {}, inputs: {:?}",
         message.node_type, message.inputs
@@ -26,7 +26,8 @@ pub fn run_node(message: RunNodeMessage) -> NodeOutputValue {
     //    Value::Other(v) => panic!("Unexpected return value from python: {}", v),
     //    _ => res,
     //}
-    gpipy_compute(message.node_type, message.inputs).unwrap()
+    //TODO: Handle errors more discretely/descriptevly
+    gpipy_compute(message.node_type, message.inputs).map_err(|op| op.to_string())
 }
 
 #[tauri::command]
@@ -59,7 +60,7 @@ pub fn get_python_nodes() -> Vec<PythonNode> {
 mod test {
     use std::{collections::HashMap, path::PathBuf};
 
-    use gpipy::{port::PortValue, pyo::initialize_gpipy};
+    use gpirs::{port::PortValue, pyo::initialize_gpipy};
 
     use super::*;
     #[test]
@@ -72,7 +73,7 @@ mod test {
             ("b".into(), PortValue::Integer(3)),
         ]));
 
-        let _ = initialize_gpipy(&d);
+        let _ = initialize_gpipy();
         let _result = match gpipy_compute("add_int", inputs) {
             Ok(res) => res,
             //Ok(_) => panic!("Unexpected return value from python"),

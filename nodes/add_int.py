@@ -1,14 +1,5 @@
-from typing import NamedTuple
-from gpipy import PortType
-
-
-def init():
-    return 1, 2, 3
-
-
-class In(NamedTuple):
-    a: int
-    b: int
+import gpirs
+from gpy import PortType
 
 
 def config():

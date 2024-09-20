@@ -1,24 +1,10 @@
 import numpy as np
-from typing import NamedTuple
-from gpipy import PortType
-
-
-def init():
-    return 7, 8, 9
-
-
-class In(NamedTuple):
-    path: str
-
-
-class Config(NamedTuple):
-    inputs = (str,)
-    outputs = np.ndarray
+from gpy import PortType
 
 
 def config():
     inputs = {"a": PortType.String}
-    outputs = {"out": PortType.Vec}
+    outputs = {"out": [PortType.Integer]}
     return (inputs, outputs)
 
 

@@ -4981,6 +4981,12 @@ supports-preserve-symlinks-flag@^1.0.0:
   resolved "https://registry.yarnpkg.com/supports-preserve-symlinks-flag/-/supports-preserve-symlinks-flag-1.0.0.tgz#6eda4bd344a3c94aea376d4cc31bc77311039e09"
   integrity sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==
 
+"tauri-plugin-fs-watch-api@https://github.com/tauri-apps/tauri-plugin-fs-watch#v1":
+  version "0.0.0"
+  resolved "https://github.com/tauri-apps/tauri-plugin-fs-watch#b595fef18f0b861b212c09dbfda86a0f4f2acda6"
+  dependencies:
+    "@tauri-apps/api" "1.6.0"
+
 "tauri-plugin-window-state-api@https://github.com/tauri-apps/tauri-plugin-window-state#v1":
   version "0.0.0"
   resolved "https://github.com/tauri-apps/tauri-plugin-window-state#aa0b2a9cbf96f87a172e999670be79c4bb5d67dd"

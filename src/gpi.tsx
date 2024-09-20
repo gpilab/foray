@@ -23,10 +23,11 @@ DefaultColorThemePalette.lightMode.background = "#ffffff00"
 
 
 import { NodeDefinition } from './shapes/node/nodeType'
-import React, { useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { parse_nodes, SerializedPythonNode } from './util/parse_tauri'
 import { GPI_UI } from './ui/gpi_ui'
 import { nodeDefaultDefinitions } from './shapes/node/nodeDefinitions'
+import { watch } from 'tauri-plugin-fs-watch-api'
 //import { NodeSelect } from './ui/NodeSelect'
 //import { GPI_UI } from './ui/gpi_ui'
 
@@ -40,8 +41,45 @@ export const GPIContext = React.createContext(initGPIState)
 export let GPI_Nodes: NodeDefinition<any, any, any>[] = []
 
 
+
 export default function GPI() {
   const [gpiState, setGpiState] = useState(initGPIState)
+
+  const fetchPythonNodes = () => {
+    //// Initialize python nodes from server
+    invoke<SerializedPythonNode[]>('get_python_nodes').then(
+      parse_nodes).then(nodes => {
+        // Trying out just having this be global state
+        const all_nodes = nodes.concat(Object.values(nodeDefaultDefinitions))
+        GPI_Nodes = all_nodes
+        setGpiState({ ...gpiState, NodeDefinitions: all_nodes })
+      }
+      ).catch((e) => {
+        console.error("Failed to load nodes", e)
+      })
+  }
+
+  //watch for changes to the node file
+  useEffect(() => {
+    const stop_watching = watch(
+      "/Users/jechristens3/projects/gpi_v2/nodes/",
+      (events) => {
+        const node_changes = events.filter((e) => e.kind != "AnyContinuous" && e.path.split(".").at(-1) == "py")
+        if (node_changes.length > 0) {
+          console.log("reloading python nodes due to file change: ", node_changes[0].path)
+          fetchPythonNodes()
+          //TODO: add notifcation to user
+          //TODO re-run changed nodes
+        }
+      },
+      {
+        recursive: true,
+        delayMs: 2000,
+      },
+    );
+  }, [])
+
+
   return (
     <GPIContext.Provider value={gpiState}>
       <div className="tldraw__editor">
@@ -55,17 +93,7 @@ export default function GPI() {
           components={components}
           assetUrls={customAssetURLs}
           onMount={() => {
-            //// Initialize python nodes from server
-            invoke<SerializedPythonNode[]>('get_python_nodes').then(
-              parse_nodes).then(nodes => {
-                // Trying out just having this be global state
-                const all_nodes = nodes.concat(Object.values(nodeDefaultDefinitions))
-                GPI_Nodes = all_nodes
-                setGpiState({ ...gpiState, NodeDefinitions: all_nodes })
-              }
-              ).catch((e) => {
-                console.error("Failed to load nodes", e)
-              })
+            fetchPythonNodes()
 
           }}
         >

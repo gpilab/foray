@@ -66,7 +66,7 @@ export const rangeDef = createNodeDef({
   state: {
     type: "_Range",
     inputs: {},
-    output: singleOutput("Vec"),
+    output: singleOutput("Vec1"),
     config: {
       start: -10,
       end: 10,
@@ -82,8 +82,8 @@ export const rangeDef = createNodeDef({
 export const sinDef = createNodeDef({
   state: {
     type: "_sin",
-    inputs: singleInput("Vec"),
-    output: singleOutput("Vec"),
+    inputs: singleInput("Vec1"),
+    output: singleOutput("Vec1"),
     config: { amplitude: 1, phaseOffset: 0, frequency: 4 }
   },
   compute: ({ a }, { amplitude, phaseOffset, frequency }) =>
@@ -124,8 +124,8 @@ export const sincDef = createNodeDef({
 export const arrayAddDef = createNodeDef({
   state: {
     type: "_ArrayAdd",
-    inputs: binaryOpInputs("Vec"),
-    output: singleOutput("Vec"),
+    inputs: binaryOpInputs("Vec1"),
+    output: singleOutput("Vec1"),
     config: { formula: "\\textbf{+}" }
   },
   compute: ({ a, b }) => a.value.map((e, i) => e + b.value[i])
@@ -134,8 +134,8 @@ export const arrayAddDef = createNodeDef({
 export const arrayMultiplyDef = createNodeDef({
   state: {
     type: "_ArrayMult",
-    inputs: binaryOpInputs("Vec"),
-    output: singleOutput("Vec"),
+    inputs: binaryOpInputs("Vec1"),
+    output: singleOutput("Vec1"),
     config: { formula: "\\times" }
   },
   compute: ({ a, b }) => a.value.map((e, i) => e * b.value[i])
@@ -144,8 +144,8 @@ export const arrayMultiplyDef = createNodeDef({
 export const fftDef = createNodeDef({
   state: {
     type: "_fft",
-    inputs: singleInput("Vec"),
-    output: singleOutput("Vec"),
+    inputs: singleInput("Vec1"),
+    output: singleOutput("Vec1"),
     config: { formula: "\\mathcal{F}\\{f(x)\\}" },
   },
   compute: async ({ a }) => {
@@ -158,8 +158,8 @@ export const fftDef = createNodeDef({
 export const pyAddArrayDef = createNodeDef({
   state: {
     type: "_PyAddArray",
-    inputs: binaryOpInputs("Vec"),
-    output: singleOutput("Vec"),
+    inputs: binaryOpInputs("Vec1"),
+    output: singleOutput("Vec1"),
     config: { formula: "+ (py array)" },
   },
   compute: async ({ a, b }) => {
@@ -179,8 +179,8 @@ export const pyAddArrayDef = createNodeDef({
 export const plotDef = createNodeDef({
   state: {
     type: "_Plot",
-    inputs: singleInput("Vec"),
-    output: singleOutput("Vec"),
+    inputs: singleInput("Vec1"),
+    output: singleOutput("Vec1"),
     config: {}
   },
   compute: ({ a }) => a.value
@@ -207,9 +207,15 @@ export const createDynamicNode = (type: string, config: Config,
       const input_formatted =
         Object.entries(input_values)
           .reduce<Record<string, Record<string, PortDataType>>>((acc, [name, port]) => {
+            let value = undefined
+            if (port.dataType == "Vec1") {
+              value = port.value.map(e => ({ "Real": e }))
+            } else {
+              value = port.value
+            }
             return {
               ...acc,
-              [name]: { [port.dataType]: port.value }
+              [name]: { [port.dataType]: value }
             }
           }, {})
 

@@ -17,7 +17,14 @@ TODO:
 [ ] - Node UI interactions that make editing paramters quick and easy
 [ ] - Detailed node configuration editing
 [s] - make any python node defined automatically appear in the UI
-  [ ] - Define port types that match across UI/Rust/Python
+  [x] - Define port types that match across UI/Rust/Python
+  [s] - auto reload on file change
+    [ ] - show file update notification/indication in UI
+    [ ] - auto run node after file changes
+[ ] - Unmatched ports can't be connected
+[ ] - port connection UX improvemnts
+  [ ] - ports that can be connected are emphasized
+  [ ] - ports can be connected automatically if they are placed directly after a compatible node?
 [ ] - debugging/logging information surfaced to the user
 [ ] - indication of when nodes fire, and how long they run
 [ ] - export network as a file
@@ -45,8 +52,15 @@ TODO:
 
 TODO:
 [s] - init function
-[s] - compute function
+[x] - compute function
 [ ] - view function
+[ ] - create standardized node definitions for node modules
+  [ ] - load nodes that are installed via pip
+
+
+### User Configuration
+[ ] - read default configuration overrides from file
+[ ] - have a list of folders to load nodes from
 
 
 

@@ -3,7 +3,7 @@ import { createShapeId, EASINGS, track, useEditor } from "tldraw"
 import './custom-ui.css'
 import { useHover } from "usehooks-ts"
 import { GPIContext } from "../gpi"
-import { Idle, WireTool } from "../shapes/wire/WireTool"
+import { Idle } from "../shapes/wire/WireTool"
 
 export const NodeSelect = track(() => {
   const editor = useEditor()
@@ -45,7 +45,9 @@ export const NodeSelect = track(() => {
   }
 
   return <>
-    {active ? <div className="node-select-frame">
+    {active ? <div
+      className="node-select-frame"
+      style={{ pointerEvents: "all" }} >
       < GridSelect items={node_names} onSelectionChange={(name) => { handle_select(name) }} />
     </div >
       : <></>}
@@ -67,7 +69,6 @@ export const GridSelect = ({ items, onSelectionChange }: GridSelectProps) => {
           key={index}
           className={`grid-item`}
           onPointerDown={() => onSelectionChange(item)}
-          style={{ pointerEvents: "all" }}
         >
           <Hoverable>{item}</Hoverable>
         </div>

@@ -1,4 +1,4 @@
-from gpipy import PortType
+from gpy import PortType
 
 
 def init():
@@ -6,8 +6,8 @@ def init():
 
 
 def config():
-    inputs = {"a": PortType.Vec}
-    outputs = {"out": PortType.Vec}
+    inputs = {"a": [PortType.Integer]}
+    outputs = {"out": [PortType.Integer]}
     return (inputs, outputs)
 
 
