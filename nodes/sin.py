@@ -3,17 +3,12 @@ import numpy as np
 
 
 def config():
-    inputs = {"a": [PortType.Integer], "b": [PortType.Integer]}
+    inputs = {"a": [PortType.Integer]}
     outputs = {"out": [PortType.Integer]}
     return (inputs, outputs)
 
 
 def compute(input):
     a = np.asarray(input["a"])
-    b = np.asarray(input["b"])
-    print("add int:")
-    print(a)
-    print(b)
-    out = a + b
-    print(out)
+    out = np.sin(a)
     return out

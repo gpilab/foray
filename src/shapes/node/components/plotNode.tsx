@@ -7,10 +7,11 @@ import { useTheme } from "../../../util/useTheme"
 
 export const PlotNode = track(
   () => {
-    console.log("Rendering Plot Node")
     const theme = useTheme()
     const { inputs, color, showPlotGrid } = useNodeConfig()
-    const value = inputs.a?.value as number[] | undefined
+    const value = inputs.a?.value?.[1];
+
+    const data = value?.map(e => e["Real"])
 
     const dataWidth = 4
     const dataHeight = 3
@@ -30,7 +31,7 @@ export const PlotNode = track(
             transform="scale(1,-1)"
             fill={"none"}
             strokeLinejoin="round">
-            <PolyLine points={value.map((y, i) => ({
+            <PolyLine points={data.map((y, i) => ({
               x: linspace(-dataWidth / 2, dataWidth / 2, value?.length)[i],
               y: y
             }))} />

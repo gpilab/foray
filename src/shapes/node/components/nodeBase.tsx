@@ -14,7 +14,7 @@ export const NodeBase = track(({ shape }: { shape: NodeShape }) => {
   const theme = useTheme()
   const { nodeType, inputs, output, width, height, color } = shape.props
 
-  console.log(`Rendering node ${nodeType}`)
+  //console.log(`Rendering node ${nodeType}`)
 
   const backgroundColor = theme.id == "dark" ? "#000000dd" : "#ffffffdd"
   return <HTMLContainer>
@@ -40,11 +40,13 @@ export const NodeBase = track(({ shape }: { shape: NodeShape }) => {
       <g
         strokeWidth={nodeStrokeWidth}
       >
-        <rect id="cover_node_frame" rx={5}
-          width={width}
-          height={height}
-          stroke={"none"}
-          fill={"none"} />
+        {
+          //<rect id="cover_node_frame" rx={5}
+          //width={width}
+          //height={height}
+          //stroke={"none"}
+          //fill={"none"} />
+        }
         <rect id="cover_node_frame" rx={5}
           width={width}
           height={height}
@@ -121,7 +123,7 @@ const IOPort = track(({ port }: { port: Port }) => {
 })
 
 function displayPortValue(port: Port) {
-  console.log(JSON.stringify(port))
+  //console.log(JSON.stringify(port))
   if (port.value === undefined) {
     return ""
   }

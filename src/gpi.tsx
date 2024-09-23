@@ -3,7 +3,7 @@ import {
   DefaultToolbar, DefaultToolbarContent,
   TLUiAssetUrlOverrides,
   TLUiComponents, TLUiOverrides, Tldraw,
-  TldrawUiMenuItem, useIsToolSelected, useTools
+  TldrawUiMenuItem, useEditor, useIsToolSelected, useTools
 } from 'tldraw'
 
 import 'tldraw/tldraw.css'
@@ -59,6 +59,7 @@ export default function GPI() {
       })
   }
 
+
   //watch for changes to the node file
   useEffect(() => {
     const stop_watching = watch(
@@ -94,7 +95,6 @@ export default function GPI() {
           assetUrls={customAssetURLs}
           onMount={() => {
             fetchPythonNodes()
-
           }}
         >
           <GPI_UI />

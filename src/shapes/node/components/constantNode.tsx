@@ -7,9 +7,11 @@ export const ConstantNode = track((props: { updateNode: (updatedProps: Partial<N
   const { updateNode } = props
   const { output } = useNodeConfig()
 
+
   const updateConfig = (value: number) => { updateNode({ config: { value } }) }
 
+
   return <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center" }}>
-    <NumericInput value={output.out.value} setValue={updateConfig} textAlign="center" />
+    <NumericInput value={output.out.value != undefined ? output.out.value[1] : 10} setValue={updateConfig} textAlign="center" />
   </div>
 })

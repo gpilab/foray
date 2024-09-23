@@ -81,11 +81,11 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
   static override props = nodeShapeProps
 
   override canResize: TLShapeUtilFlag<NodeShape> = () => true
-  //override hideResizeHandles = () => false
+  override hideResizeHandles = () => true
   override canEdit: TLShapeUtilFlag<NodeShape> = () => false
   override isAspectRatioLocked: TLShapeUtilFlag<NodeShape> = () => false
-  //override hideSelectionBoundsBg = () => true
-  //override hideSelectionBoundsFg = () => true
+  override hideSelectionBoundsBg = () => true
+  override hideSelectionBoundsFg = () => true
   override hideRotateHandle = () => true
 
   getDefaultProps(): NodeShapeProps {

@@ -14,7 +14,7 @@ export type NodeConfig = {
 } & NodeShapeProps
 
 
-const NodeConfigContext = createContext<NodeConfig | null>(null)
+export const NodeConfigContext = createContext<NodeConfig | null>(null)
 
 export const useNodeConfig = () => {
   const context = useContext(NodeConfigContext)

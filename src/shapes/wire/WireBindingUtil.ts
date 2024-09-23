@@ -114,10 +114,10 @@ export class WireBindingUtil extends BindingUtil<WireBinding> {
     const childInPort = childNode.props.inputs[endBinding.props.portName]
 
 
-    if (parentOutPort.value == childInPort.value) {
-      // ports are already synced, no need to updated
-      return
-    }
+    //if (parentOutPort.value == childInPort.value) {
+    //  // ports are already synced, no need to updated
+    //  return
+    //}
 
     // artificial delay for testing 
     window.setTimeout(() => {

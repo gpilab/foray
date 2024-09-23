@@ -1,4 +1,4 @@
-import { binaryOpInputs, PortDataType, singleOutput } from "./portDefinition"
+import { binaryOpInputs, PortDataType, singleInput, singleOutput } from "./portDefinition"
 import { invoke } from "@tauri-apps/api"
 import { GPI_Nodes } from "../../gpi"
 import { Config, createNodeDef, NodeDefinition, NodeInputs, NodeOutputs } from "./nodeType"
@@ -31,15 +31,15 @@ export const addNodeDefinition = createNodeDef({
 //  compute: ({ a, b }) => a.value * b.value
 //})
 //
-//const constantDef = createNodeDef({
-//  state: {
-//    type: "_Constant",
-//    inputs: {},
-//    output: singleOutput("Real"),
-//    config: { value: 10 }
-//  },
-//  compute: (_, config) => config.value
-//})
+const constantDef = createNodeDef({
+  state: {
+    type: "_Constant",
+    inputs: {},
+    output: singleOutput(["Real"]),
+    config: { value: 10 }
+  },
+  compute: (_, config) => ["Real", config.value]
+})
 //
 //export const pyAddDef = createNodeDef({
 //  state: {
@@ -174,15 +174,15 @@ export const arrayNodes = ["_Range", "_cos", "_sin", "_sinc", "_fft", "_Plot", "
 //  }
 //})
 //
-//export const plotDef = createNodeDef({
-//  state: {
-//    type: "_Plot",
-//    inputs: singleInput("Vec1"),
-//    output: singleOutput("Vec1"),
-//    config: {}
-//  },
-//  compute: ({ a }) => a.value
-//})
+export const plotDef = createNodeDef({
+  state: {
+    type: "_Plot",
+    inputs: singleInput(["Array", ["Real"]]),
+    output: singleOutput(["Array", ["Real"]]),
+    config: {}
+  },
+  compute: ({ a }) => a.value
+})
 
 
 
@@ -190,7 +190,7 @@ export const arrayNodes = ["_Range", "_cos", "_sin", "_sinc", "_fft", "_Plot", "
 export const createDynamicNode = (type: string, config: Config,
   inputs: NodeInputs,
   output: NodeOutputs) => {
-  console.log("creating node:", { type, inputs, output, config })
+  //console.log("creating node:", { type, inputs, output, config })
 
   return createNodeDef({
     state: {
@@ -267,7 +267,7 @@ export const nodeDefaultDefinitions = {
   //"_Add": addNodeDefinition,
   //"_Subtract": subtractDef,
   //"_Multiply": multiplyDef,
-  //"_Constant": constantDef,
+  "_Constant": constantDef,
   //"_Range": rangeDef,
   //"_sin": sinDef,
   //"_cos": cosDef,
@@ -275,7 +275,7 @@ export const nodeDefaultDefinitions = {
   //"_fft": fftDef,
   //"_ArrayAdd": arrayAddDef,
   //"_ArrayMult": arrayMultiplyDef,
-  //"_Plot": plotDef,
+  "_Plot": plotDef,
   //"_pyAdd": pyAddDef,
   //"_PyAddArray": pyAddArrayDef,
   "_DynamicNode": defaultDynamicNodeDef,
@@ -292,6 +292,7 @@ export const getDefaultNodeDefinition = (nodeType: string) => {
   }
   const node = GPI_Nodes.find(n => n.state.type == nodeType)
   if (node === undefined) {
+    console.log(`tried to get node definition for ${nodeType},but it is not in the known list of nodes`, GPI_Nodes)
     throw "Node not found!" + nodeType
   }
   console.log("using dynamic node from python", node)

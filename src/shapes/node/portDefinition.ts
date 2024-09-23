@@ -118,8 +118,7 @@ export type PortDataType =
 //export type PortDataType = PortTypeMap[PortDataTypeLabel]
 
 export function isPortDataTypeLabel(maybeLabel: unknown): maybeLabel is PortDataTypeLabel {
-  console.log("maybe label?", maybeLabel)
-  return PortTypeLabels.includes(maybeLabel)
+  return PortTypeLabels.includes(maybeLabel as any)
 }
 
 export const portColorMap: Record<PortDataTypeLabel[0], TLDefaultColorStyle> = {
