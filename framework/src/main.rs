@@ -1,10 +1,10 @@
-use std::{cell::RefCell, fmt::Debug, rc::Rc};
+use std::{cell::RefCell, fmt::Debug};
 
 use petgraph::{algo::toposort, graph::DiGraph, visit::Topo};
 #[derive(Debug)]
 struct Port {
     source_label: String,
-    val: Option<Rc<RefCell<i32>>>,
+    val: Option<RefCell<i32>>,
     target_label: String,
 }
 impl Port {
@@ -107,7 +107,7 @@ fn main() {
                         .detach();
                 while let Some(edge) = in_edges.next_edge(&g.g) {
                     let (_nw, ew) = g.g.index_twice_mut(nx, edge);
-                    ew.val = Some(Rc::new(val.into()));
+                    ew.val = Some(val.into());
                 }
             }
             NodeType::Add => {
@@ -136,7 +136,7 @@ fn main() {
                         .detach();
                 while let Some(edge) = in_edges.next_edge(&g.g) {
                     let (_nw, ew) = g.g.index_twice_mut(nx, edge);
-                    ew.val = Some(Rc::new(out.into()));
+                    ew.val = Some(out.into());
                 }
             }
             NodeType::_Sub => {}
@@ -163,7 +163,7 @@ fn main() {
                         .detach();
                 while let Some(edge) = in_edges.next_edge(&g.g) {
                     let (_nw, ew) = g.g.index_twice_mut(nx, edge);
-                    ew.val = Some(Rc::new(out.into()));
+                    ew.val = Some(out.into());
                 }
             }
         };
