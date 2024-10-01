@@ -2,12 +2,12 @@ use std::{collections::HashMap, fmt::Debug, rc::Rc};
 
 use petgraph::{graph::DiGraph, visit::Topo, Direction::Incoming};
 #[derive(Debug)]
-struct Port<'a> {
+struct Port {
     _source_label: String,
-    val: Option<&'a Rc<i32>>,
+    val: Option<Rc<i32>>,
     target_label: String,
 }
-impl Port<'_> {
+impl Port {
     fn new(source_label: &str, target_label: &str) -> Self {
         Self {
             _source_label: source_label.into(),
@@ -18,8 +18,8 @@ impl Port<'_> {
 }
 
 #[derive(Debug)]
-struct Graph<'a> {
-    g: DiGraph<Node<'a>, Port<'a>>,
+struct Graph {
+    g: DiGraph<Node, Port>,
 }
 
 #[derive(Debug)]
@@ -30,14 +30,14 @@ enum NodeType {
     Offset(i32),
 }
 
-struct Node<'a> {
+struct Node {
     name: String,
-    inputs: HashMap<String, Option<&'a Rc<i32>>>,
+    inputs: HashMap<String, Option<Rc<i32>>>,
     outputs: HashMap<String, Option<Rc<i32>>>,
     n_type: NodeType,
 }
 
-impl Node<'_> {
+impl Node {
     fn new(name: String, n_type: NodeType, inputs: Vec<String>, outputs: Vec<String>) -> Self {
         Node {
             name,
@@ -153,10 +153,9 @@ fn main() {
             let (nw, ew) = g.g.index_twice_mut(nx, edge);
             //PERF: could this clone be avoided using something like
             // rfcell or COW or someting?
-            //dbg!(&ew);
-            let val = nw.outputs.get(&ew._source_label).unwrap().clone();
-            ew.val = val.as_ref();
-            //dbg!(&ew);
+            dbg!(&ew);
+            ew.val = nw.outputs.get(&ew._source_label).unwrap().clone();
+            dbg!(&ew);
         }
     }
     //println!("{:?}", &g);
@@ -166,7 +165,7 @@ fn main() {
     //println!("{:?}", Dot::with_config(&g.g, &[Config::EdgeNoLabel]));
 }
 
-impl Debug for Node<'_> {
+impl Debug for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
