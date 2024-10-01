@@ -1,10 +1,10 @@
-use std::{cell::RefCell, fmt::Debug};
+use std::{borrow::Borrow, fmt::Debug};
 
 use petgraph::{algo::toposort, graph::DiGraph, visit::Topo};
 #[derive(Debug)]
 struct Port {
     source_label: String,
-    val: Option<RefCell<i32>>,
+    val: Option<Box<i32>>,
     target_label: String,
 }
 impl Port {
