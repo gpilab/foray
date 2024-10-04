@@ -1,21 +1,25 @@
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
+use serde::Serialize;
+
+/// Temporarily Serializable, probably don't want to
+/// serialize data in the long run
+#[derive(Debug, Clone, Serialize)]
 pub enum PortData {
     Integer(i64),
     Real(f64),
     String(String),
     Vec(Vec<PortData>),
-    Obj(HashMap<String, PortData>),
+    Struct(HashMap<String, PortData>),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize)]
 pub enum PortType {
     Integer,
     Real,
     String,
     Vec,
-    Obj,
+    Struct,
 }
 
 impl From<&PortData> for PortType {
@@ -25,7 +29,7 @@ impl From<&PortData> for PortType {
             PortData::Real(_) => PortType::Real,
             PortData::String(_) => PortType::String,
             PortData::Vec(_) => PortType::Vec,
-            PortData::Obj(_) => PortType::Obj,
+            PortData::Struct(_) => PortType::Struct,
         }
     }
 }

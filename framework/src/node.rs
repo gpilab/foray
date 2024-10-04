@@ -1,47 +1,52 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use petgraph::graph::NodeIndex;
+use serde::Serialize;
 
+use crate::network::NodeIndex;
 use crate::node_type::NodeType;
 use crate::port::{PortData, PortType};
 
-pub struct Node {
+#[derive(Serialize)]
+pub(crate) struct Node {
     /// Determines how outputs are calculated from inputs
     pub node_type: NodeType,
+
+    pub(crate) node_id: NodeIndex,
     /// Each port is named
     /// Output data is stored directly in the node
-    pub output: HashMap<PortName, OutputPort>,
+    output: HashMap<PortName, OutputPort>,
     /// Inputs don't store data,
     /// they only store their type, and the node+port they are connected to
-    pub input: HashMap<PortName, InputPort>,
+    input: HashMap<PortName, InputPort>,
 }
 
 /// Input Ports always have a type.
 /// If connected, they identify their connection with a `NodeIndex` and `PortName`
-#[derive(Debug)]
-pub enum InputPort {
+#[derive(Debug, Serialize)]
+enum InputPort {
     Empty(PortType),
     Connected(PortType, NodeIndex, PortName),
 }
 
 /// Output ports always have a type.
 /// They optionally have data
-#[derive(Debug)]
-pub enum OutputPort {
+#[derive(Debug, Serialize)]
+enum OutputPort {
     Empty(PortType),
     Filled(PortData),
 }
 
 impl Node {
-    //Initialize a node with no connections
     pub fn new(
-        n_type: NodeType,
+        node_type: NodeType,
         input: Vec<(PortName, PortType)>,
         output: Vec<(PortName, PortType)>,
     ) -> Self {
         Node {
-            node_type: n_type,
+            node_type,
+            // this will be updated immediately below!
+            node_id: 0.into(),
             input: input
                 .iter()
                 .map(|(name, pt)| (name.clone(), InputPort::Empty(*pt)))
@@ -52,6 +57,7 @@ impl Node {
                 .collect(),
         }
     }
+
     pub fn can_connect_child<T: Into<PortName>>(
         &self,
         local_port_name: T,
@@ -83,7 +89,7 @@ impl Node {
 
     /// set an input port to point to a parent port
     /// The `network` should also be updated!!!
-    pub(crate) fn connect_input(
+    pub fn connect_input(
         &mut self,
         local_port_name: PortName,
         parent_node: NodeIndex,
@@ -97,13 +103,25 @@ impl Node {
             InputPort::Connected(input_port.into(), parent_node, parent_node_name),
         );
     }
+
+    pub(crate) fn get_output_data(&self, port_name: &PortName) -> &PortData {
+        self.output.get(port_name).unwrap().get_data()
+    }
+
+    pub(crate) fn get_connected_port_id(&self, port_name: &PortName) -> OutPortId {
+        self.input.get(port_name).unwrap().get_connected_port_id()
+    }
 }
 
 impl InputPort {
-    pub fn get_connected_port_id(&self) -> PortId {
+    pub fn get_connected_port_id(&self) -> OutPortId {
         match self {
             Self::Empty(_) => panic!("Output is not populated"),
-            Self::Connected(_, n_index, port_name) => (*n_index, port_name.clone()),
+            Self::Connected(port_type, n_index, port_name) => OutPortId {
+                node_id: *n_index,
+                port_name: port_name.clone(),
+                port_type: *port_type,
+            },
         }
     }
 }
@@ -134,7 +152,7 @@ impl From<&OutputPort> for PortType {
     }
 }
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize)]
 pub struct PortName(String);
 
 impl From<&str> for PortName {
@@ -144,7 +162,17 @@ impl From<&str> for PortName {
 }
 
 /// A Port is uniquely identified with a NodeIndex and a PortName
-pub type PortId = (NodeIndex, PortName);
+pub struct InPortId {
+    pub node_id: NodeIndex,
+    pub port_name: PortName,
+    pub port_type: PortType,
+}
+
+pub struct OutPortId {
+    pub node_id: NodeIndex,
+    pub port_name: PortName,
+    pub port_type: PortType,
+}
 
 impl Debug for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -167,7 +195,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn build_node() {
+    fn can_connect_node() {
         //node 1
         let n1 = Node::new(
             NodeType::Add,

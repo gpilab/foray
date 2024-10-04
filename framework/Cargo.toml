@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-petgraph = "0.6.5"
+petgraph = { version = "0.6.5", features = ["serde-1"] }
 serde = { version = "1.0.207", features = ["serde_derive"] }

@@ -1,10 +1,11 @@
 use petgraph::graph::NodeIndex;
+use serde::Serialize;
 
 use crate::{network::Network, node::PortName, port::PortData};
 
 //const STRESS_SIZE: usize = 100_000_000;
 const STRESS_SIZE: usize = 3;
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum NodeType {
     Const(f64),
     Add,
