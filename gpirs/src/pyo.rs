@@ -69,7 +69,7 @@ pub fn gpipy_compute(
         //        .unwrap();
 
         let node_module = PyModule::from_code_bound(py, node_src, "gpi_node.py", "gpi_node")?;
-        println!("running py compute");
+        //println!("running py compute");
 
         //// COMPUTE
         let node_output = node_module

@@ -5,14 +5,14 @@ use serde::Serialize;
 
 use crate::node_type::NodeType;
 use crate::port::NodeIndex;
-use crate::port::{InputPort, OutputPort, OutputPortId, PortData, PortName, PortType};
+use crate::port::{InputPort, OutputPort, PortData, PortName, PortType};
 
 #[derive(Serialize)]
 pub(crate) struct Node {
     /// Determines how outputs are calculated from inputs
     pub node_type: NodeType,
     /// This node's index in the `Network`
-    pub(crate) node_id: NodeIndex,
+    pub node_id: NodeIndex,
     /// Each port is named
     /// Output data is stored directly in the node
     output: HashMap<PortName, OutputPort>,
@@ -90,7 +90,7 @@ impl Node {
         self.output.get(port_name).unwrap().get_data()
     }
 
-    pub(crate) fn get_connected_port_id(&self, port_name: &PortName) -> OutputPortId {
+    pub(crate) fn get_connected_port_id(&self, port_name: &PortName) -> (NodeIndex, PortName) {
         self.input.get(port_name).unwrap().get_connected_port_id()
     }
 }
@@ -105,7 +105,9 @@ impl Debug for Node {
 \t  outpus:{:?}
 \t}}
 ",
-            self.node_type, self.input, self.output
+            self.node_type,
+            self.input,
+            self.output.len()
         )
     }
 }

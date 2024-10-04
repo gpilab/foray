@@ -6,7 +6,7 @@ pub type NodeIndex = petgraph::graph::NodeIndex;
 
 /// Temporarily Serializable, probably don't want to
 /// serialize data in the long run
-#[derive(Debug, Clone, Serialize)]
+#[derive(PartialEq, Debug, Clone, Serialize)]
 pub enum PortData {
     Integer(i64),
     Real(f64),
@@ -56,14 +56,10 @@ impl From<&PortData> for PortType {
 }
 
 impl InputPort {
-    pub fn get_connected_port_id(&self) -> OutputPortId {
+    pub fn get_connected_port_id(&self) -> (NodeIndex, PortName) {
         match self {
             Self::Empty(_) => panic!("Output is not populated"),
-            Self::Connected(port_type, n_index, port_name) => OutputPortId {
-                node_id: *n_index,
-                port_name: port_name.clone(),
-                port_type: *port_type,
-            },
+            Self::Connected(_, n_index, port_name) => (*n_index, port_name.clone()),
         }
     }
 }

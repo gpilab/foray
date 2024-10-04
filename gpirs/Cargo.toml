@@ -8,11 +8,9 @@ name = "gpirs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-gpi_framework =  {path = "../framework/"}
 numpy = "0.21.0"
-pyo3 = {version="0.21.2"}
-serde = {version="1.0.207", features=["serde_derive"]}
+pyo3 = { version = "0.21.2" }
+serde = { version = "1.0.207", features = ["serde_derive"] }
 anyhow = "1.0.86"
 pyo3-stub-gen = "0.6.0"
-ordered-float = {version = "4.2.2",features=["serde"]}
-
+ordered-float = { version = "4.2.2", features = ["serde"] }

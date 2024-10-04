@@ -9,7 +9,7 @@ def config():
 
 
 def compute(input):
-    a = np.asarray(input["a"])
-    b = input["b"]
+    a = input["a"]
+    b = np.asarray(input["b"])
     out = a * b
     return out

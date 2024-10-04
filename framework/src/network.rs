@@ -9,7 +9,7 @@ use serde::Serialize;
 use crate::{
     node::Node,
     node_type::NodeType,
-    port::{NodeIndex, OutputPortId, PortData, PortName, PortType},
+    port::{NodeIndex, PortData, PortName, PortType},
 };
 
 #[derive(Debug, Serialize)]
@@ -26,6 +26,7 @@ impl Default for Network {
     }
 }
 
+/// A network of nodes. Nodes are connected via ports.
 impl Network {
     //// Mutators
 
@@ -84,11 +85,11 @@ impl Network {
     //// Accessors
 
     #[must_use]
-    pub fn get_output_data(&self, port_id: OutputPortId) -> &PortData {
+    pub fn get_output_data(&self, port_id: (NodeIndex, PortName)) -> &PortData {
         self.g
-            .node_weight(port_id.node_id)
+            .node_weight(port_id.0)
             .unwrap()
-            .get_output_data(&port_id.port_name)
+            .get_output_data(&port_id.1)
     }
 
     pub(crate) fn retrieve_input_data(&self, node: &Node, input_port_name: &PortName) -> &PortData {
