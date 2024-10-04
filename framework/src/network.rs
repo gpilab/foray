@@ -16,6 +16,7 @@ use crate::{
 pub struct Network {
     pub(crate) g: DiGraph<Node, ()>,
 }
+
 impl Default for Network {
     ///Initialize an empty network
     fn default() -> Self {
@@ -24,6 +25,7 @@ impl Default for Network {
         }
     }
 }
+
 impl Network {
     //// Mutators
 
@@ -35,9 +37,9 @@ impl Network {
         output: Vec<(PortName, PortType)>,
     ) -> NodeIndex {
         let node_id = self.g.add_node(Node::new(n_type, input, output));
+
         // now that we have a node_id, set it on the node
         self.g.node_weight_mut(node_id).unwrap().node_id = node_id;
-
         node_id
     }
 
@@ -54,13 +56,11 @@ impl Network {
             // need to use immutable references to check two nodes at once
             let from_node = self.g.node_weight(from_node_idx).unwrap();
             let to_node = self.g.node_weight(to_node_idx).unwrap();
-            if !from_node.can_connect_child(from_port_name.clone(), to_node, to_port_name.clone()) {
-                // TODO: Custom error types and returning a result would be nice here
-                panic!(
-                    "Tried to connect incompatible ports: {:?}->{:?}",
-                    from_node, to_node
-                );
-            }
+            // TODO: Custom error types and returning a result would be nice here
+            assert!(
+                from_node.can_connect_child(from_port_name.clone(), to_node, to_port_name.clone()),
+                "Tried to connect incompatible ports: {from_node:?}->{to_node:?}"
+            );
         }
         //// Update to_node's input to point to from_node
         let to_node = self.g.node_weight_mut(to_node_idx).unwrap();
@@ -73,14 +73,17 @@ impl Network {
     /// Loop through the graph and propogate values
     pub fn process(&mut self) {
         let mut topo = Topo::new(&self.g);
+
         while let Some(nx) = topo.next(&self.g) {
             let node = self.g.node_weight(nx).unwrap();
+
             node.node_type.clone().compute(nx, self);
         }
     }
 
     //// Accessors
 
+    #[must_use]
     pub fn get_output_data(&self, port_id: OutputPortId) -> &PortData {
         self.g
             .node_weight(port_id.node_id)

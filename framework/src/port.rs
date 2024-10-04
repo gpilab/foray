@@ -80,11 +80,11 @@ impl OutputPort {
 impl From<&InputPort> for PortType {
     fn from(value: &InputPort) -> Self {
         match value {
-            InputPort::Empty(pt) => *pt,
-            InputPort::Connected(pt, _, _) => *pt,
+            InputPort::Connected(pt, _, _) | InputPort::Empty(pt) => *pt,
         }
     }
 }
+
 impl From<&OutputPort> for PortType {
     fn from(value: &OutputPort) -> Self {
         match value {
@@ -100,7 +100,7 @@ impl From<&str> for PortName {
     }
 }
 
-/// A Port is uniquely identified with a NodeIndex and a PortName
+/// A Port is uniquely identified with a `NodeIndex` and a `PortName`
 pub struct InputPortId {
     pub node_id: NodeIndex,
     pub port_name: PortName,

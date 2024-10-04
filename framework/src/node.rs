@@ -11,7 +11,7 @@ use crate::port::{InputPort, OutputPort, OutputPortId, PortData, PortName, PortT
 pub(crate) struct Node {
     /// Determines how outputs are calculated from inputs
     pub node_type: NodeType,
-
+    /// This node's index in the `Network`
     pub(crate) node_id: NodeIndex,
     /// Each port is named
     /// Output data is stored directly in the node
@@ -79,8 +79,6 @@ impl Node {
         parent_node: NodeIndex,
         parent_node_name: PortName,
     ) {
-        dbg!(&self);
-        dbg!(&local_port_name);
         let input_port = self.input.get(&local_port_name).unwrap();
         self.input.insert(
             local_port_name,
@@ -114,7 +112,6 @@ impl Debug for Node {
 
 #[cfg(test)]
 mod test {
-
     use super::*;
 
     #[test]

@@ -5,7 +5,7 @@ use crate::{network::Network, port::PortData, port::PortName};
 
 //const STRESS_SIZE: usize = 100_000_000;
 const STRESS_SIZE: usize = 3;
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize)]
 pub enum NodeType {
     Const(f64),
     Add,
@@ -50,7 +50,6 @@ impl NodeType {
             NodeType::_Sub => {}
             NodeType::Offset(val) => {
                 let a = g.retrieve_input_data(node, &PortName::from("a"));
-
                 let PortData::Vec(a) = a else { todo!() };
 
                 let out = PortData::Vec(
