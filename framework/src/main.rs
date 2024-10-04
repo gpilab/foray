@@ -2,7 +2,7 @@ use gpi_framework::port::PortType;
 use gpi_framework::{network::Network, node_type::NodeType};
 
 fn main() {
-    let mut g = Network::new();
+    let mut g = Network::default();
 
     let n1 = g.add_node(
         NodeType::Const(9.),

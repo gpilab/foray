@@ -16,15 +16,18 @@ use crate::{
 pub struct Network {
     pub(crate) g: DiGraph<Node, ()>,
 }
-
-impl Network {
-    pub fn new() -> Self {
+impl Default for Network {
+    ///Initialize an empty network
+    fn default() -> Self {
         Network {
             g: DiGraph::<Node, ()>::new(),
         }
     }
+}
+impl Network {
     //// Mutators
-    //Initialize a node with no connections
+
+    /// Add a new node to the network
     pub fn add_node(
         &mut self,
         n_type: NodeType,
@@ -38,9 +41,6 @@ impl Network {
         node_id
     }
 
-    /// Add node to the graph
-    //pub fn add_node(&mut self, node: Node) -> NodeIndex {}
-
     /// connect an input node to an output node
     pub fn connect_nodes<T: Into<PortName> + Clone>(
         &mut self,
@@ -52,8 +52,8 @@ impl Network {
         //// Check Port Compatability
         {
             // need to use immutable references to check two nodes at once
-            let from_node = self.g.node_weight(from_node_idx.into()).unwrap();
-            let to_node = self.g.node_weight(to_node_idx.into()).unwrap();
+            let from_node = self.g.node_weight(from_node_idx).unwrap();
+            let to_node = self.g.node_weight(to_node_idx).unwrap();
             if !from_node.can_connect_child(from_port_name.clone(), to_node, to_port_name.clone()) {
                 // TODO: Custom error types and returning a result would be nice here
                 panic!(
@@ -63,7 +63,7 @@ impl Network {
             }
         }
         //// Update to_node's input to point to from_node
-        let to_node = self.g.node_weight_mut(to_node_idx.into()).unwrap();
+        let to_node = self.g.node_weight_mut(to_node_idx).unwrap();
         to_node.connect_input(to_port_name.into(), from_node_idx, from_port_name.into());
 
         //// Create the edge in the graph as well
@@ -83,7 +83,7 @@ impl Network {
 
     pub fn get_output_data(&self, port_id: OutputPortId) -> &PortData {
         self.g
-            .node_weight(port_id.node_id.into())
+            .node_weight(port_id.node_id)
             .unwrap()
             .get_output_data(&port_id.port_name)
     }
