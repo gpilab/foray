@@ -1,51 +1,191 @@
-use petgraph::graph::NodeIndex;
 use std::collections::HashMap;
 use std::fmt::Debug;
 
+use petgraph::graph::NodeIndex;
+
 use crate::node_type::NodeType;
-
-type PortData = Vec<i32>;
-
-pub type PortId = (NodeIndex, String);
+use crate::port::{PortData, PortType};
 
 pub struct Node {
-    /// name just used for debugging context
-    name: String,
-    /// inputs store the the index of the node they are connected to
-    pub input: HashMap<String, PortId>,
-    /// Output data is stored in the node
-    pub output: HashMap<String, Option<PortData>>,
     /// Determines how outputs are calculated from inputs
-    pub n_type: NodeType,
+    pub node_type: NodeType,
+    /// Each port is named
+    /// Output data is stored directly in the node
+    pub output: HashMap<PortName, OutputPort>,
+    /// Inputs don't store data,
+    /// they only store their type, and the node+port they are connected to
+    pub input: HashMap<PortName, InputPort>,
+}
+
+/// Input Ports always have a type.
+/// If connected, they identify their connection with a `NodeIndex` and `PortName`
+#[derive(Debug)]
+pub enum InputPort {
+    Empty(PortType),
+    Connected(PortType, NodeIndex, PortName),
+}
+
+/// Output ports always have a type.
+/// They optionally have data
+#[derive(Debug)]
+pub enum OutputPort {
+    Empty(PortType),
+    Filled(PortData),
 }
 
 impl Node {
     //Initialize a node with no connections
-    pub fn new(name: String, n_type: NodeType) -> Self {
+    pub fn new(
+        n_type: NodeType,
+        input: Vec<(PortName, PortType)>,
+        output: Vec<(PortName, PortType)>,
+    ) -> Self {
         Node {
-            name,
-            n_type,
-            input: [].into(),
-            output: [].into(),
+            node_type: n_type,
+            input: input
+                .iter()
+                .map(|(name, pt)| (name.clone(), InputPort::Empty(*pt)))
+                .collect(),
+            output: output
+                .iter()
+                .map(|(name, pt)| (name.clone(), OutputPort::Empty(*pt)))
+                .collect(),
+        }
+    }
+    pub fn can_connect_child<T: Into<PortName>>(
+        &self,
+        local_port_name: T,
+        to_node: &Node,
+        to_port_name: T,
+    ) -> bool {
+        //// from port exists
+        let from_port = self
+            .output
+            .get(&local_port_name.into())
+            .expect("port should exist on node");
+
+        //// to port exists
+        let to_port = to_node
+            .input
+            .get(&to_port_name.into())
+            .expect("port should exist on node");
+
+        //// PortTypes match
+        PortType::from(from_port) == PortType::from(to_port)
+    }
+
+    /// Set the data for an ouput port
+    pub fn update_output_data<T: Into<PortName>>(&mut self, port_name: T, port_data: PortData) {
+        self.output
+            .insert(port_name.into(), OutputPort::Filled(port_data))
+            .expect("port should exists on Node");
+    }
+
+    /// set an input port to point to a parent port
+    /// The `network` should also be updated!!!
+    pub(crate) fn connect_input(
+        &mut self,
+        local_port_name: PortName,
+        parent_node: NodeIndex,
+        parent_node_name: PortName,
+    ) {
+        dbg!(&self);
+        dbg!(&local_port_name);
+        let input_port = self.input.get(&local_port_name).unwrap();
+        self.input.insert(
+            local_port_name,
+            InputPort::Connected(input_port.into(), parent_node, parent_node_name),
+        );
+    }
+}
+
+impl InputPort {
+    pub fn get_connected_port_id(&self) -> PortId {
+        match self {
+            Self::Empty(_) => panic!("Output is not populated"),
+            Self::Connected(_, n_index, port_name) => (*n_index, port_name.clone()),
         }
     }
 }
+
+impl OutputPort {
+    pub(crate) fn get_data(&self) -> &PortData {
+        match self {
+            Self::Empty(_) => panic!("Output is not populated"),
+            Self::Filled(port_data) => port_data,
+        }
+    }
+}
+
+impl From<&InputPort> for PortType {
+    fn from(value: &InputPort) -> Self {
+        match value {
+            InputPort::Empty(pt) => *pt,
+            InputPort::Connected(pt, _, _) => *pt,
+        }
+    }
+}
+impl From<&OutputPort> for PortType {
+    fn from(value: &OutputPort) -> Self {
+        match value {
+            OutputPort::Empty(pt) => *pt,
+            OutputPort::Filled(pd) => pd.into(),
+        }
+    }
+}
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+pub struct PortName(String);
+
+impl From<&str> for PortName {
+    fn from(value: &str) -> Self {
+        PortName(value.to_string())
+    }
+}
+
+/// A Port is uniquely identified with a NodeIndex and a PortName
+pub type PortId = (NodeIndex, PortName);
 
 impl Debug for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "\t{{
-\t  name: {},
 \t  type:{:?},
 \t  inputs:{:?},
 \t  outpus:{:?}
 \t}}
 ",
-            self.name,
-            self.n_type,
-            self.input,
-            self.output.len()
+            self.node_type, self.input, self.output
         )
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    #[test]
+    fn build_node() {
+        //node 1
+        let n1 = Node::new(
+            NodeType::Add,
+            vec![("a".into(), PortType::Integer)],
+            vec![
+                ("out1".into(), PortType::Integer),
+                ("out2".into(), PortType::Real),
+            ],
+        );
+        //node 2
+        let n2 = Node::new(
+            NodeType::Add,
+            vec![("a".into(), PortType::Integer)],
+            vec![("out".into(), PortType::Integer)],
+        );
+
+        //can node 1 connect to node2?
+        assert!(n1.can_connect_child("out1", &n2, "a"));
+        assert!(!n1.can_connect_child("out2", &n2, "a"));
     }
 }

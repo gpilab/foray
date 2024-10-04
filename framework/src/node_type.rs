@@ -1,73 +1,69 @@
 use petgraph::graph::NodeIndex;
 
-use crate::network::{Network, STRESS_SIZE};
+use crate::{network::Network, node::PortName, port::PortData};
 
+//const STRESS_SIZE: usize = 100_000_000;
+const STRESS_SIZE: usize = 3;
 #[derive(Debug, Clone)]
 pub enum NodeType {
-    Const(i32),
+    Const(f64),
     Add,
     _Sub,
-    Offset(i32),
+    Offset(f64),
 }
 
 impl NodeType {
     pub fn compute(&self, nx: NodeIndex, g: &mut Network) {
+        dbg!("Starting compute", self, &g);
+        let node = g.g.node_weight(nx).unwrap();
         match self {
             NodeType::Const(val) => {
                 let node = g.g.node_weight_mut(nx).unwrap();
-                node.output
-                    .insert("out".into(), Some(vec![*val; STRESS_SIZE]));
+                node.update_output_data(
+                    "out",
+                    PortData::Vec(vec![PortData::Real(*val); STRESS_SIZE]),
+                );
             }
             NodeType::Add => {
-                let node = g.g.node_weight(nx).unwrap();
+                let a = g.retrieve_input_data(node, &PortName::from("a"));
+                let b = g.retrieve_input_data(node, &PortName::from("b"));
 
-                let inputs = &node.input;
-                let (a_index, _a_port) = inputs.get("a".into()).unwrap();
-                let a =
-                    g.g.node_weight(*a_index)
-                        .unwrap()
-                        .output
-                        .get("out")
-                        .unwrap()
-                        .as_ref()
-                        .unwrap();
+                let PortData::Vec(a) = a else { todo!() };
+                let PortData::Vec(b) = b else { todo!() };
 
-                let (b_index, _b_port) = inputs.get("b".into()).unwrap();
-                let b =
-                    g.g.node_weight(*b_index)
-                        .unwrap()
-                        .output
-                        .get("out")
-                        .unwrap()
-                        .as_ref()
-                        .unwrap();
+                let out = PortData::Vec(
+                    a.iter()
+                        .zip(b)
+                        .map(|(ai, bi)| {
+                            let PortData::Real(ai) = ai else { todo!() };
 
-                let out = a.iter().zip(b).map(|(ai, bi)| ai + bi).collect();
+                            let PortData::Real(bi) = bi else { todo!() };
+                            PortData::Real(ai + bi)
+                        })
+                        .collect(),
+                );
 
                 let node = g.g.node_weight_mut(nx).unwrap();
-                node.output.insert("out".into(), Some(out));
+                node.update_output_data("out", out);
             }
             NodeType::_Sub => {}
             NodeType::Offset(val) => {
-                let node = g.g.node_weight(nx).unwrap();
+                let a = g.retrieve_input_data(node, &PortName::from("a"));
 
-                let inputs = &node.input;
-                let (a_index, _a_port) = inputs.get("a".into()).unwrap();
-                let a =
-                    g.g.node_weight(*a_index)
-                        .unwrap()
-                        .output
-                        .get("out")
-                        .unwrap()
-                        .as_ref()
-                        .unwrap();
+                let PortData::Vec(a) = a else { todo!() };
 
-                //let out = a + val;
-                let out = a.iter().map(|ai| ai + val).collect();
+                let out = PortData::Vec(
+                    a.iter()
+                        .map(|ai| {
+                            let PortData::Real(ai) = ai else { todo!() };
+                            PortData::Real(ai + val)
+                        })
+                        .collect(),
+                );
 
                 let node = g.g.node_weight_mut(nx).unwrap();
-                node.output.insert("out".into(), Some(out));
+                node.update_output_data("out", out);
             }
-        }
+        };
     }
 }
