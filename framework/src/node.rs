@@ -3,9 +3,9 @@ use std::fmt::Debug;
 
 use serde::Serialize;
 
-use crate::network::NodeIndex;
 use crate::node_type::NodeType;
-use crate::port::{PortData, PortType};
+use crate::port::NodeIndex;
+use crate::port::{InputPort, OutputPort, OutputPortId, PortData, PortName, PortType};
 
 #[derive(Serialize)]
 pub(crate) struct Node {
@@ -19,22 +19,6 @@ pub(crate) struct Node {
     /// Inputs don't store data,
     /// they only store their type, and the node+port they are connected to
     input: HashMap<PortName, InputPort>,
-}
-
-/// Input Ports always have a type.
-/// If connected, they identify their connection with a `NodeIndex` and `PortName`
-#[derive(Debug, Serialize)]
-enum InputPort {
-    Empty(PortType),
-    Connected(PortType, NodeIndex, PortName),
-}
-
-/// Output ports always have a type.
-/// They optionally have data
-#[derive(Debug, Serialize)]
-enum OutputPort {
-    Empty(PortType),
-    Filled(PortData),
 }
 
 impl Node {
@@ -108,70 +92,9 @@ impl Node {
         self.output.get(port_name).unwrap().get_data()
     }
 
-    pub(crate) fn get_connected_port_id(&self, port_name: &PortName) -> OutPortId {
+    pub(crate) fn get_connected_port_id(&self, port_name: &PortName) -> OutputPortId {
         self.input.get(port_name).unwrap().get_connected_port_id()
     }
-}
-
-impl InputPort {
-    pub fn get_connected_port_id(&self) -> OutPortId {
-        match self {
-            Self::Empty(_) => panic!("Output is not populated"),
-            Self::Connected(port_type, n_index, port_name) => OutPortId {
-                node_id: *n_index,
-                port_name: port_name.clone(),
-                port_type: *port_type,
-            },
-        }
-    }
-}
-
-impl OutputPort {
-    pub(crate) fn get_data(&self) -> &PortData {
-        match self {
-            Self::Empty(_) => panic!("Output is not populated"),
-            Self::Filled(port_data) => port_data,
-        }
-    }
-}
-
-impl From<&InputPort> for PortType {
-    fn from(value: &InputPort) -> Self {
-        match value {
-            InputPort::Empty(pt) => *pt,
-            InputPort::Connected(pt, _, _) => *pt,
-        }
-    }
-}
-impl From<&OutputPort> for PortType {
-    fn from(value: &OutputPort) -> Self {
-        match value {
-            OutputPort::Empty(pt) => *pt,
-            OutputPort::Filled(pd) => pd.into(),
-        }
-    }
-}
-
-#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize)]
-pub struct PortName(String);
-
-impl From<&str> for PortName {
-    fn from(value: &str) -> Self {
-        PortName(value.to_string())
-    }
-}
-
-/// A Port is uniquely identified with a NodeIndex and a PortName
-pub struct InPortId {
-    pub node_id: NodeIndex,
-    pub port_name: PortName,
-    pub port_type: PortType,
-}
-
-pub struct OutPortId {
-    pub node_id: NodeIndex,
-    pub port_name: PortName,
-    pub port_type: PortType,
 }
 
 impl Debug for Node {

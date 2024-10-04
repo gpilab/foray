@@ -1,7 +1,7 @@
 use petgraph::graph::NodeIndex;
 use serde::Serialize;
 
-use crate::{network::Network, node::PortName, port::PortData};
+use crate::{network::Network, port::PortData, port::PortName};
 
 //const STRESS_SIZE: usize = 100_000_000;
 const STRESS_SIZE: usize = 3;

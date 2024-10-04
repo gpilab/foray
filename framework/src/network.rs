@@ -7,12 +7,10 @@ use petgraph::{
 use serde::Serialize;
 
 use crate::{
-    node::{Node, OutPortId, PortName},
+    node::Node,
     node_type::NodeType,
-    port::{PortData, PortType},
+    port::{NodeIndex, OutputPortId, PortData, PortName, PortType},
 };
-
-pub type NodeIndex = petgraph::graph::NodeIndex;
 
 #[derive(Debug, Serialize)]
 pub struct Network {
@@ -83,7 +81,7 @@ impl Network {
 
     //// Accessors
 
-    pub fn get_output_data(&self, port_id: OutPortId) -> &PortData {
+    pub fn get_output_data(&self, port_id: OutputPortId) -> &PortData {
         self.g
             .node_weight(port_id.node_id.into())
             .unwrap()
