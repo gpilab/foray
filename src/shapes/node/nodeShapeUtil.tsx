@@ -81,7 +81,7 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
   static override props = nodeShapeProps
 
   override canResize: TLShapeUtilFlag<NodeShape> = () => true
-  override hideResizeHandles = () => true
+  override hideResizeHandles = () => false
   override canEdit: TLShapeUtilFlag<NodeShape> = () => false
   override isAspectRatioLocked: TLShapeUtilFlag<NodeShape> = () => false
   override hideSelectionBoundsBg = () => true
@@ -131,6 +131,19 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
   //especially when multiple changes need to be made
   //TODO make sure ports with multiple children upate correctly! i.e. one change doesn't overwrite the other
   override onBeforeUpdate: TLOnBeforeUpdateHandler<NodeShape> = (prev: NodeShape, next: NodeShape) => {
+    //Hacky way to avoid expensive comparisons
+    //PERF: improve the JSON stringify comparisons below?
+    // This alone isn't enough, somethng going on in tldraw processing changes
+    // really dislikes having large amounts of data in inputs/outputs.
+    // I'm not sure if going to native arrays (number[][]) will fix this,
+    // or if we need nodes to store a reference to the data, and store the 
+    // data somewhere outside the node 
+    if (prev.x != next.x || prev.y != next.y) {
+      console.log("skipping node calculations/comparisons")
+      return next
+    }
+    console.log("performing node calculations/comparisons")
+    //console.log(prev, next)
     // If we just got back the new computed output, just return that
     if (prev.props.inFlightCalc && !next.props.inFlightCalc) {
       return next
@@ -190,7 +203,7 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
     if (JSON.stringify(next.props.inputs) !== JSON.stringify(prev.props.inputs)
       || JSON.stringify(next.props.config) !== JSON.stringify(prev.props.config)) {
 
-      console.log("updating input to type:", next.props.nodeType, prev.props.nodeType)
+      console.log("updating input to type:", next.props.nodeType)
 
       this.computeNodeValue(next.props.nodeType, next.props.inputs, next.props.output, next.props.config)
         .then((out) => {
@@ -209,6 +222,9 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
         ...next, props: { ...next.props, inFlightCalc: true }
       }
     }
+
+    console.log("didn't make any changes, why did I do all that work??")
+    //console.log("changes in object?", (JSON.stringify(next) !== JSON.stringify(prev)))
     return next
   }
 
@@ -235,7 +251,9 @@ export class NodeShapeUtil extends ShapeUtil<NodeShape> {
         output: output,
         config: config,
       }
+      const startTime = Date.now()
       const nextValue = await nodeCompute(node)
+      console.log(`Tauri round trip (ms) for ${nodeType}:`, Date.now() - startTime);
       return { "out": { ...output["out"], value: nextValue } }
     } else {
       console.log(`Encountered undefined port value when calculating output for node: ${nodeType}`)

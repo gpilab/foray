@@ -18,6 +18,7 @@ pub enum PortValue {
     Complex((f64, f64)),
     String(String),
     Flag(bool),
+    Image(Vec<Vec<u8>>),
     Array(Vec<PortValue>),
     Struct(HashMap<String, PortValue>),
 }
@@ -31,6 +32,7 @@ pub enum PortType {
     Complex,
     String,
     Flag,
+    Image,
     Array(Box<PortType>),
     Struct(HashMap<String, PortType>),
 }
@@ -63,6 +65,7 @@ impl TryFrom<SimplePortType> for PortType {
                 "Real" => PortType::Real,
                 "String" => PortType::String,
                 "Flag" => PortType::Flag,
+                "Image" => PortType::Image,
                 e => return Err(e.to_string()),
             },
             SimplePortType::Array(simple_port_vec) => {
@@ -109,6 +112,7 @@ impl IntoPy<PyObject> for PortValue {
             PortValue::Complex(v) => v.into_py(py),
             PortValue::String(v) => v.into_py(py),
             PortValue::Flag(v) => v.into_py(py),
+            PortValue::Image(v) => v.into_py(py),
             PortValue::Array(v) => v.into_py(py),
             PortValue::Struct(v) => v.into_py(py),
         }

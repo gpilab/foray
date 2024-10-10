@@ -9,7 +9,7 @@ type Complex = [number, number]
 
 //// Primitive
 
-export const PortTypeLabels = ["Integer", "Real", "Complex", "String", "Flag", "Array", "Struct"] as const
+export const PortTypeLabels = ["Integer", "Real", "Complex", "String", "Flag", "Image", "Array", "Struct"] as const
 //export type PortDataTypeLabel = typeof PortTypeLabels[number]
 export type PortDataTypeLabel =
   | ["Integer"]
@@ -17,6 +17,7 @@ export type PortDataTypeLabel =
   | ["Complex"]
   | ["String"]
   | ["Flag"]
+  | ["Image"]
   | ["Struct", Record<string, PortDataTypeLabel>]
   | ["Array", PortDataTypeLabel]
 
@@ -26,6 +27,7 @@ export type PortDataType =
   | ["Complex", Complex]
   | ["String", string]
   | ["Flag", Boolean]
+  | ["Image", number[][]]
   | ["Struct", Record<string, [PortDataType[1]]>]
   | ["Array", PortDataType[1][]]
 
@@ -127,6 +129,7 @@ export const portColorMap: Record<PortDataTypeLabel[0], TLDefaultColorStyle> = {
   "Complex": "green",
   "Real": "yellow",
   "Integer": "orange",
+  "Image": "light-green",
   "Flag": "red",
   "Array": "light-violet",
 }

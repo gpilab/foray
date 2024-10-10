@@ -18,10 +18,10 @@ pub struct RunNodeMessage<'a> {
 
 #[tauri::command]
 pub fn run_node(message: RunNodeMessage) -> Result<NodeOutputValue, String> {
-    println!(
-        "node type: {}, inputs: {:?}",
-        message.node_type, message.inputs
-    );
+    //println!(
+    //    "node type: {}, inputs: {:?}",
+    //    message.node_type, message.inputs
+    //);
     //match res {
     //    Value::Other(v) => panic!("Unexpected return value from python: {}", v),
     //    _ => res,
@@ -48,7 +48,6 @@ pub fn get_python_nodes() -> Vec<PythonNode> {
             }
             None => None,
         })
-        .into_iter()
         .filter_map(|r| {
             r.map_err(|e| println!("Failed to load python file {}", e))
                 .ok()

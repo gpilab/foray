@@ -12,4 +12,7 @@ export default defineConfig({
       localsConvention: "camelCaseOnly",
     },
   },
+  build: {
+    target: 'esnext' //browsers can handle the latest ES features
+  }
 });

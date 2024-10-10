@@ -1564,18 +1564,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "gpi_framework"
-version = "0.1.0"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "gpirs"
 version = "0.0.0"
 dependencies = [
  "anyhow",
- "gpi_framework",
  "numpy",
  "ordered-float",
  "pyo3",

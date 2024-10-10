@@ -57,7 +57,7 @@ const constantDef = createNodeDef({
 //  }
 //})
 
-export const arrayNodes = ["_Range", "_cos", "_sin", "_sinc", "_fft", "_Plot", "_ArrayAdd", "_ArrayMult", "_PyAddArray"] as const
+export const arrayNodes = ["_Range", "_cos", "_sin", "_sinc", "_fft", "_Plot", "_Image", "_ArrayAdd", "_ArrayMult", "_PyAddArray"] as const
 
 
 //export const rangeDef = createNodeDef({
@@ -183,6 +183,15 @@ export const plotDef = createNodeDef({
   },
   compute: ({ a }) => a.value
 })
+export const imageDef = createNodeDef({
+  state: {
+    type: "_Image",
+    inputs: singleInput(["Image"]),
+    output: singleOutput(["Image"]),
+    config: {}
+  },
+  compute: ({ a }) => a.value
+})
 
 
 
@@ -219,15 +228,15 @@ export const createDynamicNode = (type: string, config: Config,
           inputs: formatted_input
         }
       }
-      console.log("using python node!:", dynamic_message)
+      //console.log("using python node!:", dynamic_message)
       /// list of input `Values` to pass to `node_type`'s python "compute" function
       const val = await invoke<Record<"out", PortDataType>>('run_node', dynamic_message)
-      console.log("dynamic node value", val)
+      //console.log("dynamic node value", val)
       const out = val["out"]
       const key = Object.keys(out)[0]
       // @ts-ignore
       const portValue = [key, out[key]] as PortDataType
-      console.log("dynamic node value", portValue)
+      //console.log("dynamic node value", portValue)
       return portValue
     }
 
@@ -276,6 +285,7 @@ export const nodeDefaultDefinitions = {
   //"_ArrayAdd": arrayAddDef,
   //"_ArrayMult": arrayMultiplyDef,
   "_Plot": plotDef,
+  "_Image": imageDef,
   //"_pyAdd": pyAddDef,
   //"_PyAddArray": pyAddArrayDef,
   "_DynamicNode": defaultDynamicNodeDef,

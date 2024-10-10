@@ -70,7 +70,6 @@ export default function GPI() {
           console.log("reloading python nodes due to file change: ", node_changes[0].path)
           fetchPythonNodes()
           //TODO: add notifcation to user
-          //TODO re-run changed nodes
         }
       },
       {

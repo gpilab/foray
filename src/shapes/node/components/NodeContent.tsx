@@ -7,6 +7,7 @@ import { useTheme } from "../../../util/useTheme";
 import { createContext, useContext } from "react";
 import { TrigNode } from "./trigNode";
 import { BlockMath } from "react-katex";
+import { ImageNode } from "./imageNode";
 
 
 export type NodeConfig = {
@@ -49,6 +50,8 @@ export const NodeContent = track((props: { nodeShape: NodeShape }) => {
           return <ConstantNode updateNode={updateNode} />
         case ("_Plot"):
           return <PlotNode />
+        case ("_Image"):
+          return <ImageNode />
         case ("_Range"):
           return <RangeNode updateNode={updateNode} />
         case ("_sin"):

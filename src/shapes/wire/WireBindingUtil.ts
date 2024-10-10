@@ -72,6 +72,7 @@ export class WireBindingUtil extends BindingUtil<WireBinding> {
   onAfterChangeToShape(options: BindingOnShapeChangeOptions<WireBinding>): void {
     if (options.binding.props.terminal == "start") {
       //the parentNode has changed, propogate changes
+      console.log("propogate!")
       this.propogate(options.binding.fromId)
     }
     // force a re-render of the wire

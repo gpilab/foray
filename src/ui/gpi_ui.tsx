@@ -7,6 +7,13 @@ import { NodeShape } from "../shapes/node/nodeShapeUtil";
 
 export const GPI_UI = () => {
   const editor = useEditor();
+
+  const unlisten = editor.store.listen(
+    (update) => {
+      console.log('update', update)
+    },
+    { scope: 'document', source: 'user' }
+  )
   const gpi_context = useContext(GPIContext);
   useEffect(() => {
     console.log("Should I reload all the nodes now??");
