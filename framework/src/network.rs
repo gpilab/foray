@@ -2,14 +2,14 @@ use std::fmt::Debug;
 
 use petgraph::{
     graph::{DiGraph, EdgeIndex},
-    visit::Topo,
+    visit::{Topo, Walker},
 };
 use serde::Serialize;
 
 use crate::{
     node::Node,
     node_type::NodeType,
-    port::{NodeIndex, PortData, PortName, PortType},
+    port::{NodeIndex, Port, PortName, PortType},
 };
 
 #[derive(Debug, Serialize)]
@@ -81,18 +81,24 @@ impl Network {
             node.node_type.clone().compute(nx, self);
         }
     }
+    pub fn display_final_node(&self) {
+        let topo = Topo::new(&self.g);
+        let nx = topo.iter(&self.g).last().unwrap();
+        let node = self.g.node_weight(nx).unwrap();
+        println!("{}", node.get_output_data(&"out".into()))
+    }
 
     //// Accessors
 
     #[must_use]
-    pub fn get_output_data(&self, port_id: (NodeIndex, PortName)) -> &PortData {
+    pub fn get_output_data(&self, port_id: (NodeIndex, PortName)) -> &Port {
         self.g
             .node_weight(port_id.0)
             .unwrap()
             .get_output_data(&port_id.1)
     }
 
-    pub(crate) fn retrieve_input_data(&self, node: &Node, input_port_name: &PortName) -> &PortData {
+    pub(crate) fn retrieve_input_data(&self, node: &Node, input_port_name: &PortName) -> &Port {
         let parent_port_id = node.get_connected_port_id(input_port_name);
         self.get_output_data(parent_port_id)
     }

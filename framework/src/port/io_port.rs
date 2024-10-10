@@ -1,28 +1,6 @@
-use std::collections::HashMap;
-
 use serde::Serialize;
 
-pub type NodeIndex = petgraph::graph::NodeIndex;
-
-/// Temporarily Serializable, probably don't want to
-/// serialize data in the long run
-#[derive(PartialEq, Debug, Clone, Serialize)]
-pub enum PortData {
-    Integer(i64),
-    Real(f64),
-    String(String),
-    Vec(Vec<PortData>),
-    Struct(HashMap<String, PortData>),
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize)]
-pub enum PortType {
-    Integer,
-    Real,
-    String,
-    Vec,
-    Struct,
-}
+use super::{NodeIndex, Port, PortType, PrimitiveType};
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize)]
 pub struct PortName(String);
@@ -40,17 +18,15 @@ pub(crate) enum InputPort {
 #[derive(Debug, Serialize)]
 pub(crate) enum OutputPort {
     Empty(PortType),
-    Filled(PortData),
+    Filled(Port),
 }
-
-impl From<&PortData> for PortType {
-    fn from(value: &PortData) -> Self {
+//
+impl From<&Port> for PortType {
+    fn from(value: &Port) -> Self {
         match value {
-            PortData::Integer(_) => PortType::Integer,
-            PortData::Real(_) => PortType::Real,
-            PortData::String(_) => PortType::String,
-            PortData::Vec(_) => PortType::Vec,
-            PortData::Struct(_) => PortType::Struct,
+            Port::Primitive(p) => PortType::Primitive(PrimitiveType::from(p)),
+            Port::Array(_) => todo!(),
+            Port::Struct(_) => todo!(),
         }
     }
 }
@@ -65,7 +41,7 @@ impl InputPort {
 }
 
 impl OutputPort {
-    pub(crate) fn get_data(&self) -> &PortData {
+    pub(crate) fn get_data(&self) -> &Port {
         match self {
             Self::Empty(_) => panic!("Output is not populated"),
             Self::Filled(port_data) => port_data,
@@ -76,7 +52,7 @@ impl OutputPort {
 impl From<&InputPort> for PortType {
     fn from(value: &InputPort) -> Self {
         match value {
-            InputPort::Connected(pt, _, _) | InputPort::Empty(pt) => *pt,
+            InputPort::Connected(pt, _, _) | InputPort::Empty(pt) => pt.clone(),
         }
     }
 }
@@ -84,7 +60,7 @@ impl From<&InputPort> for PortType {
 impl From<&OutputPort> for PortType {
     fn from(value: &OutputPort) -> Self {
         match value {
-            OutputPort::Empty(pt) => *pt,
+            OutputPort::Empty(pt) => pt.clone(),
             OutputPort::Filled(pd) => pd.into(),
         }
     }
@@ -96,15 +72,15 @@ impl From<&str> for PortName {
     }
 }
 
-/// A Port is uniquely identified with a `NodeIndex` and a `PortName`
-pub struct InputPortId {
-    pub node_id: NodeIndex,
-    pub port_name: PortName,
-    pub port_type: PortType,
-}
-
-pub struct OutputPortId {
-    pub node_id: NodeIndex,
-    pub port_name: PortName,
-    pub port_type: PortType,
-}
+// A Port is uniquely identified with a `NodeIndex` and a `PortName`
+//pub struct InputPortId {
+//    pub node_id: NodeIndex,
+//    pub port_name: PortName,
+//    pub port_type: PortType,
+//}
+//
+//pub struct OutputPortId {
+//    pub node_id: NodeIndex,
+//    pub port_name: PortName,
+//    pub port_type: PortType,
+//}
