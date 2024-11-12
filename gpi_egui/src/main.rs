@@ -1,8 +1,7 @@
 use std::{env, path::Path};
 
-use eframe::egui::{self, Layout};
+use eframe::egui::{self};
 use gpi_egui::image2d::Image2D;
-use ndarray::Array;
 
 fn main() {
     let mut native_options = eframe::NativeOptions::default();
@@ -22,19 +21,13 @@ struct MyEguiApp {
 
 impl MyEguiApp {
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
-        // Customize egui here with cc.egui_ctx.set_fonts and cc.egui_ctx.set_visuals.
-        // Restore app state using cc.storage (requires the "persistence" feature).
-        // Use the cc.gl (a glow::Context) to create graphics shaders and buffers that you can use
-        // for e.g. egui::PaintCallback.
-        let test_image = Array::from_shape_vec(
-            (300, 300),
-            Array::linspace(0., 100., 90000).into_raw_vec_and_offset().0,
-        )
-        .unwrap();
+        //let test_image = Array::from_shape_vec(
+        //    (300, 300),
+        //    Array::linspace(0., 100., 90000).into_raw_vec_and_offset().0,
+        //)
+        //.unwrap();
         let dir = env::var("CARGO_MANIFEST_DIR").unwrap();
         let path = Path::new(&dir).join("src/buf.png");
-        //+ "/src/buf.png"));
-        println!("{:?}", path.parent());
 
         let window = 1.;
         let level = 0.;

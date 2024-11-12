@@ -1,11 +1,9 @@
-use std::default;
-
 use eframe::{
     egui::{ColorImage, ImageData, TextureFilter, TextureHandle, Ui},
     emath::inverse_lerp,
 };
 use image::{ImageBuffer, ImageReader, Luma};
-use ndarray::{Array, Array2, ArrayBase};
+use ndarray::{Array, Array2};
 use ndarray_stats::QuantileExt;
 
 pub struct Image2D {
