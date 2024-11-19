@@ -11,8 +11,6 @@ use ndarray_stats::{
 
 #[derive(Clone)]
 pub struct ImageDisplayOptions {
-    pub window: f32,
-    pub level: f32,
     pub floor: f32,
     pub ceiling: f32,
 }
@@ -28,10 +26,8 @@ impl ImageDisplayOptions {
 impl Default for ImageDisplayOptions {
     fn default() -> Self {
         Self {
-            window: 1.0,
-            level: 0.0,
             floor: 0.0,
-            ceiling: 255.0,
+            ceiling: 1.0,
         }
     }
 }
@@ -71,10 +67,8 @@ impl Image2D {
             let altered_quantized = self.base_array.map(|&v| {
                 Self::quantize(
                     v as f32,
-                    display_options.floor,
-                    display_options.ceiling,
-                    display_options.window,
-                    display_options.level,
+                    display_options.floor * 255.0,
+                    display_options.ceiling * 255.0,
                 )
             });
 
@@ -96,7 +90,7 @@ impl Image2D {
         let width = shape[1];
         let height = shape[0];
 
-        let base_array = array2d.map(|&v| Self::quantize(v as f32, min, max, 1., 0.));
+        let base_array = array2d.map(|&v| Self::quantize(v as f32, min, max));
 
         Self {
             texture: None,
@@ -164,10 +158,9 @@ impl Image2D {
 
 // Helpers
 impl Image2D {
-    fn quantize(value: f32, min: f32, max: f32, window: f32, level: f32) -> u8 {
+    fn quantize(value: f32, min: f32, max: f32) -> u8 {
         let normalized = 255.0 * inverse_lerp(min..=max, value).unwrap_or(0.0);
-        let windowed = normalized * window + level;
-        windowed.round() as u8
+        normalized.round() as u8
     }
 
     fn array_to_image(quantized: ndarray::Array2<u8>, size: (usize, usize)) -> ImageData {
