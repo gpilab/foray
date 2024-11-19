@@ -1,31 +1,24 @@
 use derive_more::derive::{Add, Display, From, Sum};
-use pyo3::{pyclass, IntoPy, PyObject, Python};
 use serde::Serialize;
 
-#[pyclass]
 #[derive(From, PartialEq, Debug, Serialize, Clone, Copy, Display)]
 #[from(i8, i16, i32, i64, u8, u16, u32)]
 pub struct Integer(pub i64);
 
-#[pyclass]
 #[derive(From, PartialEq, Debug, Serialize, Clone, Add, Copy, Sum, Display)]
 #[from(f32, f64)]
 pub struct Real(pub f64);
 
-#[pyclass]
 #[derive(From, PartialEq, Debug, Serialize, Clone, Display)]
 #[display("({},{}i)", 0, 1)]
 pub struct Complex(pub f64, pub f64);
 
-#[pyclass]
 #[derive(From, PartialEq, Debug, Serialize, Clone, Display)]
 pub struct Str(pub String);
 
-#[pyclass]
 #[derive(From, PartialEq, Debug, Serialize, Clone, Display)]
 pub struct Bool(pub bool);
 
-#[pyclass]
 #[derive(From, PartialEq, Debug, Serialize, Clone, Display)]
 pub enum Primitive {
     #[from(Integer, i64, i32)]

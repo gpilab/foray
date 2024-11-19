@@ -8,21 +8,20 @@ use crate::port::NodeIndex;
 use crate::port::{InputPort, OutputPort, PortName};
 use crate::port::{Port, PortType};
 
-#[derive(Serialize)]
-pub(crate) struct Node {
+pub(crate) struct Node<'a> {
     /// Determines how outputs are calculated from inputs
     pub node_type: NodeType,
     /// This node's index in the `Network`
     pub node_id: NodeIndex,
     /// Each port is named
     /// Output data is stored directly in the node
-    output: HashMap<PortName, OutputPort>,
+    output: HashMap<PortName, OutputPort<'a>>,
     /// Inputs don't store data,
     /// they only store their type, and the node+port they are connected to
     input: HashMap<PortName, InputPort>,
 }
 
-impl Node {
+impl<'a> Node<'a> {
     pub fn new(
         node_type: NodeType,
         input: Vec<(PortName, PortType)>,
@@ -66,7 +65,7 @@ impl Node {
     }
 
     /// Set the data for an ouput port
-    pub fn update_output_data<T: Into<PortName>>(&mut self, port_name: T, port_data: Port) {
+    pub fn update_output_data<T: Into<PortName>>(&'a mut self, port_name: T, port_data: Port<'a>) {
         self.output
             .insert(port_name.into(), OutputPort::Filled(port_data))
             .expect("port should exists on Node");
@@ -96,7 +95,7 @@ impl Node {
     }
 }
 
-impl Debug for Node {
+impl Debug for Node<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

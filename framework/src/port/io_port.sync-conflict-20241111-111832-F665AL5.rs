@@ -15,19 +15,18 @@ pub(crate) enum InputPort {
 
 /// Output ports always have a type.
 /// They optionally have data
-#[derive(Debug)]
-pub(crate) enum OutputPort<'a> {
+#[derive(Debug, Serialize)]
+pub(crate) enum OutputPort {
     Empty(PortType),
-    Filled(Port<'a>),
+    Filled(Port),
 }
 //
-impl From<&Port<'_>> for PortType {
+impl From<&Port> for PortType {
     fn from(value: &Port) -> Self {
         match value {
             Port::Primitive(p) => PortType::Primitive(PrimitiveType::from(p)),
             Port::Array(_) => todo!(),
             Port::Struct(_) => todo!(),
-            Port::PyArray(_) => todo!(),
         }
     }
 }
@@ -41,7 +40,7 @@ impl InputPort {
     }
 }
 
-impl OutputPort<'_> {
+impl OutputPort {
     pub(crate) fn get_data(&self) -> &Port {
         match self {
             Self::Empty(_) => panic!("Output is not populated"),
@@ -58,7 +57,7 @@ impl From<&InputPort> for PortType {
     }
 }
 
-impl From<&OutputPort<'_>> for PortType {
+impl From<&OutputPort> for PortType {
     fn from(value: &OutputPort) -> Self {
         match value {
             OutputPort::Empty(pt) => pt.clone(),

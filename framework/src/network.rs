@@ -4,6 +4,7 @@ use petgraph::{
     graph::{DiGraph, EdgeIndex},
     visit::{Topo, Walker},
 };
+use pyo3::Python;
 use serde::Serialize;
 
 use crate::{
@@ -12,12 +13,12 @@ use crate::{
     port::{NodeIndex, Port, PortName, PortType},
 };
 
-#[derive(Debug, Serialize)]
-pub struct Network {
-    pub(crate) g: DiGraph<Node, ()>,
+#[derive(Debug)]
+pub struct Network<'a> {
+    pub(crate) g: DiGraph<Node<'a>, ()>,
 }
 
-impl Default for Network {
+impl<'a> Default for Network<'a> {
     ///Initialize an empty network
     fn default() -> Self {
         Network {
@@ -27,7 +28,7 @@ impl Default for Network {
 }
 
 /// A network of nodes. Nodes are connected via ports.
-impl Network {
+impl Network<'_> {
     //// Mutators
 
     /// Add a new node to the network
@@ -72,13 +73,13 @@ impl Network {
     }
 
     /// Loop through the graph and propogate values
-    pub fn process(&mut self) {
+    pub fn process(&mut self, py: Python) {
         let mut topo = Topo::new(&self.g);
 
         while let Some(nx) = topo.next(&self.g) {
             let node = self.g.node_weight(nx).unwrap();
 
-            node.node_type.clone().compute(nx, self);
+            node.node_type.clone().compute(nx, self, py);
         }
     }
     pub fn display_final_node(&self) {

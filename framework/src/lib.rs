@@ -1,3 +1,4 @@
+pub mod gpipy;
 pub mod network;
 pub(crate) mod node;
 pub mod node_type;

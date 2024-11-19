@@ -3,48 +3,32 @@ use std::fmt::Debug;
 use std::fmt::Display;
 
 use derive_more::derive::{From, Unwrap};
-use numpy::ndarray::Dim;
-use numpy::PyArray;
-use numpy::PyArray1;
-use numpy::PyArrayDyn;
-use pyo3::pyclass;
-use pyo3::Bound;
 use serde::Serialize;
 
 use super::{Bool, Complex, Integer, Real, Str};
 use super::{Primitive, PrimitiveType};
 
-#[derive(Clone, Debug)]
-pub struct MyPyArray<'a>(pub Bound<'a, PyArray<i32, Dim<[usize; 1]>>>);
-impl PartialEq for MyPyArray<'_> {
-    fn eq(&self, _other: &Self) -> bool {
-        return false;
+/// Temporarily Serializable
+///  TODO: probably don't want to serialize data in the long run
+#[derive(From, PartialEq, Serialize)]
+pub enum Port {
+    Primitive(Primitive),
+    Array(ArrayValue),
+    Struct(HashMap<String, Port>),
+}
+
+impl Debug for Port {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self}")
     }
 }
 
-/// Temporarily Serializable
-///  TODO: probably don't want to serialize data in the long run
-#[derive(From, Clone, PartialEq, Debug)]
-pub enum Port<'a> {
-    Primitive(Primitive),
-    Array(ArrayValue),
-    Struct(HashMap<String, Port<'a>>),
-    PyArray(MyPyArray<'a>),
-}
-
-//impl Debug for Port<'_> {
-//    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//        write!(f, "{self:?}")
-//    }
-//}
-
-impl Display for Port<'_> {
+impl Display for Port {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Port::Primitive(p) => write!(f, "{p}"),
             Port::Array(p) => write!(f, "{p}"),
             Port::Struct(p) => write!(f, "{:?}", p),
-            Port::PyArray(p) => write!(f, "pyarray"),
         }
     }
 }
@@ -65,8 +49,8 @@ pub type Shape = Vec<usize>;
 pub(crate) type ShapeType = Vec<Option<usize>>;
 
 //pub(crate) type ArrayType = (Box<PortType>, ShapeType);
-#[pyclass]
-#[derive(From, PartialEq, Debug, Serialize, Unwrap, Clone)]
+
+#[derive(From, PartialEq, Debug, Serialize, Unwrap)]
 pub enum ArrayValue {
     Integer(Shape, Vec<Integer>),
     Real(Shape, Vec<Real>),
@@ -74,7 +58,7 @@ pub enum ArrayValue {
     Str(Shape, Vec<Str>),
     Bool(Shape, Vec<Bool>),
     Array(Shape, Vec<ArrayValue>),
-    //Struct(Shape, Vec<HashMap<String, Port>>),
+    Struct(Shape, Vec<HashMap<String, Port>>),
 }
 impl Display for ArrayValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

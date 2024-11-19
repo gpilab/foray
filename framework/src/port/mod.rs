@@ -7,4 +7,4 @@ pub(crate) use io_port::{InputPort, OutputPort, PortName};
 pub(crate) type NodeIndex = petgraph::graph::NodeIndex;
 
 mod port_def;
-pub use port_def::{ArrayValue, Port, PortType, Shape};
+pub use port_def::{ArrayValue, MyPyArray, Port, PortType, Shape};
