@@ -1,6 +1,6 @@
 use iced::{
     advanced::{
-        layout::{self, positioned, Node},
+        layout::{self},
         mouse, renderer,
         widget::{tree, Tree},
         Clipboard, Layout, Shell, Widget,
@@ -10,27 +10,15 @@ use iced::{
     Alignment, Color, Element, Event, Length, Point, Rectangle, Size, Vector,
 };
 
+/// Widget State,
+/// not stored in the tree.
+/// Only InnerState get stored in the tree, I think...
 pub struct Draggable<'a, Message, Theme, Renderer> {
     //action: Action,
     on_pickup: Option<Message>,
     on_release: Option<Message>,
     inner_widget: Element<'a, Message, Theme, Renderer>,
     inner_state: InnerState,
-}
-
-pub fn draggable<'a, Message, Theme, Renderer>(
-    content: impl Into<Element<'a, Message, Theme, Renderer>>,
-) -> Draggable<'a, Message, Theme, Renderer>
-where
-    Theme: container::Catalog + 'a,
-    Renderer: renderer::Renderer,
-{
-    Draggable {
-        on_pickup: None,
-        on_release: None,
-        inner_widget: content.into(),
-        inner_state: InnerState::default(),
-    }
 }
 
 impl<'a, Message, Theme, Renderer> Draggable<'a, Message, Theme, Renderer>
@@ -60,17 +48,6 @@ where
     }
 }
 
-impl<'a, Message, Theme, Renderer> Default for Draggable<'a, Message, Theme, Renderer>
-where
-    Message: Clone + 'a,
-    Theme: container::Catalog + iced::widget::button::Catalog + iced::widget::text::Catalog + 'a,
-    Renderer: iced::advanced::Renderer + iced::advanced::text::Renderer + 'a,
-{
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer>
     for Draggable<'_, Message, Theme, Renderer>
 where
@@ -79,24 +56,24 @@ where
     Renderer: iced::advanced::Renderer,
 {
     fn tag(&self) -> tree::Tag {
-        println!("tag");
+        //println!("tag");
         tree::Tag::of::<InnerState>()
     }
 
     fn state(&self) -> tree::State {
-        println!("state");
+        //println!("state");
         tree::State::new(self.inner_state)
     }
 
     fn size(&self) -> Size<Length> {
-        println!("size");
+        //println!("size");
         Size {
             width: Length::Fixed(100.),
             height: Length::Fixed(100.),
         }
     }
     fn diff(&self, tree: &mut Tree) {
-        println!("diff");
+        //println!("diff");
         //dbg!(self.state());
         //dbg!(tree);
         //tree.diff(self.into());
@@ -107,7 +84,7 @@ where
     }
 
     fn children(&self) -> Vec<Tree> {
-        println!("children");
+        //println!("children");
         vec![Tree::new(self.inner_widget.as_widget())]
     }
 
@@ -117,7 +94,7 @@ where
         renderer: &Renderer,
         limits: &layout::Limits, //TODO: put in limits so we don't draw outside the container?
     ) -> layout::Node {
-        println!("layout");
+        //println!("layout");
         let state = tree.state.downcast_mut::<InnerState>();
 
         let mut child_node =
@@ -128,11 +105,12 @@ where
         let size_of_this_node = child_node.size().expand(Size::new(50., 50.));
 
         child_node = child_node.align(Alignment::Center, Alignment::Center, size_of_this_node);
-        dbg!(layout::Node::with_children(
+
+        layout::Node::with_children(
             Size::new(100., state.position.x.max(50.0)),
             vec![child_node.move_to(state.position)],
         )
-        .move_to(state.position))
+        .move_to(state.position)
     }
 
     fn draw(
@@ -145,12 +123,12 @@ where
         cursor: iced::advanced::mouse::Cursor,
         viewport: &iced::Rectangle,
     ) {
-        println!("draw");
+        //println!("draw");
         let state = tree.state.downcast_ref::<InnerState>();
 
         //let bounds = state.bounds(layout);
         let bounds = layout.bounds();
-        println!("{},{}", bounds.x, bounds.y);
+        //println!("{},{}", bounds.x, bounds.y);
 
         renderer.fill_quad(
             renderer::Quad {
@@ -251,8 +229,8 @@ where
                     //// update state
                     if let Some(cursor_position) = cursor.position() {
                         // force a relayout, so that inner widgets will move relative to the new position
-                        shell.invalidate_widgets(); // unsure if this should be invalidate_widgets,
-                                                    // or invalidate_layout
+                        shell.invalidate_layout(); // unsure if this should be invalidate_widgets,
+                                                   // or invalidate_layout
 
                         state.position.x = cursor_position.x - (shape_offset.x);
                         state.position.y = cursor_position.y - (shape_offset.y);
@@ -335,4 +313,31 @@ enum Action {
     },
     #[default]
     Idle,
+}
+
+// Convenience Function
+pub fn draggable<'a, Message, Theme, Renderer>(
+    content: impl Into<Element<'a, Message, Theme, Renderer>>,
+) -> Draggable<'a, Message, Theme, Renderer>
+where
+    Theme: container::Catalog + 'a,
+    Renderer: renderer::Renderer,
+{
+    Draggable {
+        on_pickup: None,
+        on_release: None,
+        inner_widget: content.into(),
+        inner_state: InnerState::default(),
+    }
+}
+
+impl<'a, Message, Theme, Renderer> Default for Draggable<'a, Message, Theme, Renderer>
+where
+    Message: Clone + 'a,
+    Theme: container::Catalog + iced::widget::button::Catalog + iced::widget::text::Catalog + 'a,
+    Renderer: iced::advanced::Renderer + iced::advanced::text::Renderer + 'a,
+{
+    fn default() -> Self {
+        Self::new()
+    }
 }

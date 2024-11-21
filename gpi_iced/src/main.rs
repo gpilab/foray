@@ -1,7 +1,8 @@
 use gpi_iced::widget::draggable::draggable;
+use gpi_iced::widget::workspace::workspace;
 use iced::advanced::graphics::core::Element;
 use iced::widget::{button, center, column, text};
-use iced::{application, Center, Renderer, Theme};
+use iced::{application, Center, Length, Point, Renderer, Theme};
 
 pub fn main() -> iced::Result {
     application("gpi_v2", Example::update, Example::view)
@@ -48,10 +49,22 @@ impl Example {
 
     fn view(&self) -> Element<Message, Theme, Renderer> {
         let content: Element<Message, Theme, Renderer> = column![
-            draggable(button("hello").on_press(Message::ButtonPressed))
-                .on_pickup(Message::OnPickup)
-                .on_release(Message::OnRelease),
-            text(self.status.clone())
+            text("menu").width(Length::Fill),
+            workspace(vec![
+                (
+                    Point::new(20., 10.),
+                    button("hi").height(10.).width(20.).into()
+                ),
+                (
+                    Point::new(50., 50.),
+                    button("how are you?").height(20.).width(40.).into()
+                )
+            ]),
+            //
+            //draggable(button("hello").on_press(Message::ButtonPressed))
+            //    .on_pickup(Message::OnPickup)
+            //    .on_release(Message::OnRelease),
+            //text(self.status.clone())
         ]
         //.padding(20)
         //.spacing(20)
