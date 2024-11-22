@@ -31,7 +31,7 @@ enum Message {
 impl Example {
     fn new() -> Self {
         Example {
-            status: "start".into(),
+            status: "start!".into(),
         }
     }
 
@@ -51,38 +51,28 @@ impl Example {
 
     fn view(&self) -> Element<Message, Theme, Renderer> {
         let content: Element<Message, Theme, Renderer> = column![
-            text("menu").width(Length::Fill),
+            text(self.status.clone()).width(Length::Fill),
             workspace(vec![
                 (
                     Point::new(20., 10.),
-                    button("hi").height(10.).width(20.).into()
+                    button("hi")
+                        .height(50.)
+                        .width(80.)
+                        .on_press(Message::ButtonPressed)
+                        .into()
                 ),
                 (
                     Point::new(50., 50.),
-                    button("how are you?").height(20.).width(40.).into()
+                    button("how are you?").height(50.).width(100.).into()
                 )
-            ]),
-            //
-            //draggable(button("hello").on_press(Message::ButtonPressed))
-            //    .on_pickup(Message::OnPickup)
-            //    .on_release(Message::OnRelease),
-            //text(self.status.clone())
+            ])
+            .on_pickup(Message::OnPickup)
+            .on_release(Message::OnRelease),
         ]
-        //.padding(20)
-        //.spacing(20)
         .align_x(Center)
         .into();
 
-        //button("outside 2 ").height(100.).width(200.),
-        //button("outside 1").height(200.).width(400.),
-        //workspace(vec![
-        //    button("hi").height(100.).width(200.).into(),
-        //    button("how are you?").height(200.).width(400.).into()
-        //]),
-        //text!("Radius: {:.2}", self.radius),
-        //slider(1.0..=100.0, self.radius, Message::RadiusChanged).step(0.01),
-
-        center(content.explain(iced::Color::BLACK)).into()
+        center(content).into()
     }
 }
 
