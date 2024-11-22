@@ -1,12 +1,14 @@
-use gpi_iced::widget::draggable::draggable;
 use gpi_iced::widget::workspace::workspace;
 use iced::advanced::graphics::core::Element;
 use iced::widget::{button, center, column, text};
 use iced::{application, Center, Length, Point, Renderer, Theme};
 
 pub fn main() -> iced::Result {
+    #[cfg(target_arch = "wasm32")]
+    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+
     application("gpi_v2", Example::update, Example::view)
-        .antialiasing(true)
+        .antialiasing(false)
         .theme(theme)
         .run()
 }

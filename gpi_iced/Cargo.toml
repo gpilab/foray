@@ -4,4 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-iced = { version = "0.13.1", features = ["debug", "lazy", "advanced", "canvas"] }
+iced = { version = "0.13.1", features = [
+	"debug",
+	"lazy",
+	"advanced",
+	"canvas",
+] }
+
+[target.'cfg(target_arch="wasm32")'.dependencies]
+iced = { version = "0.13.1", features = ["webgl", "web-colors"] }
+console_error_panic_hook = "0.1.7"
