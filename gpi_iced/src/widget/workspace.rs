@@ -4,6 +4,7 @@ use iced::advanced::layout::{self, Layout};
 use iced::advanced::widget::{tree, Tree};
 use iced::advanced::{renderer, Clipboard, Shell, Widget};
 use iced::mouse::Event::{ButtonPressed, ButtonReleased, CursorMoved};
+use iced::mouse::ScrollDelta;
 use iced::touch::Event::{FingerLifted, FingerLost, FingerMoved, FingerPressed};
 use iced::widget::container::{self};
 use iced::{event, mouse, Point, Vector};
@@ -30,13 +31,14 @@ enum Action {
 
 /// A workspace is a an infinite canvas that can be zoomed, panned,
 /// and contains widgets that can be placed anywhere in 3d (stacking in Z)
-pub struct Workspace<'a, Message, Theme, Renderer>
+pub struct Workspace<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer>
 where
-    Theme: container::Catalog,
     Renderer: renderer::Renderer,
 {
     elements: Vec<Element<'a, Message, Theme, Renderer>>,
     on_pickup: Option<Message>,
+    on_scroll: Option<Box<dyn Fn(ScrollDelta) -> Message + 'a>>,
+    on_move: Option<Box<dyn Fn(Point) -> Message + 'a>>,
     on_release: Option<Message>,
     inner_state: InnerState,
 }
@@ -49,7 +51,6 @@ struct InnerState {
 
 impl<'a, Message, Theme, Renderer> Workspace<'a, Message, Theme, Renderer>
 where
-    Theme: container::Catalog,
     Renderer: renderer::Renderer,
 {
     pub fn new(children: Vec<(Point, Element<'a, Message, Theme, Renderer>)>) -> Self {
@@ -60,9 +61,20 @@ where
                 positions,
                 action: Action::Idle,
             },
+            on_scroll: None,
+            on_move: None,
             on_pickup: None,
             on_release: None,
         }
+    }
+    pub fn on_scroll(mut self, on_move: impl Fn(ScrollDelta) -> Message + 'a) -> Self {
+        self.on_scroll = Some(Box::new(on_move));
+        self
+    }
+
+    pub fn on_move(mut self, on_move: impl Fn(Point) -> Message + 'a) -> Self {
+        self.on_move = Some(Box::new(on_move));
+        self
     }
     pub fn on_release(mut self, on_release: Message) -> Self {
         self.on_release = Some(on_release);
@@ -75,12 +87,11 @@ where
     }
 }
 
-//// Implement Widet
+/// Implement Widet
 impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer>
     for Workspace<'_, Message, Theme, Renderer>
 where
     Message: Clone,
-    Theme: container::Catalog,
     Renderer: renderer::Renderer,
 {
     fn tag(&self) -> tree::Tag {
@@ -120,10 +131,10 @@ where
                 .iter()
                 .zip(&mut tree.children)
                 .zip(positions)
-                .map(|((e, mut t), p)| {
+                .map(|((e, t), p)| {
                     //let position = t.state.downcast_mut::<InnerState>();
                     e.as_widget()
-                        .layout(&mut t, renderer, limits)
+                        .layout(t, renderer, limits)
                         //// Move children to their location here!
                         .move_to(*p)
                 })
@@ -141,26 +152,40 @@ where
         cursor: mouse::Cursor,
         viewport: &Rectangle,
     ) {
-        let padding = 5.0;
+        //return;
+        let padding = 0.0;
         //// Background
         renderer.fill_quad(
             renderer::Quad {
                 bounds: workspace_layout.bounds(),
                 border: iced::Border::default()
                     .width(padding)
-                    .color(iced::Color::WHITE),
+                    .color(Color::from_rgb8(60, 60, 90)),
+
                 ..renderer::Quad::default()
             },
-            Color::BLACK,
+            Color::from_rgb8(20, 20, 30),
         );
         //// Render Children in a layer that is bounded to the size of the workspace
-        renderer.with_layer(workspace_layout.bounds().shrink(padding), |renderer| {
-            let elements = self.elements.iter().zip(&tree.children);
-            for ((e, tree), c_layout) in elements.zip(workspace_layout.children()) {
+        //renderer.with_layer(workspace_layout.bounds().shrink(padding), |renderer| {
+        let elements = self.elements.iter().zip(&tree.children);
+        for ((e, tree), c_layout) in elements.zip(workspace_layout.children()) {
+            dbg!(c_layout);
+            renderer.with_layer(workspace_layout.bounds().shrink(padding), |renderer| {
+                renderer.fill_quad(
+                    renderer::Quad {
+                        bounds: c_layout.bounds(),
+                        border: iced::Border::default().width(2.).color(iced::Color::WHITE),
+
+                        ..renderer::Quad::default()
+                    },
+                    Color::from_rgb8(40, 40, 60),
+                );
                 e.as_widget()
-                    .draw(&tree, renderer, theme, style, c_layout, cursor, viewport)
-            }
-        });
+                    .draw(tree, renderer, theme, style, c_layout, cursor, viewport);
+            });
+        }
+        //});
     }
 
     //// Move children based on input events
@@ -175,9 +200,6 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) -> event::Status {
-        //let state = tree.state.downcast_mut::<InnerState>();
-        //let bounds = state.bounds(layout);
-        //let bounds = layout.bounds();
         let state = tree.state.downcast_mut::<InnerState>();
 
         let event_status = match (event.clone(), state.action, cursor.position()) {
@@ -192,26 +214,27 @@ where
                     .children()
                     .zip(&state.positions)
                     .enumerate()
-                    .find_map(|(i, (l, e_p))| match cursor.position_over(l.bounds()) {
-                        Some(cursor_position) => Some((i, e_p, cursor_position)),
-                        None => None,
+                    .find_map(|(i, (l, e_p))| {
+                        cursor
+                            .position_over(
+                                l.bounds()
+                                    .intersection(&layout.bounds())
+                                    .unwrap_or(Rectangle::new((0., 0.).into(), (0., 0.).into())),
+                            )
+                            .map(|cursor_position| (i, e_p, cursor_position))
                     })
                 {
-                    state.action = Action::Dragging {
-                        start_pos: *child_position,
-                        shape_offset: cursor_position - *child_position,
-                        child_index,
-                    };
                     //// fire event
                     if let Some(on_pickup) = self.on_pickup.clone() {
                         shell.publish(on_pickup);
                     }
 
                     //// update state
-                    //state.action = Action::Dragging {
-                    //    start_pos: state.position,
-                    //    shape_offset: cursor_position - state.position,
-                    //};
+                    state.action = Action::Dragging {
+                        start_pos: *child_position,
+                        shape_offset: cursor_position - *child_position,
+                        child_index,
+                    };
 
                     //// end event propogation?
                     dbg!("captured pickup");
@@ -236,8 +259,7 @@ where
 
                     //// update state
                     state.action = Action::Idle;
-                    //
-                    dbg!("captured release");
+
                     //// end event propogation?
                     event::Status::Captured
                 } else {
@@ -254,6 +276,10 @@ where
                 },
                 Some(cursor_position),
             ) => {
+                //// fire event
+                if let Some(on_move) = &self.on_move {
+                    shell.publish(on_move(cursor_position));
+                }
                 //// update state
                 // force a relayout, so that inner widgets will move relative to the new position
                 shell.invalidate_layout(); // unsure if this should be invalidate_widgets,
@@ -301,11 +327,15 @@ where
         match action {
             Action::Dragging { .. } => mouse::Interaction::Grabbing,
             Action::Idle => {
-                if layout
-                    .children()
-                    .find(|l| cursor.position_over(l.bounds()).is_some())
-                    .is_some()
-                {
+                if layout.children().any(|l| {
+                    cursor
+                        .position_over(
+                            l.bounds()
+                                .intersection(&layout.bounds())
+                                .unwrap_or(Rectangle::new((0., 0.).into(), (0., 0.).into())),
+                        )
+                        .is_some()
+                }) {
                     //TODO: get mouse status of children?
                     mouse::Interaction::Grab
                 } else {
@@ -314,6 +344,28 @@ where
             }
         }
     }
+    //fn overlay<'a>(
+    //    &'a mut self,
+    //    tree: &'a mut Tree,
+    //    layout: Layout<'_>,
+    //    renderer: &Renderer,
+    //    translation: Vector,
+    //) -> Option<iced::advanced::overlay::Element<'a, Message, Theme, Renderer>> {
+    //    //iced::advanced::overlay::from_children(
+    //    //    &mut self.elements,
+    //    //    tree,
+    //    //    layout,
+    //    //    renderer,
+    //    //    translation,
+    //    //)
+    //    ////// Render Children in a layer that is bounded to the size of the workspace
+    //    //let overlays = self.elements.map(|e| Overlay)
+    //    //
+    //    //Some(elements)
+    //    //for ((e, tree), c_layout) in elements.zip(layout.children()) {
+    //    //    e
+    //    //}
+    //}
 }
 
 /// Convert to an element
@@ -321,7 +373,7 @@ impl<'a, Message, Theme, Renderer> From<Workspace<'a, Message, Theme, Renderer>>
     for Element<'a, Message, Theme, Renderer>
 where
     Message: 'a + Clone,
-    Theme: container::Catalog + 'a,
+    Theme: 'a,
     Renderer: renderer::Renderer + 'a,
 {
     fn from(
@@ -332,10 +384,11 @@ where
 }
 
 // Convenience function
+
 /// Create a new `Workspace`
-pub fn workspace<'a, Message, Theme, Renderer>(
-    elements: Vec<(Point, Element<'a, Message, Theme, Renderer>)>,
-) -> Workspace<'a, Message, Theme, Renderer>
+pub fn workspace<Message, Theme, Renderer>(
+    elements: Vec<(Point, Element<'_, Message, Theme, Renderer>)>,
+) -> Workspace<'_, Message, Theme, Renderer>
 where
     Theme: container::Catalog,
     Renderer: renderer::Renderer,

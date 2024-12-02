@@ -7,7 +7,7 @@ use iced::{
     },
     event, touch,
     widget::{container, Space},
-    Alignment, Color, Element, Event, Length, Point, Rectangle, Size, Vector,
+    Alignment, Element, Event, Length, Point, Rectangle, Size, Vector,
 };
 
 /// Widget State,
@@ -56,35 +56,24 @@ where
     Renderer: iced::advanced::Renderer,
 {
     fn tag(&self) -> tree::Tag {
-        //println!("tag");
         tree::Tag::of::<InnerState>()
     }
 
     fn state(&self) -> tree::State {
-        //println!("state");
         tree::State::new(self.inner_state)
     }
 
     fn size(&self) -> Size<Length> {
-        //println!("size");
         Size {
             width: Length::Fixed(100.),
             height: Length::Fixed(100.),
         }
     }
     fn diff(&self, tree: &mut Tree) {
-        //println!("diff");
-        //dbg!(self.state());
-        //dbg!(tree);
-        //tree.diff(self.into());
-        //tree.diff(self.);
-        //tree.state = tree::State::new(self.inner_state);
         tree.children = vec![Tree::new(&self.inner_widget)];
-        //tree.diff_children(std::slice::from_ref(&self.inner_widget));
     }
 
     fn children(&self) -> Vec<Tree> {
-        //println!("children");
         vec![Tree::new(self.inner_widget.as_widget())]
     }
 
@@ -94,7 +83,6 @@ where
         renderer: &Renderer,
         limits: &layout::Limits, //TODO: put in limits so we don't draw outside the container?
     ) -> layout::Node {
-        //println!("layout");
         let state = tree.state.downcast_mut::<InnerState>();
 
         let mut child_node =
@@ -123,35 +111,20 @@ where
         cursor: iced::advanced::mouse::Cursor,
         viewport: &iced::Rectangle,
     ) {
-        //println!("draw");
-        let state = tree.state.downcast_ref::<InnerState>();
-
-        //let bounds = state.bounds(layout);
         let bounds = layout.bounds();
-        //println!("{},{}", bounds.x, bounds.y);
 
         renderer.fill_quad(
             renderer::Quad {
                 bounds,
                 border: iced::Border {
-                    color: Color::WHITE,
+                    color: style.text_color,
                     width: 5.,
                     radius: 5.into(),
                 },
                 ..renderer::Quad::default()
             },
-            iced::Color::WHITE,
+            iced::Color::from_rgb8(10, 10, 15),
         );
-
-        //let size_of_this_node = Size::new(50., 50.);
-        //
-        //let child_node =
-        //    Node::default().align(Alignment::Center, Alignment::Center, size_of_this_node);
-        //
-        //let node = layout::Node::with_children(
-        //    Size::new(100., 100.),
-        //    vec![child_node.move_to(state.position)],
-        //);
 
         self.inner_widget.as_widget().draw(
             &tree.children[0],
