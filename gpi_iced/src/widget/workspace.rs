@@ -1,88 +1,142 @@
-//! This example showcases a simple native custom widget that draws a circle.
-use iced::advanced::graphics::core::widget;
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::widget::{tree, Tree};
-use iced::advanced::{renderer, Clipboard, Shell, Widget};
-use iced::mouse::Event::{ButtonPressed, ButtonReleased, CursorMoved};
+use iced::advanced::{Clipboard, Shell, Widget};
+use iced::mouse::Event::{ButtonPressed, ButtonReleased, CursorMoved, WheelScrolled};
 use iced::mouse::ScrollDelta;
 use iced::touch::Event::{FingerLifted, FingerLost, FingerMoved, FingerPressed};
-use iced::widget::container::{self};
-use iced::{event, mouse, Point, Vector};
-use iced::{Color, Length, Rectangle, Size};
+
+use iced::{event, keyboard, mouse, Color, Point, Theme, Vector};
 use iced::{Element, Event};
+use iced::{Length, Rectangle, Size};
 
-pub mod content;
+use super::shapes::{Shape, ShapeId, Shapes};
 
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-enum Action {
-    Dragging {
-        /// where the drag started
-        start_pos: Point,
+#[derive(Clone)]
+pub struct Camera {
+    pub position: Vector,
+    pub zoom: f32,
+}
 
-        /// the intial offset between the shape's location and the cursor's location
-        /// used to maintain a consititent relative position between the cursor
-        /// and the shape throughout the drag event
-        shape_offset: Vector,
-        child_index: usize,
-    },
-    #[default]
-    Idle,
+impl Default for Camera {
+    fn default() -> Self {
+        Self {
+            position: Vector::ZERO,
+            zoom: 1.0,
+        }
+    }
 }
 
 /// A workspace is a an infinite canvas that can be zoomed, panned,
-/// and contains widgets that can be placed anywhere in 3d (stacking in Z)
-pub struct Workspace<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer>
+/// and contains widgets that can be placed anywhere in 2d
+pub struct Workspace<'a, Message, Theme, Renderer>
 where
-    Renderer: renderer::Renderer,
+    Theme: Catalog,
+    Renderer: iced::advanced::graphics::geometry::Renderer,
 {
-    elements: Vec<Element<'a, Message, Theme, Renderer>>,
-    on_pickup: Option<Message>,
-    on_scroll: Option<Box<dyn Fn(ScrollDelta) -> Message + 'a>>,
-    on_move: Option<Box<dyn Fn(Point) -> Message + 'a>>,
-    on_release: Option<Message>,
-    inner_state: InnerState,
+    contents: Shapes<Element<'a, Message, Theme, Renderer>>,
+    camera: Camera,
+    pan: Option<Box<dyn Fn(Vector) -> Message + 'a>>,
+    zoom: Option<Box<dyn Fn(f32) -> Message + 'a>>,
+    on_shape_click: Option<Box<dyn Fn(ShapeId) -> Message + 'a>>,
+    on_shape_drag: Option<Box<dyn Fn(ShapeId, Point) -> Message + 'a>>,
+    on_shape_release: Option<Box<dyn Fn(ShapeId) -> Message + 'a>>,
+}
+#[derive(Default, PartialEq, Clone, Debug)]
+enum Action {
+    #[default]
+    Idle,
+    /// ShapeId and offset of the cursor with respect to the shape position
+    Drag(ShapeId, Vector),
+}
+
+pub struct State<T> {
+    pub camera: Camera,
+    pub shapes: Shapes<T>,
+}
+
+impl<T: Default> Default for State<T> {
+    fn default() -> Self {
+        Self::new(vec![])
+    }
+}
+
+impl<T> State<T> {
+    pub fn new(shapes: Vec<(Point, T)>) -> State<T> {
+        Self {
+            camera: Camera::default(),
+            shapes: Shapes(
+                shapes
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, (point, shape))| (i as ShapeId, Shape::new(point, shape)))
+                    .collect(),
+            ),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
 struct InnerState {
-    positions: Vec<Point>,
+    modifiers: keyboard::Modifiers,
     action: Action,
 }
 
 impl<'a, Message, Theme, Renderer> Workspace<'a, Message, Theme, Renderer>
 where
-    Renderer: renderer::Renderer,
+    Theme: Catalog,
+    Renderer: iced::advanced::graphics::geometry::Renderer,
 {
-    pub fn new(children: Vec<(Point, Element<'a, Message, Theme, Renderer>)>) -> Self {
-        let (positions, elements) = children.into_iter().unzip();
+    pub fn new<T>(
+        state: &'a State<T>,
+        view: impl Fn(ShapeId, &'a T) -> Element<'a, Message, Theme, Renderer>,
+    ) -> Self {
+        let contents = Shapes(
+            state
+                .shapes
+                .0
+                .iter()
+                .map(|(id, shape)| {
+                    (
+                        *id as ShapeId,
+                        Shape::new(shape.position, view(*id, &shape.state)),
+                    )
+                })
+                .collect(),
+        );
+
         Self {
-            elements,
-            inner_state: InnerState {
-                positions,
-                action: Action::Idle,
-            },
-            on_scroll: None,
-            on_move: None,
-            on_pickup: None,
-            on_release: None,
+            contents,
+            camera: state.camera.clone(),
+            pan: None,
+            zoom: None,
+            on_shape_click: None,
+            on_shape_drag: None,
+            on_shape_release: None,
         }
     }
-    pub fn on_scroll(mut self, on_move: impl Fn(ScrollDelta) -> Message + 'a) -> Self {
-        self.on_scroll = Some(Box::new(on_move));
+
+    pub fn pan(mut self, pan: impl Fn(Vector) -> Message + 'a) -> Self {
+        self.pan = Some(Box::new(pan));
         self
     }
 
-    pub fn on_move(mut self, on_move: impl Fn(Point) -> Message + 'a) -> Self {
-        self.on_move = Some(Box::new(on_move));
-        self
-    }
-    pub fn on_release(mut self, on_release: Message) -> Self {
-        self.on_release = Some(on_release);
+    pub fn zoom(mut self, zoom: impl Fn(f32) -> Message + 'a) -> Self {
+        self.zoom = Some(Box::new(zoom));
         self
     }
 
-    pub fn on_pickup(mut self, on_pickup: Message) -> Self {
-        self.on_pickup = Some(on_pickup);
+    pub fn on_press(mut self, on_press: impl Fn(ShapeId) -> Message + 'a) -> Self {
+        self.on_shape_click = Some(Box::new(on_press));
+        self
+    }
+
+    pub fn on_shape_drag(mut self, on_shape_drag: impl Fn(ShapeId, Point) -> Message + 'a) -> Self {
+        self.on_shape_drag = Some(Box::new(on_shape_drag));
+        self
+    }
+
+    pub fn on_release(mut self, on_release: impl Fn(ShapeId) -> Message + 'a) -> Self {
+        self.on_shape_release = Some(Box::new(on_release));
         self
     }
 }
@@ -92,14 +146,15 @@ impl<Message, Theme, Renderer> Widget<Message, Theme, Renderer>
     for Workspace<'_, Message, Theme, Renderer>
 where
     Message: Clone,
-    Renderer: renderer::Renderer,
+    Theme: Catalog,
+    Renderer: iced::advanced::graphics::geometry::Renderer,
 {
     fn tag(&self) -> tree::Tag {
         tree::Tag::of::<InnerState>()
     }
 
     fn state(&self) -> tree::State {
-        tree::State::new(self.inner_state.clone())
+        tree::State::new(InnerState::default())
     }
 
     fn size(&self) -> Size<Length> {
@@ -110,33 +165,33 @@ where
     }
 
     fn children(&self) -> Vec<Tree> {
-        self.elements
+        self.contents
+            .0
             .iter()
-            .map(|content| Tree::new(content.as_widget()))
+            .map(|(_id, element)| Tree::new(element.state.as_widget()))
             .collect()
     }
 
     fn layout(
         &self,
-        tree: &mut widget::Tree,
+        tree: &mut Tree,
         renderer: &Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
-        let positions = &tree.state.downcast_mut::<InnerState>().positions;
         layout::Node::with_children(
             //// Fill the screen
             limits.resolve(Length::Fill, Length::Fill, Size::new(50., 50.)),
             ///// Layout child elements
-            self.elements
-                .iter()
+            self.contents
+                .0
+                .values()
                 .zip(&mut tree.children)
-                .zip(positions)
-                .map(|((e, t), p)| {
-                    //let position = t.state.downcast_mut::<InnerState>();
-                    e.as_widget()
-                        .layout(t, renderer, limits)
-                        //// Move children to their location here!
-                        .move_to(*p)
+                .map(|(shape, tree_child)| {
+                    shape
+                        .state
+                        .as_widget()
+                        .layout(tree_child, renderer, limits)
+                        .move_to(shape.position - self.camera.position)
                 })
                 .collect(),
         )
@@ -144,48 +199,40 @@ where
 
     fn draw(
         &self,
-        tree: &widget::Tree,
+        tree: &Tree,
         renderer: &mut Renderer,
         theme: &Theme,
-        style: &renderer::Style,
+        style: &iced::advanced::renderer::Style,
         workspace_layout: Layout<'_>,
         cursor: mouse::Cursor,
         viewport: &Rectangle,
     ) {
-        //return;
+        //// Saved curves
+        //let geo = self
+        //    .cache
+        //    .draw(renderer, workspace_layout.bounds().size() * 2., |frame| {
+        //        //println!("drawing!");
+        //        frame.translate(-self.camera.position);
+        //
+        //        //// Foreground
+        //        //self.primitives.iter().for_each(|v| v.draw(frame));
+        //    });
+
+        //renderer.draw_geometry(geo);
+
         let padding = 0.0;
-        //// Background
-        renderer.fill_quad(
-            renderer::Quad {
-                bounds: workspace_layout.bounds(),
-                border: iced::Border::default()
-                    .width(padding)
-                    .color(Color::from_rgb8(60, 60, 90)),
 
-                ..renderer::Quad::default()
-            },
-            Color::from_rgb8(20, 20, 30),
-        );
+        //TODO: apply zoom transform
         //// Render Children in a layer that is bounded to the size of the workspace
-        //renderer.with_layer(workspace_layout.bounds().shrink(padding), |renderer| {
-        let elements = self.elements.iter().zip(&tree.children);
-        for ((e, tree), c_layout) in elements.zip(workspace_layout.children()) {
-            dbg!(c_layout);
+        let elements = self.contents.0.values().zip(&tree.children);
+        for ((shape, tree), c_layout) in elements.zip(workspace_layout.children()) {
             renderer.with_layer(workspace_layout.bounds().shrink(padding), |renderer| {
-                renderer.fill_quad(
-                    renderer::Quad {
-                        bounds: c_layout.bounds(),
-                        border: iced::Border::default().width(2.).color(iced::Color::WHITE),
-
-                        ..renderer::Quad::default()
-                    },
-                    Color::from_rgb8(40, 40, 60),
-                );
-                e.as_widget()
+                shape
+                    .state
+                    .as_widget()
                     .draw(tree, renderer, theme, style, c_layout, cursor, viewport);
             });
         }
-        //});
     }
 
     //// Move children based on input events
@@ -200,107 +247,23 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) -> event::Status {
-        let state = tree.state.downcast_mut::<InnerState>();
+        let event_status = event::Status::Ignored;
 
-        let event_status = match (event.clone(), state.action, cursor.position()) {
-            ////Pickup
-            (
-                Event::Mouse(ButtonPressed(mouse::Button::Left))
-                | Event::Touch(FingerPressed { .. }),
-                Action::Idle,
-                Some(_),
-            ) => {
-                if let Some((child_index, child_position, cursor_position)) = layout
-                    .children()
-                    .zip(&state.positions)
-                    .enumerate()
-                    .find_map(|(i, (l, e_p))| {
-                        cursor
-                            .position_over(
-                                l.bounds()
-                                    .intersection(&layout.bounds())
-                                    .unwrap_or(Rectangle::new((0., 0.).into(), (0., 0.).into())),
-                            )
-                            .map(|cursor_position| (i, e_p, cursor_position))
-                    })
-                {
-                    //// fire event
-                    if let Some(on_pickup) = self.on_pickup.clone() {
-                        shell.publish(on_pickup);
-                    }
-
-                    //// update state
-                    state.action = Action::Dragging {
-                        start_pos: *child_position,
-                        shape_offset: cursor_position - *child_position,
-                        child_index,
-                    };
-
-                    //// end event propogation?
-                    dbg!("captured pickup");
-                    event::Status::Captured
-                } else {
-                    event::Status::Ignored
-                }
-            }
-            ////Release
-            (
-                Event::Mouse(ButtonReleased(mouse::Button::Left))
-                | Event::Touch(FingerLifted { .. })
-                | Event::Touch(FingerLost { .. }),
-                Action::Dragging { .. },
-                _,
-            ) => {
-                if let Action::Dragging { .. } = state.action {
-                    //// fire event
-                    if let Some(on_release) = self.on_release.clone() {
-                        shell.publish(on_release);
-                    }
-
-                    //// update state
-                    state.action = Action::Idle;
-
-                    //// end event propogation?
-                    event::Status::Captured
-                } else {
-                    event::Status::Ignored
-                }
-            }
-            ////Drag
-            (
-                Event::Mouse(CursorMoved { .. }) | Event::Touch(FingerMoved { .. }),
-                Action::Dragging {
-                    start_pos: _,
-                    shape_offset,
-                    child_index,
-                },
-                Some(cursor_position),
-            ) => {
-                //// fire event
-                if let Some(on_move) = &self.on_move {
-                    shell.publish(on_move(cursor_position));
-                }
-                //// update state
-                // force a relayout, so that inner widgets will move relative to the new position
-                shell.invalidate_layout(); // unsure if this should be invalidate_widgets,
-                                           // or invalidate_layout
-
-                state.positions[child_index].x = cursor_position.x - (shape_offset.x);
-                state.positions[child_index].y = cursor_position.y - (shape_offset.y);
-
-                event::Status::Captured
-            }
-
-            _ => event::Status::Ignored,
-        };
+        // update inner state
+        let inner_state = tree::State::downcast_mut::<InnerState>(&mut tree.state);
+        if let Event::Keyboard(keyboard::Event::ModifiersChanged(modifiers)) = event {
+            inner_state.modifiers = modifiers
+        }
 
         ////Pass event down to children
-        self.elements
+        let event_status = self
+            .contents
+            .0
             .iter_mut()
             .zip(&mut tree.children)
             .zip(layout.children())
-            .map(|((element, tree), layout)| {
-                element.as_widget_mut().on_event(
+            .map(|(((_id, shape), tree), layout)| {
+                shape.state.as_widget_mut().on_event(
                     tree,
                     event.clone(),
                     layout,
@@ -311,60 +274,114 @@ where
                     viewport,
                 )
             })
-            .fold(event_status, event::Status::merge)
-    }
+            .fold(event_status, event::Status::merge);
 
-    fn mouse_interaction(
-        &self,
-        tree: &Tree,
-        layout: Layout<'_>,
-        cursor: mouse::Cursor,
-        _viewport: &Rectangle,
-        _renderer: &Renderer,
-    ) -> mouse::Interaction {
-        let action = tree.state.downcast_ref::<InnerState>().action;
+        match (event_status, cursor.position()) {
+            //// Only process events that are not captured by inner widgets
+            (event::Status::Ignored, Some(cursor_position)) => match event.clone() {
+                Event::Mouse(ButtonPressed(mouse::Button::Left))
+                | Event::Touch(FingerPressed { .. }) => {
+                    debug_assert!(inner_state.action == Action::Idle);
 
-        match action {
-            Action::Dragging { .. } => mouse::Interaction::Grabbing,
-            Action::Idle => {
-                if layout.children().any(|l| {
-                    cursor
-                        .position_over(
-                            l.bounds()
-                                .intersection(&layout.bounds())
-                                .unwrap_or(Rectangle::new((0., 0.).into(), (0., 0.).into())),
-                        )
-                        .is_some()
-                }) {
-                    //TODO: get mouse status of children?
-                    mouse::Interaction::Grab
-                } else {
-                    mouse::Interaction::default()
+                    ////Find the first coliding shape
+                    if let Some((id, offset)) = self.contents.find_shape(cursor_position, layout) {
+                        //// publish event
+                        if let Some(on_shape_click) = &self.on_shape_click {
+                            shell.publish(on_shape_click(id));
+                        }
+                        //// update inner state
+                        inner_state.action = Action::Drag(id, offset);
+                        //// capture event
+                        event::Status::Captured
+                    } else {
+                        event::Status::Ignored
+                    }
                 }
-            }
+                Event::Mouse(ButtonReleased(mouse::Button::Left))
+                | Event::Touch(FingerLifted { .. })
+                | Event::Touch(FingerLost { .. }) => {
+                    if let Action::Drag(id, _) = &inner_state.action {
+                        //// publish event
+                        if let Some(on_shape_release) = &self.on_shape_release {
+                            shell.publish(on_shape_release(*id));
+                        }
+                        //// update inner state
+                        inner_state.action = Action::Idle;
+                        //// capture event
+                        event::Status::Captured
+                    } else {
+                        event::Status::Ignored
+                    }
+                }
+                Event::Mouse(CursorMoved { .. }) | Event::Touch(FingerMoved { .. }) => {
+                    //TODO: find shape
+                    if let Action::Drag(id, offset) = &inner_state.action {
+                        //// publish event
+                        if let Some(on_drag) = &self.on_shape_drag {
+                            shell.publish(on_drag(*id, cursor_position - *offset));
+                        }
+                        //// capture event
+                        event::Status::Captured
+                    } else {
+                        event::Status::Ignored
+                    }
+                }
+                Event::Mouse(WheelScrolled { delta }) => {
+                    if let Some(pan) = &self.pan {
+                        let offset = match delta {
+                            ScrollDelta::Lines { x, y } => {
+                                if inner_state.modifiers.shift() {
+                                    //scale scrolled lines to be equivalent to 16 pixels
+                                    Vector::new(y, x) * 16.
+                                } else {
+                                    Vector::new(x, y) * 16.
+                                }
+                            }
+                            ScrollDelta::Pixels { x, y } => Vector::new(x, y),
+                        };
+                        //// publish event
+                        shell.publish(pan(offset));
+                        //// capture event
+                        event::Status::Captured
+                    } else {
+                        event::Status::Ignored
+                    }
+                }
+                _ => event::Status::Ignored,
+            },
+            _ => event::Status::Ignored,
         }
     }
-    //fn overlay<'a>(
-    //    &'a mut self,
-    //    tree: &'a mut Tree,
+
+    //fn mouse_interaction(
+    //    &self,
+    //    tree: &Tree,
     //    layout: Layout<'_>,
-    //    renderer: &Renderer,
-    //    translation: Vector,
-    //) -> Option<iced::advanced::overlay::Element<'a, Message, Theme, Renderer>> {
-    //    //iced::advanced::overlay::from_children(
-    //    //    &mut self.elements,
-    //    //    tree,
-    //    //    layout,
-    //    //    renderer,
-    //    //    translation,
-    //    //)
-    //    ////// Render Children in a layer that is bounded to the size of the workspace
-    //    //let overlays = self.elements.map(|e| Overlay)
-    //    //
-    //    //Some(elements)
-    //    //for ((e, tree), c_layout) in elements.zip(layout.children()) {
-    //    //    e
-    //    //}
+    //    cursor: mouse::Cursor,
+    //    _viewport: &Rectangle,
+    //    _renderer: &Renderer,
+    //) -> mouse::Interaction {
+    //    //let action = tree.state.downcast_ref::<InnerState>().action;
+    //
+    //    match action {
+    //        Action::Dragging { .. } => mouse::Interaction::Grabbing,
+    //        Action::Idle => {
+    //            if layout.children().any(|l| {
+    //                cursor
+    //                    .position_over(
+    //                        l.bounds()
+    //                            .intersection(&layout.bounds())
+    //                            .unwrap_or(Rectangle::new((0., 0.).into(), (0., 0.).into())),
+    //                    )
+    //                    .is_some()
+    //            }) {
+    //                //TODO: get mouse status of children?
+    //                mouse::Interaction::Grab
+    //            } else {
+    //                mouse::Interaction::default()
+    //            }
+    //        }
+    //    }
     //}
 }
 
@@ -373,8 +390,8 @@ impl<'a, Message, Theme, Renderer> From<Workspace<'a, Message, Theme, Renderer>>
     for Element<'a, Message, Theme, Renderer>
 where
     Message: 'a + Clone,
-    Theme: 'a,
-    Renderer: renderer::Renderer + 'a,
+    Theme: 'a + Catalog,
+    Renderer: 'a + iced::advanced::graphics::geometry::Renderer,
 {
     fn from(
         workspace: Workspace<'a, Message, Theme, Renderer>,
@@ -386,12 +403,56 @@ where
 // Convenience function
 
 /// Create a new `Workspace`
-pub fn workspace<Message, Theme, Renderer>(
-    elements: Vec<(Point, Element<'_, Message, Theme, Renderer>)>,
-) -> Workspace<'_, Message, Theme, Renderer>
+pub fn workspace<'a, T, Message, Theme, Renderer>(
+    state: &'a State<T>,
+    view: impl Fn(ShapeId, &'a T) -> Element<'a, Message, Theme, Renderer>,
+) -> Workspace<'a, Message, Theme, Renderer>
 where
-    Theme: container::Catalog,
-    Renderer: renderer::Renderer,
+    Theme: 'a + Catalog,
+    Renderer: iced::advanced::graphics::geometry::Renderer,
 {
-    Workspace::new(elements)
+    Workspace::new(state, view)
+}
+
+/// Very rough styling implementation
+/// The appearance of a workspace.
+#[derive(Debug, Clone, Copy)]
+pub struct Style {
+    pub background: Color,
+
+    pub foreground: Color,
+}
+
+pub trait Catalog: Sized {
+    type Class<'a>;
+
+    fn default<'a>() -> Self::Class<'a>;
+
+    fn style(&self, class: &Self::Class<'_>) -> Style;
+}
+
+pub type StyleFn<'a, Theme> = Box<dyn Fn(&Theme) -> Style + 'a>;
+
+impl Catalog for Theme {
+    type Class<'a> = StyleFn<'a, Self>;
+
+    fn default<'a>() -> Self::Class<'a> {
+        Box::new(default)
+    }
+
+    fn style(&self, class: &Self::Class<'_>) -> Style {
+        class(self)
+    }
+}
+
+pub fn default(theme: &Theme) -> Style {
+    let palette = theme.palette();
+
+    let background = palette.background;
+    let foreground = palette.primary;
+
+    Style {
+        background,
+        foreground,
+    }
 }

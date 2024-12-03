@@ -1,8 +1,9 @@
-use gpi_iced::widget::node::Node;
-use gpi_iced::widget::workspace::workspace;
+use gpi_iced::widget::shapes::ShapeId;
+use gpi_iced::widget::workspace::{self, workspace};
 use iced::advanced::graphics::core::Element;
-use iced::widget::{button, column, container, text};
-use iced::{application, Color, Length, Point, Renderer, Theme, Vector};
+use iced::border::rounded;
+use iced::widget::{container, text};
+use iced::{application, Length, Point, Renderer, Theme, Vector};
 
 pub fn main() -> iced::Result {
     #[cfg(target_arch = "wasm32")]
@@ -17,105 +18,73 @@ pub fn main() -> iced::Result {
 fn theme(_state: &Example) -> Theme {
     Theme::Ferra
 }
-
-enum Action {
-    Idle,
-    Drag { offset: Vector },
+#[derive(Default)]
+struct Node {
+    name: String,
 }
-
 struct Example {
-    status: String,
-    action: Action,
-    position: Point,
-    cursor_position: Point,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum Message {
-    OnPickup,
-    OnWorkspaceCursorMove(Point),
-    OnRelease,
-    ButtonPressed,
-}
-
-impl Example {
-    fn new() -> Self {
-        Example {
-            status: "start!".into(),
-            position: (50., 50.).into(),
-            action: Action::Idle,
-            cursor_position: Point::ORIGIN,
-        }
-    }
-
-    fn update(&mut self, message: Message) {
-        match message {
-            Message::OnPickup => {
-                self.action = Action::Drag {
-                    offset: self.cursor_position - self.position,
-                }
-            }
-            Message::OnRelease => self.action = Action::Idle,
-            Message::OnWorkspaceCursorMove(cursor_position) => {
-                self.cursor_position = cursor_position;
-                if let Action::Drag { offset } = self.action {
-                    self.position = cursor_position - offset;
-                    dbg!(self.position);
-                }
-            }
-            Message::ButtonPressed => {
-                self.status = "button pressed".to_owned();
-            }
-        }
-    }
-
-    fn view(&self) -> Element<Message, Theme, Renderer> {
-        column![workspace(vec![
-            (
-                Point::new(20., 10.),
-                Node::new(
-                    button("hi"),
-                    vec![
-                        Color::from_rgb8(200, 50, 50),
-                        Color::from_rgb8(50, 200, 50),
-                        Color::from_rgb8(50, 200, 50)
-                    ],
-                    vec![Color::from_rgb8(200, 50, 50),]
-                )
-                .into()
-            ),
-            (
-                Point::new(20., 10.),
-                container(column![
-                    text("text"),
-                    button("hi")
-                        .height(50.)
-                        .width(80.)
-                        .on_press(Message::ButtonPressed)
-                ])
-                .padding(10.)
-                .style(|theme: &Theme| {
-                    let palette = theme.extended_palette();
-                    container::Style::default().background(palette.background.strong.color)
-                })
-                .into()
-            ),
-            (
-                Point::new(50., 50.),
-                button("how are you?").height(50.).width(100.).into()
-            )
-        ])
-        .on_pickup(Message::OnPickup)
-        .on_move(Message::OnWorkspaceCursorMove)
-        .on_release(Message::OnRelease),]
-        .height(Length::Fill)
-        .width(Length::Fill)
-        .into()
-    }
+    shapes: workspace::State<Node>,
 }
 
 impl Default for Example {
     fn default() -> Self {
-        Self::new()
+        Self {
+            shapes: workspace::State::<Node>::new(vec![
+                (
+                    Point::new(100., 100.),
+                    Node {
+                        name: "reduce".into(),
+                    },
+                ),
+                (Point::new(200., 300.), Node { name: "sum".into() }),
+            ]),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum Message {
+    OnDrag(ShapeId, Point),
+    Pan(Vector),
+}
+
+impl Example {
+    fn update(&mut self, message: Message) {
+        match message {
+            Message::OnDrag(shape_index, cursor_position) => {
+                self.shapes
+                    .shapes
+                    .0
+                    .get_mut(&shape_index)
+                    .expect("Shape index must exist")
+                    .position = cursor_position
+            }
+            Message::Pan(delta) => {
+                self.shapes.camera.position.x -= delta.x * 2.;
+                self.shapes.camera.position.y -= delta.y * 2.;
+            }
+        };
+    }
+
+    fn view(&self) -> Element<Message, Theme, Renderer> {
+        container(
+            workspace(&self.shapes, |_id, node| {
+                container(text(&node.name))
+                    .padding([20., 40.])
+                    .style(|t| {
+                        container::bordered_box(t).border(
+                            rounded(5.)
+                                .color(t.extended_palette().secondary.weak.color)
+                                .width(2.),
+                        )
+                    })
+                    .into()
+            })
+            .on_shape_drag(Message::OnDrag)
+            .pan(Message::Pan),
+        )
+        .height(Length::Fill)
+        .width(Length::Fill)
+        .into()
     }
 }

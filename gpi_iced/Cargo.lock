@@ -1243,6 +1243,7 @@ version = "0.1.0"
 dependencies = [
  "console_error_panic_hook",
  "iced",
+ "ordermap",
 ]
 
 [[package]]
@@ -1570,9 +1571,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.6.0"
+version = "2.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "707907fe3c25f5424cce2cb7e1cbcafee6bdbe735ca90ef77c29e84591e5b9da"
+checksum = "62f822373a4fe84d4bb149bf54e584a7f4abec90e072ed49cda0edea5b95471f"
 dependencies = [
  "equivalent",
  "hashbrown 0.15.1",
@@ -2218,6 +2219,15 @@ checksum = "9aa2b01e1d916879f73a53d01d1d6cee68adbb31d6d9177a8cfce093cced1d50"
 dependencies = [
  "futures-core",
  "pin-project-lite",
+]
+
+[[package]]
+name = "ordermap"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f80a48eb68b6a7da9829b8b0429011708f775af80676a91063d023a66a656106"
+dependencies = [
+ "indexmap",
 ]
 
 [[package]]

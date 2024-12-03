@@ -1,0 +1,38 @@
+use iced::{advanced::layout, Point, Vector};
+use ordermap::OrderMap;
+
+pub type ShapeId = u32;
+pub struct Shape<T> {
+    pub position: Point,
+    pub state: T,
+}
+
+impl<T> Shape<T> {
+    pub fn new(position: Point, state: T) -> Self {
+        Self { position, state }
+    }
+}
+
+pub struct Shapes<T>(pub OrderMap<ShapeId, Shape<T>>);
+
+impl<T> Default for Shapes<T> {
+    fn default() -> Self {
+        Self(OrderMap::new())
+    }
+}
+
+impl<T> Shapes<T> {
+    pub fn find_shape(&self, point: Point, layout: layout::Layout) -> Option<(ShapeId, Vector)> {
+        self.0
+            .iter()
+            .zip(layout.children())
+            .find_map(|((id, shape), layout)| {
+                let bounds = layout.bounds();
+                if bounds.contains(point) {
+                    Some((*id, point - shape.position))
+                } else {
+                    None
+                }
+            })
+    }
+}
