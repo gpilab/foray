@@ -6,6 +6,7 @@ use iced::border::{radius, rounded};
 use iced::widget::{column, *};
 use iced::Element;
 use iced::*;
+use ndarray::{ArrayD, ArrayViewD, IxDyn};
 const NODE_WIDTH: f32 = 100.;
 const NODE_HEIGHT: f32 = 60.;
 
@@ -25,10 +26,19 @@ fn theme(_state: &Example) -> Theme {
     Theme::Ferra
 }
 
-#[derive(Default)]
+#[derive(Debug, Clone)]
+enum PortData {
+    Integer(Option<ArrayD<i64>>),
+    Real(Option<ArrayD<f64>>),
+    Complex(Option<ArrayD<(f64, f64)>>),
+}
+
+#[derive(Default, Debug)]
 struct Node {
     name: String,
     value: u32,
+    inputs: Vec<(String, PortData)>,
+    outputs: Vec<(String, PortData)>,
 }
 
 struct Example {
@@ -54,26 +64,41 @@ impl Default for Example {
             Node {
                 name: "a".into(),
                 value: 0,
+                inputs: vec![],
+                outputs: vec![(
+                    "out".into(),
+                    PortData::Real(Some(ArrayD::from_shape_fn(IxDyn(&[16]), |_i| 0.))),
+                )],
             },
             Node {
                 name: "b".into(),
                 value: 0,
+                inputs: vec![("in".into(), PortData::Real(None))],
+                outputs: vec![("out".into(), PortData::Real(None))],
             },
             Node {
                 name: "c".into(),
                 value: 0,
+                inputs: vec![("in".into(), PortData::Real(None))],
+                outputs: vec![("out".into(), PortData::Real(None))],
             },
             Node {
                 name: "d".into(),
                 value: 0,
+                inputs: vec![("in".into(), PortData::Real(None))],
+                outputs: vec![("out".into(), PortData::Real(None))],
             },
             Node {
                 name: "e".into(),
                 value: 0,
+                inputs: vec![("in".into(), PortData::Real(None))],
+                outputs: vec![("out".into(), PortData::Real(None))],
             },
             Node {
                 name: "f".into(),
                 value: 0,
+                inputs: vec![("in".into(), PortData::Real(None))],
+                outputs: vec![("out".into(), PortData::Real(None))],
             },
         ];
 
@@ -135,8 +160,25 @@ impl Example {
                         .map(|(from, _to)| self.graph.get_node(from.0).value)
                         .sum();
 
+                    let parent_array = self
+                        .graph
+                        .incoming_edges(nx)
+                        .into_iter()
+                        .map(|(from, _to)| &self.graph.get_node(from.0).outputs[0].1)
+                        .next()
+                        .unwrap_or(&PortData::Real(None));
+
+                    let new_array = parent_array.clone();
+
                     let node = self.graph.get_mut_node(*nx);
                     node.value += parent_sum;
+                    if let PortData::Real(Some(array)) = &mut node.outputs[0].1 {
+                        array[0] = node.value as f64;
+                    } else {
+                        node.outputs[0].1 = new_array;
+                    }
+
+                    dbg!(node);
                 });
             }
             Message::OnDrag(shape_index, cursor_position) => {
