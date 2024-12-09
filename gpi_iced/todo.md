@@ -32,7 +32,7 @@
 
 - [x] render nodes
 
-- [-] select single node
+- [x] select single node
   - [-] select multiple nodes
 
 - [-] render node types differently

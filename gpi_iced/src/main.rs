@@ -52,28 +52,28 @@ impl Default for Example {
 
         let initial_nodes = vec![
             Node {
-                name: "read hdf5".into(),
+                name: "a".into(),
                 value: 0,
             },
             Node {
-                name: "reduce".into(),
-                value: 1,
+                name: "b".into(),
+                value: 0,
             },
             Node {
-                name: "*".into(),
-                value: 2,
+                name: "c".into(),
+                value: 0,
             },
             Node {
-                name: "/".into(),
-                value: 3,
+                name: "d".into(),
+                value: 0,
             },
             Node {
-                name: "fft".into(),
-                value: 4,
+                name: "e".into(),
+                value: 0,
             },
             Node {
-                name: "oracle recon".into(),
-                value: 5,
+                name: "f".into(),
+                value: 0,
             },
         ];
 
@@ -119,7 +119,26 @@ impl Example {
                 self.shapes.camera.position.y -= delta.y * 2.;
             }
             Message::Config(v) => self.config = v,
-            Message::OnSelect(shape_id) => self.selected_shape = Some(shape_id),
+            Message::OnSelect(shape_id) => {
+                self.selected_shape = Some(shape_id);
+
+                let node = self.graph.get_mut_node(shape_id);
+                node.value += 1;
+
+                let mut ordered = self.graph.sorted_subset(shape_id);
+
+                ordered.iter_mut().for_each(|nx| {
+                    let parent_sum: u32 = self
+                        .graph
+                        .incoming_edges(nx)
+                        .into_iter()
+                        .map(|(from, _to)| self.graph.get_node(from.0).value)
+                        .sum();
+
+                    let node = self.graph.get_mut_node(*nx);
+                    node.value += parent_sum;
+                });
+            }
             Message::OnDrag(shape_index, cursor_position) => {
                 self.shapes
                     .shapes
@@ -189,6 +208,17 @@ impl Example {
                 let content =
                     column![text(name), text(value).style(text::secondary)].align_x(Center);
 
+                //let output_port_pos = self
+                //    .graph
+                //    .outgoing_edges(&id)
+                //    .iter()
+                //    .enumerate()
+                //    .map(|(i, (_from, _to))| {
+                //        let port_x = (i + 1) as f32 * (NODE_WIDTH / 8.);
+                //        Vector::new(port_x, NODE_HEIGHT)
+                //    })
+                //    .map(pin(button(())));
+
                 container(content)
                     .center(Length::Fill)
                     .width(NODE_WIDTH)
@@ -208,10 +238,12 @@ impl Example {
                 let edges = self.graph.outgoing_edges(&id);
                 edges
                     .iter()
-                    .map(|(from, to)| {
+                    .enumerate()
+                    .map(|(i, (from, to))| {
+                        let port_x = (i + 1) as f32 * (NODE_WIDTH / 8.);
                         (
-                            points[&from.0] + Vector::new(NODE_WIDTH / 2., NODE_HEIGHT),
-                            points[&to.0] + Vector::new(NODE_WIDTH / 2., 0.),
+                            points[&from.0] + Vector::new(port_x, NODE_HEIGHT),
+                            points[&to.0] + Vector::new(NODE_WIDTH / 8., 0.),
                         )
                     })
                     .map(|(from, to)| {

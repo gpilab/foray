@@ -105,6 +105,22 @@ where
             panic!("graph has cycles!")
         }
     }
+    pub fn sorted_subset(&self, root: NodeIndex) -> Vec<NodeIndex> {
+        let sorted = self.topological_sort();
+        sorted
+            .into_iter()
+            .filter(|nx| self.is_self_or_dependent(root, *nx))
+            .collect()
+    }
+    fn is_self_or_dependent(&self, root: NodeIndex, to_check: NodeIndex) -> bool {
+        if root == to_check {
+            true
+        } else {
+            self.incoming_edges(&to_check)
+                .into_iter()
+                .any(|(from, _to)| self.is_self_or_dependent(root, from.0))
+        }
+    }
 
     /// determine if a node has any incoming connections
     fn has_incoming(nx: &NodeIndex, edges: &[(LabeledVertex<S>, LabeledVertex<S>)]) -> bool {
