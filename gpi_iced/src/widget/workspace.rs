@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+
+use iced::advanced::graphics::geometry::frame::Backend;
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::widget::{tree, Tree};
 use iced::advanced::{Clipboard, Shell, Widget};
@@ -5,6 +8,7 @@ use iced::mouse::Event::{ButtonPressed, ButtonReleased, CursorMoved, WheelScroll
 use iced::mouse::ScrollDelta;
 use iced::touch::Event::{FingerLifted, FingerLost, FingerMoved, FingerPressed};
 
+use iced::widget::canvas::{Path, Stroke};
 use iced::{event, keyboard, mouse, Color, Point, Theme, Vector};
 use iced::{Element, Event};
 use iced::{Length, Rectangle, Size};
@@ -34,6 +38,7 @@ where
     Renderer: iced::advanced::graphics::geometry::Renderer,
 {
     contents: Shapes<Element<'a, Message, Theme, Renderer>>,
+    connections: Vec<(Path, Stroke<'a>)>,
     camera: Camera,
     pan: Option<Box<dyn Fn(Vector) -> Message + 'a>>,
     zoom: Option<Box<dyn Fn(f32) -> Message + 'a>>,
@@ -61,14 +66,13 @@ impl<T: Default> Default for State<T> {
 }
 
 impl<T> State<T> {
-    pub fn new(shapes: Vec<(Point, T)>) -> State<T> {
+    pub fn new(shapes: Vec<(ShapeId, T, Point)>) -> State<T> {
         Self {
             camera: Camera::default(),
             shapes: Shapes(
                 shapes
                     .into_iter()
-                    .enumerate()
-                    .map(|(i, (point, shape))| (i as ShapeId, Shape::new(point, shape)))
+                    .map(|(i, shape, point)| (i as ShapeId, Shape::new(point, shape)))
                     .collect(),
             ),
         }
@@ -88,8 +92,15 @@ where
 {
     pub fn new<T>(
         state: &'a State<T>,
-        view: impl Fn(ShapeId, &'a T) -> Element<'a, Message, Theme, Renderer>,
+        node_view: impl Fn(ShapeId, &'a T) -> Element<'a, Message, Theme, Renderer>,
+        connections_view: impl Fn(ShapeId, &'a T, &HashMap<ShapeId, Point>) -> Vec<(Path, Stroke<'a>)>,
     ) -> Self {
+        let positions = state
+            .shapes
+            .0
+            .iter()
+            .map(|(id, shape)| (*id, shape.position))
+            .collect();
         let contents = Shapes(
             state
                 .shapes
@@ -98,14 +109,21 @@ where
                 .map(|(id, shape)| {
                     (
                         *id as ShapeId,
-                        Shape::new(shape.position, view(*id, &shape.state)),
+                        Shape::new(shape.position, node_view(*id, &shape.state)),
                     )
                 })
                 .collect(),
         );
+        let connections = state
+            .shapes
+            .0
+            .iter()
+            .flat_map(|(id, shape)| connections_view(*id, &shape.state, &positions))
+            .collect();
 
         Self {
             contents,
+            connections,
             camera: state.camera.clone(),
             pan: None,
             zoom: None,
@@ -207,18 +225,20 @@ where
         cursor: mouse::Cursor,
         viewport: &Rectangle,
     ) {
+        let bounds = workspace_layout.bounds();
+        let workspace_offset = Vector::new(bounds.position().x, bounds.position().y);
         //// Saved curves
-        //let geo = self
-        //    .cache
-        //    .draw(renderer, workspace_layout.bounds().size() * 2., |frame| {
-        //        //println!("drawing!");
-        //        frame.translate(-self.camera.position);
-        //
-        //        //// Foreground
-        //        //self.primitives.iter().for_each(|v| v.draw(frame));
-        //    });
+        let mut frame = renderer.new_frame(bounds.size());
 
-        //renderer.draw_geometry(geo);
+        frame.translate(-self.camera.position);
+
+        self.connections
+            .iter()
+            .for_each(|(p, s)| frame.stroke(p, *s));
+
+        renderer.with_translation(workspace_offset, |renderer| {
+            renderer.draw_geometry(frame.into_geometry())
+        });
 
         let padding = 0.0;
 
@@ -405,13 +425,14 @@ where
 /// Create a new `Workspace`
 pub fn workspace<'a, T, Message, Theme, Renderer>(
     state: &'a State<T>,
-    view: impl Fn(ShapeId, &'a T) -> Element<'a, Message, Theme, Renderer>,
+    node_view: impl Fn(ShapeId, &'a T) -> Element<'a, Message, Theme, Renderer>,
+    connections_view: impl Fn(ShapeId, &'a T, &HashMap<ShapeId, Point>) -> Vec<(Path, Stroke<'a>)>,
 ) -> Workspace<'a, Message, Theme, Renderer>
 where
     Theme: 'a + Catalog,
     Renderer: iced::advanced::graphics::geometry::Renderer,
 {
-    Workspace::new(state, view)
+    Workspace::new(state, node_view, connections_view)
 }
 
 /// Very rough styling implementation
