@@ -8,8 +8,11 @@ pub struct Shape<T> {
 }
 
 impl<T> Shape<T> {
-    pub fn new(position: Point, state: T) -> Self {
-        Self { position, state }
+    pub fn new(position: Point, content: T) -> Self {
+        Self {
+            position,
+            state: content,
+        }
     }
 }
 

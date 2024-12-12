@@ -1,12 +1,14 @@
 use canvas::{Path, Stroke};
-use gpi_iced::graph::Graph;
+use gpi_iced::graph::{constant_node, identity_node, Graph};
+use gpi_iced::widget::node_container::NodeContainer;
+use gpi_iced::widget::pin::Pin;
 use gpi_iced::widget::shapes::ShapeId;
 use gpi_iced::widget::workspace::{self, workspace};
 use iced::border::{radius, rounded};
 use iced::widget::{column, *};
 use iced::Element;
 use iced::*;
-use ndarray::{ArrayD, ArrayViewD, IxDyn};
+//use ndarray::{ArrayD, ArrayViewD, IxDyn};
 const NODE_WIDTH: f32 = 100.;
 const NODE_HEIGHT: f32 = 60.;
 
@@ -26,24 +28,21 @@ fn theme(_state: &Example) -> Theme {
     Theme::Ferra
 }
 
-#[derive(Debug, Clone)]
-enum PortData {
-    Integer(Option<ArrayD<i64>>),
-    Real(Option<ArrayD<f64>>),
-    Complex(Option<ArrayD<(f64, f64)>>),
-}
-
-#[derive(Default, Debug)]
+#[derive(Debug)]
 struct Node {
     name: String,
-    value: u32,
-    inputs: Vec<(String, PortData)>,
-    outputs: Vec<(String, PortData)>,
+}
+
+#[derive(Clone, Debug)]
+enum PortType {
+    Integer,
+    _Real,
+    _Complex,
 }
 
 struct Example {
-    graph: Graph<Node, String>,
-    shapes: workspace::State<()>,
+    graph: Graph<Node, String, PortType, u32>,
+    shapes: workspace::State,
     selected_shape: Option<ShapeId>,
     config: f32,
     theme: Theme,
@@ -60,67 +59,40 @@ impl Default for Example {
             Point::new(250., 400.),
         ];
 
+        let constant_node =
+            |name: &str, c: u32| constant_node(Node { name: name.into() }, c, PortType::Integer);
+        let identity_node =
+            |name: &str| identity_node(Node { name: name.into() }, PortType::Integer);
+
         let initial_nodes = vec![
-            Node {
-                name: "a".into(),
-                value: 0,
-                inputs: vec![],
-                outputs: vec![(
-                    "out".into(),
-                    PortData::Real(Some(ArrayD::from_shape_fn(IxDyn(&[16]), |_i| 0.))),
-                )],
-            },
-            Node {
-                name: "b".into(),
-                value: 0,
-                inputs: vec![("in".into(), PortData::Real(None))],
-                outputs: vec![("out".into(), PortData::Real(None))],
-            },
-            Node {
-                name: "c".into(),
-                value: 0,
-                inputs: vec![("in".into(), PortData::Real(None))],
-                outputs: vec![("out".into(), PortData::Real(None))],
-            },
-            Node {
-                name: "d".into(),
-                value: 0,
-                inputs: vec![("in".into(), PortData::Real(None))],
-                outputs: vec![("out".into(), PortData::Real(None))],
-            },
-            Node {
-                name: "e".into(),
-                value: 0,
-                inputs: vec![("in".into(), PortData::Real(None))],
-                outputs: vec![("out".into(), PortData::Real(None))],
-            },
-            Node {
-                name: "f".into(),
-                value: 0,
-                inputs: vec![("in".into(), PortData::Real(None))],
-                outputs: vec![("out".into(), PortData::Real(None))],
-            },
+            constant_node("a", 7),
+            identity_node("b"),
+            identity_node("c"),
+            identity_node("d"),
+            identity_node("e"),
+            identity_node("f"),
         ];
 
-        let mut g = Graph::new();
+        let mut g = Graph::<Node, String, PortType, u32>::new();
         initial_nodes.into_iter().for_each(|n| {
             g.add_node(n);
         });
-        g.add_edge((0, "out".into()), (1, "in".into()));
-        g.add_edge((1, "out".into()), (2, "in".into()));
-        g.add_edge((1, "out2".into()), (3, "in".into()));
-        g.add_edge((2, "out".into()), (4, "in".into()));
-        g.add_edge((3, "out".into()), (5, "in".into()));
+        g.add_edge((0, "out"), (1, "in"));
+        g.add_edge((1, "out"), (2, "in"));
+        g.add_edge((1, "out"), (3, "in"));
+        g.add_edge((2, "out"), (4, "in"));
+        g.add_edge((3, "out"), (5, "in"));
+
         let nodes_refs = g.nodes_ref();
-        let nr: Vec<_> = nodes_refs
+        let nr = nodes_refs
             .iter()
             .zip(points.iter())
-            .map(|((k, _v), p)| (*k, (), *p))
+            .map(|((k, _v), p)| (*k, *p))
             .collect();
 
         Self {
             graph: g,
-            shapes: workspace::State::<()>::new(nr),
+            shapes: workspace::State::new(nr),
             selected_shape: None,
             config: 50.,
             theme: Theme::Ferra,
@@ -146,48 +118,14 @@ impl Example {
             Message::Config(v) => self.config = v,
             Message::OnSelect(shape_id) => {
                 self.selected_shape = Some(shape_id);
-
-                let node = self.graph.get_mut_node(shape_id);
-                node.value += 1;
-
-                let mut ordered = self.graph.sorted_subset(shape_id);
-
-                ordered.iter_mut().for_each(|nx| {
-                    let parent_sum: u32 = self
-                        .graph
-                        .incoming_edges(nx)
-                        .into_iter()
-                        .map(|(from, _to)| self.graph.get_node(from.0).value)
-                        .sum();
-
-                    let parent_array = self
-                        .graph
-                        .incoming_edges(nx)
-                        .into_iter()
-                        .map(|(from, _to)| &self.graph.get_node(from.0).outputs[0].1)
-                        .next()
-                        .unwrap_or(&PortData::Real(None));
-
-                    let new_array = parent_array.clone();
-
-                    let node = self.graph.get_mut_node(*nx);
-                    node.value += parent_sum;
-                    if let PortData::Real(Some(array)) = &mut node.outputs[0].1 {
-                        array[0] = node.value as f64;
-                    } else {
-                        node.outputs[0].1 = new_array;
-                    }
-
-                    dbg!(node);
-                });
+                self.graph.exectute_sub_network(shape_id);
             }
             Message::OnDrag(shape_index, cursor_position) => {
-                self.shapes
+                *self
                     .shapes
-                    .0
+                    .shape_positions
                     .get_mut(&shape_index)
-                    .expect("Shape index must exist")
-                    .position = cursor_position
+                    .expect("Shape index must exist") = cursor_position
             }
         };
     }
@@ -195,11 +133,17 @@ impl Example {
     fn view(&self) -> Element<Message, Theme, Renderer> {
         const SEPERATOR: f32 = 1.0;
 
-        let button_style = |t: &Theme, s| {
+        fn button_style(t: &Theme, s: button::Status) -> button::Style {
             let mut style = button::secondary(t, s);
             style.border.radius = radius(0.);
             style
-        };
+        }
+        fn port_style(t: &Theme, s: button::Status) -> button::Style {
+            let mut style =
+                button::primary(t, s).with_background(t.extended_palette().primary.weak.color);
+            style.border.radius = radius(100.);
+            style
+        }
 
         let file_commands = row![
             horizontal_space(),
@@ -237,55 +181,75 @@ impl Example {
 
         let workspace = workspace(
             &self.shapes,
-            |id, _nx| {
+            |id| {
                 let node = self.graph.get_node(id);
                 let is_selected = match self.selected_shape {
                     Some(s_id) => id == s_id,
                     None => false,
                 };
 
-                let name = node.name.clone();
-                let value = node.value;
+                let name = node.data.name.clone();
 
-                let content =
-                    column![text(name), text(value).style(text::secondary)].align_x(Center);
-
-                //let output_port_pos = self
-                //    .graph
-                //    .outgoing_edges(&id)
-                //    .iter()
-                //    .enumerate()
-                //    .map(|(i, (_from, _to))| {
-                //        let port_x = (i + 1) as f32 * (NODE_WIDTH / 8.);
-                //        Vector::new(port_x, NODE_HEIGHT)
-                //    })
-                //    .map(pin(button(())));
-
-                container(content)
-                    .center(Length::Fill)
-                    .width(NODE_WIDTH)
-                    .height(NODE_HEIGHT)
-                    .style(move |t: &Theme| {
-                        let outline_color = match is_selected {
-                            true => t.extended_palette().primary.strong.color,
-                            false => t.extended_palette().secondary.strong.color,
-                        };
-                        container::transparent(t)
-                            .border(rounded(5.).color(outline_color).width(2.))
-                            .background(self.theme.palette().background)
-                    })
-                    .into()
-            },
-            |id, _nx, points| {
-                let edges = self.graph.outgoing_edges(&id);
-                edges
+                let out_edges = self.graph.outgoing_edges(&id);
+                dbg!(&out_edges);
+                let out_ports = out_edges
                     .iter()
                     .enumerate()
-                    .map(|(i, (from, to))| {
-                        let port_x = (i + 1) as f32 * (NODE_WIDTH / 8.);
+                    .map(|(i, (_from, _to))| {
+                        let port_x = i as f32 * (NODE_WIDTH / 4.) + 10.0;
+                        Point::new(port_x, NODE_HEIGHT - 5.)
+                    })
+                    .map(|v| {
+                        Pin::new(button("").style(port_style).width(10.).height(10.))
+                            .position(v)
+                            .into()
+                    });
+
+                let in_edges = self.graph.incoming_edges(&id);
+                dbg!(&in_edges);
+                let in_ports = in_edges
+                    .iter()
+                    .enumerate()
+                    .map(|(i, (_from, _to))| {
+                        let port_x = i as f32 * (NODE_WIDTH / 4.) + 10.0;
+                        Point::new(port_x, -5.)
+                    })
+                    .map(|v| {
+                        Pin::new(button("").style(port_style).width(10.).height(10.))
+                            .position(v)
+                            .into()
+                    });
+
+                let content: Element<Message, Theme, Renderer> = NodeContainer::new(
+                    container(text(name))
+                        .style(move |t: &Theme| {
+                            let outline_color = match is_selected {
+                                true => t.extended_palette().primary.strong.color,
+                                false => t.extended_palette().secondary.strong.color,
+                            };
+                            container::transparent(t)
+                                .border(rounded(5.).color(outline_color).width(2.))
+                                .background(self.theme.palette().background)
+                        })
+                        .center_x(NODE_WIDTH)
+                        .center_y(NODE_HEIGHT),
+                    in_ports.chain(out_ports).collect(),
+                )
+                .into();
+                content //.explain(Color::WHITE)
+            },
+            |wire_end_node, points| {
+                let incoming_wires = self.graph.incoming_edges(&wire_end_node);
+                incoming_wires
+                    .iter()
+                    .enumerate()
+                    .map(|(i, (wire_start_node, _wire_start_port))| {
+                        // WARN: i assumes sorted ports for positioning
+                        let port_x = i as f32 * (NODE_WIDTH / 4.) + 15.0;
                         (
-                            points[&from.0] + Vector::new(port_x, NODE_HEIGHT),
-                            points[&to.0] + Vector::new(NODE_WIDTH / 8., 0.),
+                            //TODO: change port_x based on it's from_node output position
+                            points[wire_start_node] + Vector::new(port_x, NODE_HEIGHT),
+                            points[&wire_end_node] + Vector::new(port_x, 0.),
                         )
                     })
                     .map(|(from, to)| {

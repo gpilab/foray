@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use iced::advanced::graphics::geometry::frame::Backend;
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::widget::{tree, Tree};
@@ -12,6 +10,7 @@ use iced::widget::canvas::{Path, Stroke};
 use iced::{event, keyboard, mouse, Color, Point, Theme, Vector};
 use iced::{Element, Event};
 use iced::{Length, Rectangle, Size};
+use ordermap::OrderMap;
 
 use super::shapes::{Shape, ShapeId, Shapes};
 
@@ -54,27 +53,22 @@ enum Action {
     Drag(ShapeId, Vector),
 }
 
-pub struct State<T> {
+pub struct State {
     pub camera: Camera,
-    pub shapes: Shapes<T>,
+    pub shape_positions: OrderMap<ShapeId, Point>,
 }
 
-impl<T: Default> Default for State<T> {
+impl Default for State {
     fn default() -> Self {
-        Self::new(vec![])
+        Self::new([].into())
     }
 }
 
-impl<T> State<T> {
-    pub fn new(shapes: Vec<(ShapeId, T, Point)>) -> State<T> {
+impl State {
+    pub fn new(shapes: OrderMap<ShapeId, Point>) -> State {
         Self {
             camera: Camera::default(),
-            shapes: Shapes(
-                shapes
-                    .into_iter()
-                    .map(|(i, shape, point)| (i as ShapeId, Shape::new(point, shape)))
-                    .collect(),
-            ),
+            shape_positions: shapes,
         }
     }
 }
@@ -90,35 +84,27 @@ where
     Theme: Catalog,
     Renderer: iced::advanced::graphics::geometry::Renderer,
 {
-    pub fn new<T>(
-        state: &'a State<T>,
-        node_view: impl Fn(ShapeId, &'a T) -> Element<'a, Message, Theme, Renderer>,
-        connections_view: impl Fn(ShapeId, &'a T, &HashMap<ShapeId, Point>) -> Vec<(Path, Stroke<'a>)>,
+    pub fn new(
+        state: &'a State,
+        node_view: impl Fn(ShapeId) -> Element<'a, Message, Theme, Renderer>,
+        connections_view: impl Fn(ShapeId, &OrderMap<ShapeId, Point>) -> Vec<(Path, Stroke<'a>)>,
     ) -> Self {
         let positions = state
-            .shapes
-            .0
+            .shape_positions
             .iter()
-            .map(|(id, shape)| (*id, shape.position))
+            .map(|(id, position)| (*id, *position))
             .collect();
         let contents = Shapes(
             state
-                .shapes
-                .0
+                .shape_positions
                 .iter()
-                .map(|(id, shape)| {
-                    (
-                        *id as ShapeId,
-                        Shape::new(shape.position, node_view(*id, &shape.state)),
-                    )
-                })
+                .map(|(id, position)| (*id as ShapeId, Shape::new(*position, node_view(*id))))
                 .collect(),
         );
         let connections = state
-            .shapes
-            .0
+            .shape_positions
             .iter()
-            .flat_map(|(id, shape)| connections_view(*id, &shape.state, &positions))
+            .flat_map(|(id, _p)| connections_view(*id, &positions))
             .collect();
 
         Self {
@@ -185,8 +171,8 @@ where
     fn children(&self) -> Vec<Tree> {
         self.contents
             .0
-            .iter()
-            .map(|(_id, element)| Tree::new(element.state.as_widget()))
+            .values()
+            .map(|shape| Tree::new(shape.state.as_widget()))
             .collect()
     }
 
@@ -301,7 +287,7 @@ where
             (event::Status::Ignored, Some(cursor_position)) => match event.clone() {
                 Event::Mouse(ButtonPressed(mouse::Button::Left))
                 | Event::Touch(FingerPressed { .. }) => {
-                    debug_assert!(inner_state.action == Action::Idle);
+                    //debug_assert!(inner_state.action == Action::Idle);
 
                     ////Find the first coliding shape
                     if let Some((id, offset)) = self.contents.find_shape(cursor_position, layout) {
@@ -423,10 +409,10 @@ where
 // Convenience function
 
 /// Create a new `Workspace`
-pub fn workspace<'a, T, Message, Theme, Renderer>(
-    state: &'a State<T>,
-    node_view: impl Fn(ShapeId, &'a T) -> Element<'a, Message, Theme, Renderer>,
-    connections_view: impl Fn(ShapeId, &'a T, &HashMap<ShapeId, Point>) -> Vec<(Path, Stroke<'a>)>,
+pub fn workspace<'a, Message, Theme, Renderer>(
+    state: &'a State,
+    node_view: impl Fn(ShapeId) -> Element<'a, Message, Theme, Renderer>,
+    connections_view: impl Fn(ShapeId, &OrderMap<ShapeId, Point>) -> Vec<(Path, Stroke<'a>)>,
 ) -> Workspace<'a, Message, Theme, Renderer>
 where
     Theme: 'a + Catalog,
