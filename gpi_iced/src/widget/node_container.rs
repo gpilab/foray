@@ -1,3 +1,5 @@
+use std::iter;
+
 use iced::advanced::layout;
 use iced::advanced::mouse;
 use iced::advanced::overlay;
@@ -85,25 +87,14 @@ where
     }
 
     fn children(&self) -> Vec<widget::Tree> {
-        //TODO: should the main content also be a child?
-        //I think it may have to be to have nested main_content elements
-        //self.main_content
-        //    .as_widget()
-        //    .children()
-        //    .into_iter()
-        //    .chain(
-        self.absolute_children
-            .iter()
+        // the first child is always main_content, followed by the children
+        iter::once(&self.main_content)
+            .chain(&self.absolute_children)
             .map(widget::Tree::new)
             .collect()
-        //self.absolute_children
-        //    .iter()
-        //    .map(|e| )
-        //    .collect()
     }
 
     fn diff(&self, tree: &mut widget::Tree) {
-        self.main_content.as_widget().diff(tree);
         tree.diff_children(&self.absolute_children);
     }
 
@@ -121,22 +112,20 @@ where
         limits: &layout::Limits,
     ) -> layout::Node {
         let limits = limits.width(self.width).height(self.height);
-        dbg!(limits);
-        //let available = limits.max() - Size::new(self.position.x, self.position.y);
-        //let available = limits.max() - Size::new(self.position.x, self.position.y);
-        dbg!(&self.absolute_children.len());
 
         let node = self
             .main_content
             .as_widget()
             .layout(
-                tree,
+                &mut tree.children[0],
                 renderer,
                 &layout::Limits::new(Size::ZERO, limits.max()),
             )
             .move_to(self.position);
 
-        let mut binding = tree.children.iter_mut(); //.skip(1);
+        let size = node.size();
+
+        let mut binding = tree.children.iter_mut().skip(1);
         let children_node = self
             .absolute_children
             .iter()
@@ -145,13 +134,13 @@ where
                 e.as_widget().layout(
                     tree,
                     renderer,
-                    &layout::Limits::new(Size::ZERO, dbg!(node.size() * 2.)), //give enough size for offset elements
+                    &layout::Limits::new(Size::ZERO, size * 2.), //give enough size for offset elements
                 )
             });
 
         let size = limits.resolve(self.width, self.height, node.size());
 
-        layout::Node::with_children(dbg!(size), children_node.collect()) //iter::once(node).chain(children_node).collect())
+        layout::Node::with_children(size, iter::once(node).chain(children_node).collect())
     }
 
     fn operate(
@@ -233,24 +222,29 @@ where
             for ((child, state), layout) in self
                 .absolute_children
                 .iter()
-                .zip(&tree.children)
-                .zip(layout.children())
+                .zip(tree.children.iter().skip(1))
+                .zip(layout.children().skip(1))
             {
                 child.as_widget().draw(
-                    dbg!(state),
+                    state,
                     renderer,
                     theme,
                     style,
-                    dbg!(layout),
+                    layout,
                     cursor,
-                    dbg!(&layout.bounds()),
+                    &layout.bounds(),
                 );
             }
         });
         renderer.with_layer(*viewport, |renderer| {
             self.main_content.as_widget().draw(
-                tree, renderer, theme, style, layout, //.children().next().unwrap(),
-                cursor, viewport,
+                &tree.children[0],
+                renderer,
+                theme,
+                style,
+                layout.children().next().unwrap(),
+                cursor,
+                viewport,
             )
         });
         //}

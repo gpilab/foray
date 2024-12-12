@@ -209,7 +209,7 @@ where
         style: &iced::advanced::renderer::Style,
         workspace_layout: Layout<'_>,
         cursor: mouse::Cursor,
-        viewport: &Rectangle,
+        _viewport: &Rectangle,
     ) {
         let bounds = workspace_layout.bounds();
         let workspace_offset = Vector::new(bounds.position().x, bounds.position().y);
@@ -236,7 +236,7 @@ where
                 shape
                     .state
                     .as_widget()
-                    .draw(tree, renderer, theme, style, c_layout, cursor, viewport);
+                    .draw(tree, renderer, theme, style, c_layout, cursor, &bounds);
             });
         }
     }

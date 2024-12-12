@@ -190,8 +190,9 @@ impl Example {
 
                 let name = node.data.name.clone();
 
+                //let port_x = |i: usize| i as f32 * (NODE_WIDTH / 4.) + 10.0;
+
                 let out_edges = self.graph.outgoing_edges(&id);
-                dbg!(&out_edges);
                 let out_ports = out_edges
                     .iter()
                     .enumerate()
@@ -206,7 +207,6 @@ impl Example {
                     });
 
                 let in_edges = self.graph.incoming_edges(&id);
-                dbg!(&in_edges);
                 let in_ports = in_edges
                     .iter()
                     .enumerate()
@@ -221,7 +221,7 @@ impl Example {
                     });
 
                 let content: Element<Message, Theme, Renderer> = NodeContainer::new(
-                    container(text(name))
+                    container(row!(text("n"), horizontal_space(), text(name)).width(Length::Fill))
                         .style(move |t: &Theme| {
                             let outline_color = match is_selected {
                                 true => t.extended_palette().primary.strong.color,
@@ -231,10 +231,13 @@ impl Example {
                                 .border(rounded(5.).color(outline_color).width(2.))
                                 .background(self.theme.palette().background)
                         })
-                        .center_x(NODE_WIDTH)
-                        .center_y(NODE_HEIGHT),
+                        .padding(5.)
+                        .center_x(Length::Fill)
+                        .center_y(Length::Fill),
                     in_ports.chain(out_ports).collect(),
                 )
+                .width(NODE_WIDTH)
+                .height(NODE_HEIGHT)
                 .into();
                 content //.explain(Color::WHITE)
             },
