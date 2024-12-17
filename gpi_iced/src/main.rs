@@ -1,5 +1,8 @@
+use std::iter::once;
+
 use canvas::{Path, Stroke};
-use gpi_iced::graph::{constant_node, identity_node, Graph};
+use gpi_iced::graph::{constant_node, identity_node, Graph, PortRef, IO};
+use gpi_iced::widget::custom_button;
 use gpi_iced::widget::node_container::NodeContainer;
 use gpi_iced::widget::pin::Pin;
 use gpi_iced::widget::shapes::ShapeId;
@@ -40,12 +43,34 @@ enum PortType {
     _Complex,
 }
 
+#[derive(Default)]
+enum Action {
+    #[default]
+    Idle,
+    CreatingWire(PortRef, Option<PortRef>),
+}
+
+#[derive(Debug, Clone)]
+enum Message {
+    OnDrag(ShapeId, Point),
+    OnMove(Point),
+    Pan(Vector),
+    Config(f32),
+    OnSelect(ShapeId),
+    PortPress(PortRef),
+    PortStartHover(PortRef),
+    PortEndHover(PortRef),
+    PortRelease,
+}
+
 struct Example {
-    graph: Graph<Node, String, PortType, u32>,
+    graph: Graph<Node, PortType, u32>,
     shapes: workspace::State,
     selected_shape: Option<ShapeId>,
+    cursor_position: Point,
     config: f32,
     theme: Theme,
+    action: Action,
 }
 
 impl Default for Example {
@@ -60,9 +85,9 @@ impl Default for Example {
         ];
 
         let constant_node =
-            |name: &str, c: u32| constant_node(Node { name: name.into() }, c, PortType::Integer);
+            |name: &str, c: u32| constant_node(Node { name: name.into() }, c, &PortType::Integer);
         let identity_node =
-            |name: &str| identity_node(Node { name: name.into() }, PortType::Integer);
+            |name: &str| identity_node(Node { name: name.into() }, &PortType::Integer);
 
         let initial_nodes = vec![
             constant_node("a", 7),
@@ -73,7 +98,7 @@ impl Default for Example {
             identity_node("f"),
         ];
 
-        let mut g = Graph::<Node, String, PortType, u32>::new();
+        let mut g = Graph::<Node, PortType, u32>::new();
         initial_nodes.into_iter().for_each(|n| {
             g.add_node(n);
         });
@@ -87,25 +112,19 @@ impl Default for Example {
         let nr = nodes_refs
             .iter()
             .zip(points.iter())
-            .map(|((k, _v), p)| (*k, *p))
+            .map(|(k, p)| (*k, *p))
             .collect();
 
         Self {
             graph: g,
             shapes: workspace::State::new(nr),
             selected_shape: None,
+            cursor_position: Default::default(),
             config: 50.,
             theme: Theme::Ferra,
+            action: Default::default(),
         }
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-enum Message {
-    OnDrag(ShapeId, Point),
-    Pan(Vector),
-    Config(f32),
-    OnSelect(ShapeId),
 }
 
 impl Example {
@@ -116,6 +135,7 @@ impl Example {
                 self.shapes.camera.position.y -= delta.y * 2.;
             }
             Message::Config(v) => self.config = v,
+            Message::OnMove(cursor_position) => self.cursor_position = cursor_position,
             Message::OnSelect(shape_id) => {
                 self.selected_shape = Some(shape_id);
                 self.graph.exectute_sub_network(shape_id);
@@ -126,6 +146,41 @@ impl Example {
                     .shape_positions
                     .get_mut(&shape_index)
                     .expect("Shape index must exist") = cursor_position
+            }
+            Message::PortPress(port_id) => self.action = Action::CreatingWire(port_id, None),
+            //TODO: handle connecting nodes
+            Message::PortRelease => {
+                dbg!("port_drop");
+                if let Action::CreatingWire(from, Some(to)) = &self.action {
+                    let (in_port, out_port) = match (from.io.clone(), to.io.clone()) {
+                        (IO::Out, IO::In) => (to, from),
+                        (IO::In, IO::Out) => (from, to),
+                        _ => panic!("attempted invalid port connection"),
+                    };
+                    self.graph.add_edge(
+                        (out_port.node, out_port.name.clone()),
+                        (in_port.node, in_port.name.clone()),
+                    );
+                    //TODO: remove duplicate port
+                    //self.graph.remove_edge();
+                }
+                self.action = Action::Idle;
+            }
+            Message::PortStartHover(port_id) => {
+                if let Action::CreatingWire(from_port, _) = &self.action {
+                    //TODO: do  a better check for valid connection
+                    if *from_port != port_id {
+                        self.action = Action::CreatingWire(from_port.clone(), Some(port_id))
+                    }
+                }
+            }
+            Message::PortEndHover(_port_id) => {
+                if let Action::CreatingWire(from_port, Some(_tentative_connection)) = &self.action {
+                    //TODO: do  a better check for valid connection
+                    //if *from_port != port_id {
+                    self.action = Action::CreatingWire(from_port.clone(), None)
+                    //}
+                }
             }
         };
     }
@@ -138,9 +193,8 @@ impl Example {
             style.border.radius = radius(0.);
             style
         }
-        fn port_style(t: &Theme, s: button::Status) -> button::Style {
-            let mut style =
-                button::primary(t, s).with_background(t.extended_palette().primary.weak.color);
+        fn port_style(t: &Theme, s: custom_button::Status) -> custom_button::Style {
+            let mut style = custom_button::primary(t, s);
             style.border.radius = radius(100.);
             style
         }
@@ -165,19 +219,23 @@ impl Example {
 
         let config = column![
             vertical_space().height(20.),
-            row!["Label1", slider(0.0..=100.0, self.config, Message::Config)]
+            row!["Label_1", slider(0.0..=100.0, self.config, Message::Config)]
                 .spacing(20.)
                 .align_y(Alignment::Center),
-            row!["Label2", slider(0.0..=100.0, self.config, Message::Config)]
+            row!["Label_2", slider(0.0..=100.0, self.config, Message::Config)]
                 .spacing(20.)
                 .align_y(Alignment::Center),
-            row!["Label3", slider(0.0..=100.0, self.config, Message::Config)]
+            row!["Label_3", slider(0.0..=100.0, self.config, Message::Config)]
                 .spacing(20.)
                 .align_y(Alignment::Center),
             vertical_space(),
         ]
         .spacing(5.0)
         .padding(5.);
+
+        const PORT_RADIUS: f32 = 7.5;
+        const NODE_RADIUS: f32 = 5.0;
+        let port_x = |i: usize| i as f32 * (NODE_WIDTH / 4.) + NODE_RADIUS * 2.;
 
         let workspace = workspace(
             &self.shapes,
@@ -190,92 +248,208 @@ impl Example {
 
                 let name = node.data.name.clone();
 
-                //let port_x = |i: usize| i as f32 * (NODE_WIDTH / 4.) + 10.0;
-
-                let out_edges = self.graph.outgoing_edges(&id);
-                let out_ports = out_edges
-                    .iter()
-                    .enumerate()
-                    .map(|(i, (_from, _to))| {
-                        let port_x = i as f32 * (NODE_WIDTH / 4.) + 10.0;
-                        Point::new(port_x, NODE_HEIGHT - 5.)
-                    })
-                    .map(|v| {
-                        Pin::new(button("").style(port_style).width(10.).height(10.))
-                            .position(v)
+                //// Ports
+                let port_buttons = {
+                    let in_port_buttons = node
+                        .inputs
+                        .iter()
+                        .enumerate()
+                        .map(|(i, port)| (Point::new(port_x(i), -PORT_RADIUS), port))
+                        .map(|(point, port)| {
+                            let in_port = PortRef {
+                                node: id,
+                                name: port.0.clone(),
+                                io: IO::In,
+                            };
+                            Pin::new(
+                                mouse_area(
+                                    custom_button::Button::new("")
+                                        .on_press(Message::PortPress(in_port.clone()))
+                                        .on_release_self(Message::PortRelease)
+                                        .style(port_style)
+                                        .width(PORT_RADIUS * 2.)
+                                        .height(PORT_RADIUS * 2.),
+                                )
+                                .on_enter(Message::PortStartHover(in_port.clone()))
+                                .on_exit(Message::PortEndHover(in_port.clone())),
+                            )
+                            .position(point)
                             .into()
-                    });
-
-                let in_edges = self.graph.incoming_edges(&id);
-                let in_ports = in_edges
-                    .iter()
-                    .enumerate()
-                    .map(|(i, (_from, _to))| {
-                        let port_x = i as f32 * (NODE_WIDTH / 4.) + 10.0;
-                        Point::new(port_x, -5.)
-                    })
-                    .map(|v| {
-                        Pin::new(button("").style(port_style).width(10.).height(10.))
-                            .position(v)
+                        });
+                    let out_port_buttons = node
+                        .outputs
+                        .iter()
+                        .enumerate()
+                        .map(|(i, port)| (Point::new(port_x(i), NODE_HEIGHT - PORT_RADIUS), port))
+                        .map(|(point, port)| {
+                            let out_port = PortRef {
+                                node: id,
+                                name: port.0.clone(),
+                                io: IO::Out,
+                            };
+                            Pin::new(
+                                mouse_area(
+                                    custom_button::Button::new("")
+                                        .on_press(Message::PortPress(out_port.clone()))
+                                        .on_release_self(Message::PortRelease)
+                                        .style(port_style)
+                                        .width(PORT_RADIUS * 2.)
+                                        .height(PORT_RADIUS * 2.),
+                                )
+                                .on_enter(Message::PortStartHover(out_port.clone()))
+                                .on_exit(Message::PortEndHover(out_port.clone())),
+                            )
+                            .position(point)
                             .into()
-                    });
+                        });
+                    in_port_buttons.chain(out_port_buttons)
+                };
 
+                //// Node
                 let content: Element<Message, Theme, Renderer> = NodeContainer::new(
-                    container(row!(text("n"), horizontal_space(), text(name)).width(Length::Fill))
+                    container(text(name))
                         .style(move |t: &Theme| {
                             let outline_color = match is_selected {
                                 true => t.extended_palette().primary.strong.color,
                                 false => t.extended_palette().secondary.strong.color,
                             };
                             container::transparent(t)
-                                .border(rounded(5.).color(outline_color).width(2.))
+                                .border(rounded(NODE_RADIUS).color(outline_color).width(2.))
                                 .background(self.theme.palette().background)
                         })
                         .padding(5.)
                         .center_x(Length::Fill)
                         .center_y(Length::Fill),
-                    in_ports.chain(out_ports).collect(),
+                    port_buttons.collect(),
                 )
                 .width(NODE_WIDTH)
                 .height(NODE_HEIGHT)
                 .into();
                 content //.explain(Color::WHITE)
             },
+            //// Wires
             |wire_end_node, points| {
-                let incoming_wires = self.graph.incoming_edges(&wire_end_node);
-                incoming_wires
-                    .iter()
-                    .enumerate()
-                    .map(|(i, (wire_start_node, _wire_start_port))| {
-                        // WARN: i assumes sorted ports for positioning
-                        let port_x = i as f32 * (NODE_WIDTH / 4.) + 15.0;
-                        (
-                            //TODO: change port_x based on it's from_node output position
-                            points[wire_start_node] + Vector::new(port_x, NODE_HEIGHT),
-                            points[&wire_end_node] + Vector::new(port_x, 0.),
-                        )
-                    })
-                    .map(|(from, to)| {
-                        (
-                            Path::new(|builder| {
-                                builder.move_to(from);
-                                let mid = f32::abs((from.y - to.y) * 0.5).max(15.0);
-                                builder.bezier_curve_to(
-                                    (from.x, from.y + mid).into(),
-                                    (to.x, to.y - mid).into(),
-                                    to,
-                                );
-                            }),
-                            Stroke::default()
-                                .with_width(3.0)
-                                .with_color(self.theme.extended_palette().secondary.weak.color)
-                                .with_line_cap(canvas::LineCap::Round),
-                        )
-                    })
-                    .collect()
-            },
+                let from_offset = Vector::new(PORT_RADIUS, PORT_RADIUS / 2.);
+                let to_offset = Vector::new(PORT_RADIUS, -PORT_RADIUS / 2.);
+                let find_port_offset = |port_id: &PortRef| -> Point {
+                       match port_id.io {
+                           IO::In => {
+                               let i = &self
+                                   .graph
+                                   .get_node(port_id.node)
+                                   .inputs
+                                   .iter()
+                                   .position(|n| *n.0 == *port_id.name)
+                                   .unwrap_or_else(|| {
+                                       panic!(
+                                           "PortId must have valid input node index and port id {port_id:?}",
+                                       )
+                                   });
+                               points[&port_id.node] + Vector::new(port_x(*i), 0.) + from_offset
+                           }
+                           IO::Out => {
+                               let i = &self
+                                   .graph
+                                   .get_node(wire_end_node)
+                                   .outputs
+                                   .iter()
+                                   .position(|n| *n.0 == *port_id.name)
+                                   .unwrap_or_else(|| {
+                                       panic!(
+                                           "PortId must have valid output node index and port id {port_id:?}",
+                                       )
+                                   });
+                               points[&port_id.node]
+                                   + Vector::new(port_x(*i), NODE_HEIGHT)
+                                   + to_offset
+                           }
+                       }
+                   };
+
+                   let new_connection_proposed = matches!(&self.action, Action::CreatingWire(_, Some(_tentative)));
+
+
+                   let creating_active_wire = match &self.action {
+                       //TODO: account for wire postion that are not the first
+                       Action::CreatingWire(start_port, tentative_end) => {
+
+                           let end_pos = match tentative_end {
+                               Some(end_port) => find_port_offset(end_port),
+                               None => self.cursor_position,
+                           };
+                           let start_pos = find_port_offset(start_port);
+
+                           match start_port.io{
+                               IO::In => {
+                                   if start_port.node == wire_end_node{
+                                           Some(((start_pos,end_pos),self.theme.extended_palette().secondary.weak.color))
+                                   }
+                                   else{
+                                       None
+                                   }
+                               },
+                               IO::Out =>{
+                                   if start_port.node == wire_end_node{
+                                           Some(((end_pos,start_pos),self.theme.extended_palette().secondary.weak.color))
+                                   }
+                                   else{
+                                       None
+                                   }
+
+                               }
+                           }
+                       }
+                       _=>None
+                   };
+
+                   let incoming_wires = self.graph.incoming_edges(&wire_end_node);
+                   incoming_wires
+                       .iter()
+                       .map(|(from,to)| {
+
+                           let connection = (
+                               find_port_offset(to),
+                               find_port_offset(from),
+                               );
+                           let color = if let Some((active_wire,_)) =  creating_active_wire {
+                                if(dbg!(active_wire.0) == dbg!(connection.0) ) {
+                                   if dbg!(new_connection_proposed) {
+                                       self.theme.extended_palette().danger.base.color
+                                   }
+                                   else{
+                                       self.theme.extended_palette().danger.weak.color
+                                   }
+                               }else{
+                                   self.theme.extended_palette().success.weak.color
+                               }
+                           }else{
+                                   self.theme.extended_palette().success.strong.color
+                           };
+                           (connection,color)
+                       })
+                       .chain(once(creating_active_wire).flatten())
+                       .map(|((from, to),color)| {
+                           (
+                               Path::new(|builder| {
+                                   builder.move_to(from);
+                                   let mid = f32::abs((to.y - from.y) * 0.5).max(PORT_RADIUS * 2.);
+                                   builder.bezier_curve_to(
+                                       (from.x, from.y - mid).into(),
+                                       (to.x, to.y + mid).into(),
+                                       to,
+                                   );
+                               }),
+                               Stroke::default()
+                                   .with_width(3.0)
+                                   .with_color(color)
+                                   .with_line_cap(canvas::LineCap::Round),
+                           )
+                       })
+                       .collect()
+               },
         )
         .on_shape_drag(Message::OnDrag)
+        .on_cursor_move(Message::OnMove)
         .on_press(Message::OnSelect)
         .pan(Message::Pan);
 

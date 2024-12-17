@@ -8,7 +8,8 @@ use iced::advanced::widget;
 use iced::advanced::widget::Widget;
 use iced::advanced::Shell;
 use iced::advanced::{Clipboard, Layout};
-use iced::{Element, Event, Length, Pixels, Point, Rectangle, Size, Vector};
+use iced::event;
+use iced::{Element, Event, Length, Rectangle, Size, Vector};
 
 /// A container that can have additional pinned elements positioned relative to the container
 /// and doesn't cut them off because they are out of the container's bounds
@@ -21,7 +22,6 @@ where
     absolute_children: Vec<Element<'a, Message, Theme, Renderer>>,
     width: Length,
     height: Length,
-    position: Point,
 }
 
 impl<'a, Message, Theme, Renderer> NodeContainer<'a, Message, Theme, Renderer>
@@ -38,7 +38,6 @@ where
             absolute_children,
             width: Length::Shrink,
             height: Length::Shrink,
-            position: Point::ORIGIN,
         }
     }
 
@@ -51,24 +50,6 @@ where
     /// Sets the height of the NodeContainer
     pub fn height(mut self, height: impl Into<Length>) -> Self {
         self.height = height.into();
-        self
-    }
-
-    /// Sets the position of the [`Pin`]; where the pinned widget will be displayed.
-    pub fn position(mut self, position: impl Into<Point>) -> Self {
-        self.position = position.into();
-        self
-    }
-
-    /// Sets the X coordinate of the [`Pin`].
-    pub fn x(mut self, x: impl Into<Pixels>) -> Self {
-        self.position.x = x.into().0;
-        self
-    }
-
-    /// Sets the Y coordinate of the [`Pin`].
-    pub fn y(mut self, y: impl Into<Pixels>) -> Self {
-        self.position.y = y.into().0;
         self
     }
 }
@@ -95,7 +76,11 @@ where
     }
 
     fn diff(&self, tree: &mut widget::Tree) {
-        tree.diff_children(&self.absolute_children);
+        tree.diff_children(
+            &iter::once(&self.main_content)
+                .chain(&self.absolute_children)
+                .collect::<Vec<_>>(),
+        );
     }
 
     fn size(&self) -> Size<Length> {
@@ -113,15 +98,11 @@ where
     ) -> layout::Node {
         let limits = limits.width(self.width).height(self.height);
 
-        let node = self
-            .main_content
-            .as_widget()
-            .layout(
-                &mut tree.children[0],
-                renderer,
-                &layout::Limits::new(Size::ZERO, limits.max()),
-            )
-            .move_to(self.position);
+        let node = self.main_content.as_widget().layout(
+            &mut tree.children[0],
+            renderer,
+            &layout::Limits::new(Size::ZERO, limits.max()),
+        );
 
         let size = node.size();
 
@@ -158,7 +139,6 @@ where
         );
     }
 
-    //TODO: make events work for children
     fn on_event(
         &mut self,
         tree: &mut widget::Tree,
@@ -170,10 +150,23 @@ where
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) -> iced::event::Status {
-        self.main_content.as_widget_mut().on_event(
-            tree, event, layout, //.children().next().unwrap(),
-            cursor, renderer, clipboard, shell, viewport,
-        )
+        iter::once(&mut self.main_content)
+            .chain(&mut self.absolute_children)
+            .zip(&mut tree.children)
+            .zip(layout.children())
+            .map(|((child, state), layout)| {
+                child.as_widget_mut().on_event(
+                    state,
+                    event.clone(),
+                    layout,
+                    cursor,
+                    renderer,
+                    clipboard,
+                    shell,
+                    viewport,
+                )
+            })
+            .fold(event::Status::Ignored, event::Status::merge)
     }
 
     fn mouse_interaction(
@@ -184,10 +177,21 @@ where
         viewport: &Rectangle,
         renderer: &Renderer,
     ) -> mouse::Interaction {
-        self.main_content.as_widget().mouse_interaction(
-            tree, layout, //.children().next().unwrap(),
-            cursor, viewport, renderer,
-        )
+        //self.main_content
+        //    .as_widget()
+        //    .mouse_interaction(tree, layout, cursor, viewport, renderer);
+        iter::once(&self.main_content)
+            .chain(&self.absolute_children)
+            .zip(&tree.children)
+            .zip(layout.children())
+            .map(|((child, state), layout)| {
+                child.as_widget().mouse_interaction(
+                    state, layout, //.children().next().unwrap(),
+                    cursor, viewport, renderer,
+                )
+            })
+            .max()
+            .unwrap_or_default()
     }
 
     fn draw(
@@ -200,24 +204,7 @@ where
         cursor: mouse::Cursor,
         viewport: &Rectangle,
     ) {
-        //let bounds = layout.bounds();
-
-        //if let Some(clipped_viewport) = bounds.intersection(viewport) {
-        //    self.main_content.as_widget().draw(
-        //        tree,
-        //        renderer,
-        //        theme,
-        //        style,
-        //        layout.children().next().unwrap(),
-        //        cursor,
-        //        &clipped_viewport,
-        //    );
-        //        self.absolute_children
-        //            .iter()
-        //            .for_each(|e| e.as_widget().draw(tree)),
-        //}
-
-        //if let Some(clipped_viewport) = layout.bounds().intersection(viewport) {
+        //Render ports behind the main content
         renderer.with_layer(*viewport, |renderer| {
             for ((child, state), layout) in self
                 .absolute_children
@@ -236,6 +223,7 @@ where
                 );
             }
         });
+        //Render main content
         renderer.with_layer(*viewport, |renderer| {
             self.main_content.as_widget().draw(
                 &tree.children[0],
@@ -247,7 +235,6 @@ where
                 viewport,
             )
         });
-        //}
     }
 
     //TODO: support this?

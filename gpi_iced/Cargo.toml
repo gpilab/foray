@@ -14,6 +14,7 @@ iced = { version = "0.13.1", features = [
 ] }
 ndarray = "0.16.1"
 ordermap = "0.5.4"
+smol_str = { version = "0.3.2", features = ["serde"] }
 
 [target.'cfg(target_arch="wasm32")'.dependencies]
 iced = { version = "0.13.1", features = ["webgl", "web-colors"] }

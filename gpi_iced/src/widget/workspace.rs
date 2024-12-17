@@ -41,6 +41,7 @@ where
     camera: Camera,
     pan: Option<Box<dyn Fn(Vector) -> Message + 'a>>,
     zoom: Option<Box<dyn Fn(f32) -> Message + 'a>>,
+    on_cursor_move: Option<Box<dyn Fn(Point) -> Message + 'a>>,
     on_shape_click: Option<Box<dyn Fn(ShapeId) -> Message + 'a>>,
     on_shape_drag: Option<Box<dyn Fn(ShapeId, Point) -> Message + 'a>>,
     on_shape_release: Option<Box<dyn Fn(ShapeId) -> Message + 'a>>,
@@ -113,6 +114,7 @@ where
             camera: state.camera.clone(),
             pan: None,
             zoom: None,
+            on_cursor_move: None,
             on_shape_click: None,
             on_shape_drag: None,
             on_shape_release: None,
@@ -141,6 +143,11 @@ where
 
     pub fn on_release(mut self, on_release: impl Fn(ShapeId) -> Message + 'a) -> Self {
         self.on_shape_release = Some(Box::new(on_release));
+        self
+    }
+
+    pub fn on_cursor_move(mut self, on_move: impl Fn(Point) -> Message + 'a) -> Self {
+        self.on_cursor_move = Some(Box::new(on_move));
         self
     }
 }
@@ -213,6 +220,21 @@ where
     ) {
         let bounds = workspace_layout.bounds();
         let workspace_offset = Vector::new(bounds.position().x, bounds.position().y);
+
+        //// elements
+        {
+            //TODO: apply zoom transform
+            //// Render Children in a layer that is bounded to the size of the workspace
+            let elements = self.contents.0.values().zip(&tree.children);
+            for ((shape, tree), c_layout) in elements.zip(workspace_layout.children()) {
+                renderer.with_layer(workspace_layout.bounds(), |renderer| {
+                    shape
+                        .state
+                        .as_widget()
+                        .draw(tree, renderer, theme, style, c_layout, cursor, &bounds);
+                });
+            }
+        }
         //// Saved curves
         let mut frame = renderer.new_frame(bounds.size());
 
@@ -222,23 +244,11 @@ where
             .iter()
             .for_each(|(p, s)| frame.stroke(p, *s));
 
-        renderer.with_translation(workspace_offset, |renderer| {
-            renderer.draw_geometry(frame.into_geometry())
-        });
-
-        let padding = 0.0;
-
-        //TODO: apply zoom transform
-        //// Render Children in a layer that is bounded to the size of the workspace
-        let elements = self.contents.0.values().zip(&tree.children);
-        for ((shape, tree), c_layout) in elements.zip(workspace_layout.children()) {
-            renderer.with_layer(workspace_layout.bounds().shrink(padding), |renderer| {
-                shape
-                    .state
-                    .as_widget()
-                    .draw(tree, renderer, theme, style, c_layout, cursor, &bounds);
+        renderer.with_layer(workspace_layout.bounds(), |renderer| {
+            renderer.with_translation(workspace_offset, |renderer| {
+                renderer.draw_geometry(frame.into_geometry())
             });
-        }
+        });
     }
 
     //// Move children based on input events
@@ -260,6 +270,8 @@ where
         if let Event::Keyboard(keyboard::Event::ModifiersChanged(modifiers)) = event {
             inner_state.modifiers = modifiers
         }
+        let bounds = layout.bounds();
+        let workspace_offset = Vector::new(bounds.position().x, bounds.position().y);
 
         ////Pass event down to children
         let event_status = self
@@ -329,6 +341,9 @@ where
                         //// capture event
                         event::Status::Captured
                     } else {
+                        if let Some(on_move) = &self.on_cursor_move {
+                            shell.publish(on_move(cursor_position - workspace_offset));
+                        }
                         event::Status::Ignored
                     }
                 }
@@ -359,33 +374,46 @@ where
         }
     }
 
-    //fn mouse_interaction(
-    //    &self,
-    //    tree: &Tree,
-    //    layout: Layout<'_>,
-    //    cursor: mouse::Cursor,
-    //    _viewport: &Rectangle,
-    //    _renderer: &Renderer,
-    //) -> mouse::Interaction {
-    //    //let action = tree.state.downcast_ref::<InnerState>().action;
-    //
-    //    match action {
-    //        Action::Dragging { .. } => mouse::Interaction::Grabbing,
-    //        Action::Idle => {
-    //            if layout.children().any(|l| {
-    //                cursor
-    //                    .position_over(
-    //                        l.bounds()
-    //                            .intersection(&layout.bounds())
-    //                            .unwrap_or(Rectangle::new((0., 0.).into(), (0., 0.).into())),
-    //                    )
-    //                    .is_some()
-    //            }) {
-    //                //TODO: get mouse status of children?
-    //                mouse::Interaction::Grab
-    //            } else {
-    //                mouse::Interaction::default()
-    //            }
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+        renderer: &Renderer,
+    ) -> mouse::Interaction {
+        self.contents
+            .0
+            .values()
+            .zip(&tree.children)
+            .zip(layout.children())
+            .map(|((shape, state), layout)| {
+                shape
+                    .state
+                    .as_widget()
+                    .mouse_interaction(state, layout, cursor, viewport, renderer)
+            })
+            .max()
+            .unwrap_or_default()
+    }
+    //let action = tree.state.downcast_ref::<InnerState>().action;
+
+    //match action {
+    //    Action::Dragging { .. } => mouse::Interaction::Grabbing,
+    //    Action::Idle => {
+    //        if layout.children().any(|l| {
+    //            cursor
+    //                .position_over(
+    //                    l.bounds()
+    //                        .intersection(&layout.bounds())
+    //                        .unwrap_or(Rectangle::new((0., 0.).into(), (0., 0.).into())),
+    //                )
+    //                .is_some()
+    //        }) {
+    //            //TODO: get mouse status of children?
+    //            mouse::Interaction::Grab
+    //        } else {
+    //            mouse::Interaction::default()
     //        }
     //    }
     //}

@@ -1,24 +1,3 @@
-//! A pin widget positions a widget at some fixed coordinates inside its boundaries.
-//!
-//! # Example
-//! ```no_run
-//! # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::core::Length::Fill; }
-//! # pub type State = ();
-//! # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-//! use iced::widget::pin;
-//! use iced::Fill;
-//!
-//! enum Message {
-//!     // ...
-//! }
-//!
-//! fn view(state: &State) -> Element<'_, Message> {
-//!     pin("This text is displayed at coordinates (50, 50)!")
-//!         .x(50)
-//!         .y(50)
-//!         .into()
-//! }
-//! ```
 use iced::advanced::layout;
 use iced::advanced::mouse;
 use iced::advanced::overlay;
@@ -28,29 +7,6 @@ use iced::advanced::widget::Widget;
 use iced::advanced::Shell;
 use iced::advanced::{Clipboard, Layout};
 use iced::{Element, Event, Length, Pixels, Point, Rectangle, Size, Vector};
-/// A widget that positions its contents at some fixed coordinates inside of its boundaries.
-///
-/// By default, a [`Pin`] widget will try to fill its parent.
-///
-/// # Example
-/// ```no_run
-/// # mod iced { pub mod widget { pub use iced_widget::*; } pub use iced_widget::core::Length::Fill; }
-/// # pub type State = ();
-/// # pub type Element<'a, Message> = iced_widget::core::Element<'a, Message, iced_widget::Theme, iced_widget::Renderer>;
-/// use iced::widget::pin;
-/// use iced::Fill;
-///
-/// enum Message {
-///     // ...
-/// }
-///
-/// fn view(state: &State) -> Element<'_, Message> {
-///     pin("This text is displayed at coordinates (50, 50)!")
-///         .x(50)
-///         .y(50)
-///         .into()
-/// }
-/// ```
 #[allow(missing_debug_implementations)]
 pub struct Pin<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer>
 where
