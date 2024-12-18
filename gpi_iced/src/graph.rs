@@ -141,8 +141,13 @@ where
         self.wire_data.get(&(*nx, port_name.into()))
     }
 
-    /// create a connection between two nodes, and an associated
-    /// label for each node
+    /// create a connection between two port references
+    pub fn add_edge_from_ref(&mut self, from: &PortRef, to: &PortRef) {
+        assert!(from.io == IO::Out);
+        assert!(to.io == IO::In);
+        self.add_edge((from.node, from.name.clone()), (to.node, to.name.clone()));
+    }
+    /// create a connection between two ports
     pub fn add_edge(
         &mut self,
         from: (NodeIndex, impl Into<PortName>),
@@ -164,6 +169,40 @@ where
         self.edges.push((from, to));
     }
 
+    // remove any edges associated with the given port
+    pub fn remove_edge(&mut self, port: &PortRef) {
+        self.edges.retain(|(from, to)| port != from && port != to)
+    }
+
+    pub fn get_parent(&self, nx: &NodeIndex, in_port: PortName) -> Option<PortRef> {
+        self.edges
+            .iter()
+            .find(|(_from, to)| to.node == *nx && to.name == in_port)
+            .map(|(from, _to)| from.clone())
+    }
+
+    /// find the index of the port based on the order defined in the `GraphNode`
+    /// panics if `port` is not valid
+    pub fn port_index(&self, port: &PortRef) -> usize {
+        match port.io {
+            IO::In => self
+                .get_node(port.node)
+                .inputs
+                .iter()
+                .position(|n| *n.0 == *port.name)
+                .unwrap_or_else(|| {
+                    panic!("PortId must have valid input node index and port id {port:?}",)
+                }),
+            IO::Out => self
+                .get_node(port.node)
+                .outputs
+                .iter()
+                .position(|n| *n.0 == *port.name)
+                .unwrap_or_else(|| {
+                    panic!("PortId must have valid input node index and port id {port:?}",)
+                }),
+        }
+    }
     ///Find a nodes direct parents and the associated labels
     pub fn incoming_edges(&self, nx: &NodeIndex) -> Vec<(PortRef, PortRef)> {
         self.edges
@@ -262,12 +301,6 @@ where
         ordered.iter_mut().for_each(|nx| self.compute_node(nx))
     }
 
-    pub fn get_parent(&self, nx: &NodeIndex, in_port: PortName) -> Option<PortRef> {
-        self.edges
-            .iter()
-            .find(|(_from, to)| to.node == *nx && to.name == in_port)
-            .map(|(from, _to)| from.clone())
-    }
     fn compute_node(&mut self, nx: &NodeIndex) {
         //let incoming_edges = &self.incoming_edges(nx);
         dbg!(nx);

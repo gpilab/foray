@@ -221,7 +221,7 @@ where
         let bounds = workspace_layout.bounds();
         let workspace_offset = Vector::new(bounds.position().x, bounds.position().y);
 
-        //// elements
+        //// Draw Elements
         {
             //TODO: apply zoom transform
             //// Render Children in a layer that is bounded to the size of the workspace
@@ -235,7 +235,7 @@ where
                 });
             }
         }
-        //// Saved curves
+        //// Draw saved curves
         let mut frame = renderer.new_frame(bounds.size());
 
         frame.translate(-self.camera.position);
@@ -273,7 +273,7 @@ where
         let bounds = layout.bounds();
         let workspace_offset = Vector::new(bounds.position().x, bounds.position().y);
 
-        ////Pass event down to children
+        //// Pass event down to children
         let event_status = self
             .contents
             .0
@@ -299,8 +299,6 @@ where
             (event::Status::Ignored, Some(cursor_position)) => match event.clone() {
                 Event::Mouse(ButtonPressed(mouse::Button::Left))
                 | Event::Touch(FingerPressed { .. }) => {
-                    //debug_assert!(inner_state.action == Action::Idle);
-
                     ////Find the first coliding shape
                     if let Some((id, offset)) = self.contents.find_shape(cursor_position, layout) {
                         //// publish event
@@ -396,27 +394,6 @@ where
             .max()
             .unwrap_or_default()
     }
-    //let action = tree.state.downcast_ref::<InnerState>().action;
-
-    //match action {
-    //    Action::Dragging { .. } => mouse::Interaction::Grabbing,
-    //    Action::Idle => {
-    //        if layout.children().any(|l| {
-    //            cursor
-    //                .position_over(
-    //                    l.bounds()
-    //                        .intersection(&layout.bounds())
-    //                        .unwrap_or(Rectangle::new((0., 0.).into(), (0., 0.).into())),
-    //                )
-    //                .is_some()
-    //        }) {
-    //            //TODO: get mouse status of children?
-    //            mouse::Interaction::Grab
-    //        } else {
-    //            mouse::Interaction::default()
-    //        }
-    //    }
-    //}
 }
 
 /// Convert to an element
