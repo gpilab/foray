@@ -1,6 +1,6 @@
 use iced::advanced::graphics::geometry::frame::Backend;
 use iced::advanced::layout::{self, Layout};
-use iced::advanced::widget::{tree, Tree};
+use iced::advanced::widget::{self, tree, Tree};
 use iced::advanced::{Clipboard, Shell, Widget};
 use iced::mouse::Event::{ButtonPressed, ButtonReleased, CursorMoved, WheelScrolled};
 use iced::mouse::ScrollDelta;
@@ -166,6 +166,17 @@ where
 
     fn state(&self) -> tree::State {
         tree::State::new(InnerState::default())
+    }
+
+    fn diff(&self, tree: &mut widget::Tree) {
+        tree.diff_children(
+            &self
+                .contents
+                .0
+                .values()
+                .map(|shape| &shape.state)
+                .collect::<Vec<_>>(),
+        )
     }
 
     fn size(&self) -> Size<Length> {
