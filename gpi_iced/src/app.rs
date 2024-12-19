@@ -348,15 +348,17 @@ impl App {
             Action::CreatingInputWire(input, Some(tentative_output)) => {
                 Some((port_position(input), port_position(tentative_output)))
             }
-            Action::CreatingInputWire(input, None) => {
-                Some((port_position(input), self.cursor_position))
-            }
+            Action::CreatingInputWire(input, None) => Some((
+                port_position(input),
+                self.cursor_position + self.shapes.camera.position,
+            )),
             Action::CreatingOutputWire(output, Some(input)) => {
                 Some((port_position(input), port_position(output)))
             }
-            Action::CreatingOutputWire(output, None) => {
-                Some((self.cursor_position, port_position(output)))
-            }
+            Action::CreatingOutputWire(output, None) => Some((
+                self.cursor_position + self.shapes.camera.position,
+                port_position(output),
+            )),
             _ => None,
         };
 
