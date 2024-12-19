@@ -100,7 +100,7 @@ where
     }
 
     /// Add a new node to the graph, returns the node's index
-    pub fn add_node(&mut self, node: GraphNode<NodeData, PortType, WireData>) -> NodeIndex {
+    pub fn node(&mut self, node: GraphNode<NodeData, PortType, WireData>) -> NodeIndex {
         let id = self.next_id;
         self.nodes.insert(id, node);
         self.next_id += 1;
@@ -157,10 +157,10 @@ where
     pub fn add_edge_from_ref(&mut self, from: &PortRef, to: &PortRef) {
         assert!(from.io == IO::Out);
         assert!(to.io == IO::In);
-        self.add_edge((from.node, from.name.clone()), (to.node, to.name.clone()));
+        self.connect((from.node, from.name.clone()), (to.node, to.name.clone()));
     }
     /// create a connection between two ports
-    pub fn add_edge(
+    pub fn connect(
         &mut self,
         from: (NodeIndex, impl Into<PortName>),
         to: (NodeIndex, impl Into<PortName>),
@@ -359,56 +359,56 @@ where
     }
 }
 
-pub fn identity_node<NodeData, PortType: Clone, WireData: Clone>(
-    data: NodeData,
-    port_type: &PortType,
-) -> GraphNode<NodeData, PortType, WireData> {
-    GraphNode::new(
-        data,
-        vec![("in", port_type)],
-        vec![("out", port_type)],
-        Box::new(|a| [("out".into(), a["in"].borrow().clone())].into()),
-    )
-}
-
-pub fn constant_node<NodeData: 'static, PortType: Clone + 'static, WireData: Clone + 'static>(
-    data: NodeData,
-    out_data: WireData,
-    out_type: &PortType,
-) -> GraphNode<NodeData, PortType, WireData> {
-    GraphNode::new(
-        data,
-        vec![],
-        vec![("out", out_type)],
-        Box::new(move |_| [("out".into(), out_data.clone())].into()),
-    )
-}
-
 #[cfg(test)]
 mod test {
 
     use super::*;
 
+    fn identity_node<NodeData, PortType: Clone, WireData: Clone>(
+        data: NodeData,
+        port_type: &PortType,
+    ) -> GraphNode<NodeData, PortType, WireData> {
+        GraphNode::new(
+            data,
+            vec![("in", port_type)],
+            vec![("out", port_type)],
+            Box::new(|a| [("out".into(), a["in"].borrow().clone())].into()),
+        )
+    }
+
+    fn constant_node<NodeData: 'static, PortType: Clone + 'static, WireData: Clone + 'static>(
+        data: NodeData,
+        out_data: WireData,
+        out_type: &PortType,
+    ) -> GraphNode<NodeData, PortType, WireData> {
+        GraphNode::new(
+            data,
+            vec![],
+            vec![("out", out_type)],
+            Box::new(move |_| [("out".into(), out_data.clone())].into()),
+        )
+    }
+
     #[test]
     fn sort() {
         let mut g: Graph<u32, (), ()> = Graph::new();
 
-        let n8 = g.add_node(identity_node(8, &()));
-        let n7 = g.add_node(identity_node(7, &()));
-        let n6 = g.add_node(identity_node(6, &()));
-        let n5 = g.add_node(identity_node(5, &()));
-        let n4 = g.add_node(identity_node(4, &()));
-        let n3 = g.add_node(identity_node(3, &()));
-        let n2 = g.add_node(identity_node(2, &()));
-        let n1 = g.add_node(identity_node(1, &()));
+        let n8 = g.node(identity_node(8, &()));
+        let n7 = g.node(identity_node(7, &()));
+        let n6 = g.node(identity_node(6, &()));
+        let n5 = g.node(identity_node(5, &()));
+        let n4 = g.node(identity_node(4, &()));
+        let n3 = g.node(identity_node(3, &()));
+        let n2 = g.node(identity_node(2, &()));
+        let n1 = g.node(identity_node(1, &()));
 
-        g.add_edge((n1, "out"), (n3, "in"));
-        g.add_edge((n1, "out"), (n2, "in"));
-        g.add_edge((n3, "out"), (n4, "in"));
-        g.add_edge((n4, "out"), (n5, "in"));
-        g.add_edge((n5, "out"), (n6, "in"));
-        g.add_edge((n6, "out"), (n7, "in"));
-        g.add_edge((n7, "out"), (n8, "in"));
+        g.connect((n1, "out"), (n3, "in"));
+        g.connect((n1, "out"), (n2, "in"));
+        g.connect((n3, "out"), (n4, "in"));
+        g.connect((n4, "out"), (n5, "in"));
+        g.connect((n5, "out"), (n6, "in"));
+        g.connect((n6, "out"), (n7, "in"));
+        g.connect((n7, "out"), (n8, "in"));
         assert_eq!(g.topological_sort(), vec![7, 6, 5, 4, 3, 2, 1, 0]);
     }
 
@@ -416,16 +416,16 @@ mod test {
     fn process() {
         let mut g: Graph<(), (), u32> = Graph::new();
 
-        let n1 = g.add_node(constant_node((), 7, &()));
-        let n2 = g.add_node(identity_node((), &()));
-        let n3 = g.add_node(identity_node((), &()));
-        let n4 = g.add_node(identity_node((), &()));
+        let n1 = g.node(constant_node((), 7, &()));
+        let n2 = g.node(identity_node((), &()));
+        let n3 = g.node(identity_node((), &()));
+        let n4 = g.node(identity_node((), &()));
         // leave a node unconnected to check that it doesn't get a value propogated
-        let n_unconnected = g.add_node(identity_node((), &()));
+        let n_unconnected = g.node(identity_node((), &()));
 
-        g.add_edge((n1, "out"), (n3, "in"));
-        g.add_edge((n1, "out"), (n2, "in"));
-        g.add_edge((n3, "out"), (n4, "in"));
+        g.connect((n1, "out"), (n3, "in"));
+        g.connect((n1, "out"), (n2, "in"));
+        g.connect((n3, "out"), (n4, "in"));
 
         //Propogate values
         g.execute_network();

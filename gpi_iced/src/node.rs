@@ -2,7 +2,7 @@ use ordermap::OrderMap;
 use smol_str::SmolStr;
 use std::cell::RefCell;
 
-use crate::app::PortData;
+use crate::math_nodes::PortData;
 
 pub const NODE_WIDTH: f32 = 100.;
 pub const NODE_HEIGHT: f32 = 60.;

@@ -177,18 +177,14 @@ where
         viewport: &Rectangle,
         renderer: &Renderer,
     ) -> mouse::Interaction {
-        //self.main_content
-        //    .as_widget()
-        //    .mouse_interaction(tree, layout, cursor, viewport, renderer);
         iter::once(&self.main_content)
             .chain(&self.absolute_children)
             .zip(&tree.children)
             .zip(layout.children())
             .map(|((child, state), layout)| {
-                child.as_widget().mouse_interaction(
-                    state, layout, //.children().next().unwrap(),
-                    cursor, viewport, renderer,
-                )
+                child
+                    .as_widget()
+                    .mouse_interaction(state, layout, cursor, viewport, renderer)
             })
             .max()
             .unwrap_or_default()

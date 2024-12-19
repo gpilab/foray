@@ -5,7 +5,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-derive_more = { version = "1.0.0", features = ["debug"] }
+derive_more = { version = "1.0.0", features = ["debug","display"] }
 iced = { version = "0.13.1", features = [
 	"debug",
 	"lazy",

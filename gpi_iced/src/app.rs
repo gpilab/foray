@@ -1,8 +1,7 @@
-use std::fmt::Display;
 use std::iter::once;
-use std::ops::Deref;
 
-use crate::graph::{constant_node, identity_node, Graph, GraphNode, PortRef, IO};
+use crate::graph::{Graph, PortRef, IO};
+use crate::math_nodes::{add, constant_node, Node, PortData, PortType};
 use crate::node::{format_node_output, NODE_HEIGHT, NODE_RADIUS, NODE_WIDTH, PORT_RADIUS};
 use crate::widget::custom_button;
 use crate::widget::node_container::NodeContainer;
@@ -14,53 +13,7 @@ use canvas::{Path, Stroke};
 use iced::border::{radius, rounded};
 use iced::widget::{column, *};
 use iced::*;
-use ndarray::Array1;
 use ordermap::OrderMap;
-
-#[derive(Debug)]
-struct Node {
-    name: String,
-}
-
-#[derive(Clone, Debug)]
-enum PortType {
-    Integer,
-    _Real,
-    _Complex,
-}
-
-#[derive(Debug, Clone)]
-pub enum PortData {
-    Integer(Array1<i64>),
-    Real(Array1<f64>),
-    Complex(Array1<(f64, f64)>),
-}
-
-impl Display for PortData {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Integer(data) => write!(f, "{:?}", data.to_vec()),
-            Self::Real(data) => write!(f, "{:?}", data.to_vec()),
-            Self::Complex(data) => write!(f, "{:?}", data.to_vec()),
-        }
-    }
-}
-
-fn add_node(data: Node) -> GraphNode<Node, PortType, PortData> {
-    GraphNode::new(
-        data,
-        vec![("a", &PortType::Integer), ("b", &PortType::Integer)],
-        vec![("out", &PortType::Integer)],
-        Box::new(|inputs| {
-            let out = match (inputs["a"].borrow().deref(), inputs["b"].borrow().deref()) {
-                (PortData::Integer(a), PortData::Integer(b)) => a + b,
-                _ => panic!("bad inputs!"),
-            };
-
-            [("out".into(), PortData::Integer(out))].into()
-        }),
-    )
-}
 
 #[derive(Default)]
 pub enum Action {
@@ -95,52 +48,31 @@ pub struct App {
 
 impl Default for App {
     fn default() -> App {
-        let points = [
-            Point::new(300., 100.),
-            Point::new(300., 200.),
-            Point::new(150., 300.),
-            Point::new(400., 300.),
-            Point::new(100., 400.),
-            Point::new(250., 400.),
-        ];
-
-        let constant_node = |name: &str, c: PortData| {
-            constant_node(Node { name: name.into() }, c, &PortType::Integer)
-        };
-        let identity_node =
-            |name: &str| identity_node(Node { name: name.into() }, &PortType::Integer);
-
-        let initial_nodes = vec![
-            constant_node("constant", PortData::Integer(vec![7].into())),
-            identity_node("i"),
-            add_node(Node { name: "add".into() }),
-            identity_node("i"),
-            identity_node("i"),
-            identity_node("i"),
-        ];
-
         let mut g = Graph::<Node, PortType, PortData>::new();
-        initial_nodes.into_iter().for_each(|n| {
-            g.add_node(n);
-        });
-        g.add_edge((0, "out"), (1, "in"));
-        g.add_edge((0, "out"), (2, "a"));
-        g.add_edge((1, "out"), (2, "b"));
-        g.add_edge((1, "out"), (3, "in"));
-        g.add_edge((2, "out"), (4, "in"));
-        g.add_edge((3, "out"), (5, "in"));
+
+        let c1 = g.node(constant_node(PortData::Real(vec![7.].into())));
+        let c2 = g.node(constant_node(PortData::Real(vec![9.].into())));
+        let c3 = g.node(constant_node(PortData::Real(vec![13.].into())));
+        let add1 = g.node(add());
+        let add2 = g.node(add());
+
+        g.connect((c1, "out"), (add1, "a"));
+        g.connect((c2, "out"), (add1, "b"));
+        g.connect((add1, "out"), (add2, "a"));
+        g.connect((c3, "out"), (add2, "b"));
         g.execute_network();
 
-        let nodes_refs = g.nodes_ref();
-        let nr = nodes_refs
-            .iter()
-            .zip(points.iter())
-            .map(|(k, p)| (*k, *p))
-            .collect();
+        let shapes = [
+            (c1, Point::new(100., 100.)),
+            (c2, Point::new(250., 80.)),
+            (c3, Point::new(400., 100.)),
+            (add1, Point::new(200., 200.)),
+            (add2, Point::new(300., 300.)),
+        ];
 
         Self {
             graph: g,
-            shapes: workspace::State::new(nr),
+            shapes: workspace::State::new(shapes.into()),
             selected_shape: None,
             cursor_position: Default::default(),
             config: 50.,
@@ -388,7 +320,7 @@ impl App {
                 .border(rounded(NODE_RADIUS).color(outline_color).width(2.))
                 .background(self.theme.palette().background)
         })
-        .padding(5.)
+        .padding(2.)
         //.width(NODE_WIDTH)
         //.height(NODE_HEIGHT),
         .center_x(Length::Fill)
