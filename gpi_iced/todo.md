@@ -21,7 +21,7 @@
 ## Data generation
 
 ## Data manipulation
-- [~] execution
+- [x] execution
   - [*] async execution
   - [!] parallel execution
   - [-] pause execution
@@ -38,9 +38,13 @@
 - [-] render node types differently
 
 - [x] wires
+  - [x] create wires via click and drag
+  - [x] indicate wires that will be deleted when a new wire replaces an old wire  
 - [-] multiple inputs/outputs
   - [-] render input/output types differently
 
+- [-] restrict node connections to only valid ports
+  - [-] nd arrays of data on wires
 
 - [-] display editable node config
   - [*] Specify config UI from python

@@ -1,7 +1,9 @@
+use std::fmt::Display;
 use std::iter::once;
+use std::ops::Deref;
 
-use crate::graph::{constant_node, identity_node, Graph, PortRef, IO};
-use crate::node::{NODE_HEIGHT, NODE_RADIUS, NODE_WIDTH, PORT_RADIUS};
+use crate::graph::{constant_node, identity_node, Graph, GraphNode, PortRef, IO};
+use crate::node::{format_node_output, NODE_HEIGHT, NODE_RADIUS, NODE_WIDTH, PORT_RADIUS};
 use crate::widget::custom_button;
 use crate::widget::node_container::NodeContainer;
 use crate::widget::pin::Pin;
@@ -11,8 +13,8 @@ use crate::wires::{active_wire_color, find_port_offset, wire_status};
 use canvas::{Path, Stroke};
 use iced::border::{radius, rounded};
 use iced::widget::{column, *};
-use iced::Element;
 use iced::*;
+use ndarray::Array1;
 use ordermap::OrderMap;
 
 #[derive(Debug)]
@@ -25,6 +27,39 @@ enum PortType {
     Integer,
     _Real,
     _Complex,
+}
+
+#[derive(Debug, Clone)]
+pub enum PortData {
+    Integer(Array1<i64>),
+    Real(Array1<f64>),
+    Complex(Array1<(f64, f64)>),
+}
+
+impl Display for PortData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Integer(data) => write!(f, "{:?}", data.to_vec()),
+            Self::Real(data) => write!(f, "{:?}", data.to_vec()),
+            Self::Complex(data) => write!(f, "{:?}", data.to_vec()),
+        }
+    }
+}
+
+fn add_node(data: Node) -> GraphNode<Node, PortType, PortData> {
+    GraphNode::new(
+        data,
+        vec![("a", &PortType::Integer), ("b", &PortType::Integer)],
+        vec![("out", &PortType::Integer)],
+        Box::new(|inputs| {
+            let out = match (inputs["a"].borrow().deref(), inputs["b"].borrow().deref()) {
+                (PortData::Integer(a), PortData::Integer(b)) => a + b,
+                _ => panic!("bad inputs!"),
+            };
+
+            [("out".into(), PortData::Integer(out))].into()
+        }),
+    )
 }
 
 #[derive(Default)]
@@ -49,7 +84,7 @@ pub enum Message {
 }
 
 pub struct App {
-    graph: Graph<Node, PortType, u32>,
+    graph: Graph<Node, PortType, PortData>,
     shapes: workspace::State,
     selected_shape: Option<ShapeId>,
     cursor_position: Point,
@@ -69,29 +104,32 @@ impl Default for App {
             Point::new(250., 400.),
         ];
 
-        let constant_node =
-            |name: &str, c: u32| constant_node(Node { name: name.into() }, c, &PortType::Integer);
+        let constant_node = |name: &str, c: PortData| {
+            constant_node(Node { name: name.into() }, c, &PortType::Integer)
+        };
         let identity_node =
             |name: &str| identity_node(Node { name: name.into() }, &PortType::Integer);
 
         let initial_nodes = vec![
-            constant_node("a", 7),
-            identity_node("b"),
-            identity_node("c"),
-            identity_node("d"),
-            identity_node("e"),
-            identity_node("f"),
+            constant_node("constant", PortData::Integer(vec![7].into())),
+            identity_node("i"),
+            add_node(Node { name: "add".into() }),
+            identity_node("i"),
+            identity_node("i"),
+            identity_node("i"),
         ];
 
-        let mut g = Graph::<Node, PortType, u32>::new();
+        let mut g = Graph::<Node, PortType, PortData>::new();
         initial_nodes.into_iter().for_each(|n| {
             g.add_node(n);
         });
         g.add_edge((0, "out"), (1, "in"));
-        g.add_edge((1, "out"), (2, "in"));
+        g.add_edge((0, "out"), (2, "a"));
+        g.add_edge((1, "out"), (2, "b"));
         g.add_edge((1, "out"), (3, "in"));
         g.add_edge((2, "out"), (4, "in"));
         g.add_edge((3, "out"), (5, "in"));
+        g.execute_network();
 
         let nodes_refs = g.nodes_ref();
         let nr = nodes_refs
@@ -205,23 +243,23 @@ impl App {
 
         let config = column![
             vertical_space().height(20.),
-            row!["Label_1", slider(0.0..=100.0, self.config, Message::Config)]
+            row!["Label_1", slider(1.0..=100.0, self.config, Message::Config)]
                 .spacing(20.)
                 .align_y(Alignment::Center),
-            row!["Label_2", slider(0.0..=100.0, self.config, Message::Config)]
+            row!["Label_2", slider(1.0..=100.0, self.config, Message::Config)]
                 .spacing(20.)
                 .align_y(Alignment::Center),
-            row!["Label_3", slider(0.0..=100.0, self.config, Message::Config)]
+            row!["Label_3", slider(1.0..=100.0, self.config, Message::Config)]
                 .spacing(20.)
                 .align_y(Alignment::Center),
             vertical_space(),
         ]
-        .spacing(5.0)
+        .spacing(5.)
         .padding(5.);
 
         let workspace = workspace(
             &self.shapes,
-            |id| self.node_contnet(id),
+            |id| self.node_content(id),
             //// Wires
             |wire_end_node, points| self.wire_curve(wire_end_node, points),
         )
@@ -236,10 +274,10 @@ impl App {
                 column![
                     //// File
                     file_commands.align_y(Alignment::Center).width(Length::Fill),
-                    ////Config
-                    horizontal_rule(SEPERATOR),
                     ////
-                    config
+                    horizontal_rule(SEPERATOR),
+                    //// Config
+                    config,
                 ]
                 .height(Length::Fill)
                 .width(250.),
@@ -252,14 +290,12 @@ impl App {
         .into()
     }
 
-    fn node_contnet(&self, id: u32) -> Element<Message> {
+    fn node_content(&self, id: u32) -> Element<Message> {
         let node = self.graph.get_node(id);
         let is_selected = match self.selected_shape {
             Some(s_id) => id == s_id,
             None => false,
         };
-
-        let name = node.data.name.clone();
 
         fn port_style(t: &Theme, s: custom_button::Status) -> custom_button::Style {
             let mut style = custom_button::primary(t, s);
@@ -310,7 +346,7 @@ impl App {
                     };
                     Pin::new(
                         mouse_area(
-                            custom_button::Button::new("")
+                            custom_button::Button::new(vertical_space())
                                 .on_press(Message::PortPress(out_port.clone()))
                                 .on_release_self(Message::PortRelease)
                                 .style(port_style)
@@ -326,27 +362,47 @@ impl App {
             in_port_buttons.chain(out_port_buttons)
         };
 
+        let name = node.data.name.clone();
+        let data = self.graph.get_output_data(id);
+        let node_output = format_node_output(&data).clone();
+
         //// Node
+        let node_content: Element<Message, Theme, Renderer> = container(column!(
+            text(name).width(Length::Fill).center(),
+            vertical_space(),
+            column(node_output.into_iter().map(|(lbl, val)| {
+                row![text(lbl).size(10.), text(val).size(10.)]
+                    .spacing(5.0)
+                    .into()
+            }))
+            .width(Length::Fill)
+            .align_x(Center)
+        ))
+        .center_y(Length::Fill)
+        .style(move |t: &Theme| {
+            let outline_color = match is_selected {
+                true => t.extended_palette().primary.strong.color,
+                false => t.extended_palette().secondary.strong.color,
+            };
+            container::transparent(t)
+                .border(rounded(NODE_RADIUS).color(outline_color).width(2.))
+                .background(self.theme.palette().background)
+        })
+        .padding(5.)
+        //.width(NODE_WIDTH)
+        //.height(NODE_HEIGHT),
+        .center_x(Length::Fill)
+        .center_y(Length::Fill)
+        .into();
+
         let content: Element<Message, Theme, Renderer> = NodeContainer::new(
-            container(text(name))
-                .style(move |t: &Theme| {
-                    let outline_color = match is_selected {
-                        true => t.extended_palette().primary.strong.color,
-                        false => t.extended_palette().secondary.strong.color,
-                    };
-                    container::transparent(t)
-                        .border(rounded(NODE_RADIUS).color(outline_color).width(2.))
-                        .background(self.theme.palette().background)
-                })
-                .padding(5.)
-                .center_x(Length::Fill)
-                .center_y(Length::Fill),
+            node_content, //.explain(Color::from_rgba(0.7, 0.7, 0.8, 0.2)),
             port_buttons.collect(),
         )
         .width(NODE_WIDTH)
         .height(NODE_HEIGHT)
         .into();
-        content //.explain(Color::WHITE)
+        content
     }
 
     fn wire_curve(&self, wire_end_node: u32, points: &OrderMap<u32, Point>) -> Vec<(Path, Stroke)> {

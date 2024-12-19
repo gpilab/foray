@@ -120,7 +120,19 @@ where
     pub fn get_mut_node(&mut self, nx: NodeIndex) -> &mut GraphNode<NodeData, PortType, WireData> {
         self.nodes.get_mut(&nx).unwrap()
     }
-
+    pub fn get_output_data(&self, nx: NodeIndex) -> OrderMap<SmolStr, Option<&RefCell<WireData>>> {
+        self.get_node(nx)
+            .outputs
+            .clone()
+            .into_iter()
+            .map(|(port_name, _)| {
+                (
+                    port_name.clone(),
+                    self.wire_data.get(&(nx, port_name.clone())),
+                )
+            })
+            .collect()
+    }
     /// get a list of node indices
     pub fn nodes_ref(&self) -> Vec<NodeIndex> {
         self.nodes.keys().copied().collect()
@@ -303,7 +315,6 @@ where
 
     fn compute_node(&mut self, nx: &NodeIndex) {
         //let incoming_edges = &self.incoming_edges(nx);
-        dbg!(nx);
         let node = self.get_node(*nx);
         //TODO: Handle errors nicely
         let inputs: Option<HashMap<PortName, &RefCell<WireData>>> = node
@@ -319,10 +330,9 @@ where
             .collect();
 
         if let Some(inputs) = inputs {
-            if dbg!(inputs.len()) == dbg!(node.inputs.len()) {
+            if inputs.len() == node.inputs.len() {
                 let outputs = (*node.compute)(inputs);
-                self.update_wire_data(*dbg!(nx), dbg!(outputs));
-                dbg!(self);
+                self.update_wire_data(*nx, outputs);
             }
         }
     }

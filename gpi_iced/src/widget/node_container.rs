@@ -115,7 +115,7 @@ where
                 e.as_widget().layout(
                     tree,
                     renderer,
-                    &layout::Limits::new(Size::ZERO, size * 2.), //give enough size for offset elements
+                    &layout::Limits::new(Size::ZERO, size * 1.3), //give enough size for offset elements
                 )
             });
 
@@ -202,42 +202,37 @@ where
         style: &renderer::Style,
         layout: Layout<'_>,
         cursor: mouse::Cursor,
-        viewport: &Rectangle,
+        _viewport: &Rectangle,
     ) {
         //Render ports behind the main content
-        renderer.with_layer(*viewport, |renderer| {
-            for ((child, state), layout) in self
-                .absolute_children
-                .iter()
-                .zip(tree.children.iter().skip(1))
-                .zip(layout.children().skip(1))
-            {
-                child.as_widget().draw(
-                    state,
-                    renderer,
-                    theme,
-                    style,
-                    layout,
-                    cursor,
-                    &layout.bounds(),
-                );
-            }
-        });
-        //Render main content
-        renderer.with_layer(*viewport, |renderer| {
-            self.main_content.as_widget().draw(
-                &tree.children[0],
+        for ((child, state), layout) in self
+            .absolute_children
+            .iter()
+            .zip(tree.children.iter().skip(1))
+            .zip(layout.children().skip(1))
+        {
+            child.as_widget().draw(
+                state,
                 renderer,
                 theme,
                 style,
-                layout.children().next().unwrap(),
+                layout,
                 cursor,
-                viewport,
-            )
-        });
+                &layout.bounds(),
+            );
+        }
+        //Render main content
+        self.main_content.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            layout.children().next().unwrap(),
+            cursor,
+            &layout.children().next().unwrap().bounds(),
+        );
     }
 
-    //TODO: support this?
     fn overlay<'b>(
         &'b mut self,
         tree: &'b mut widget::Tree,
@@ -246,7 +241,7 @@ where
         translation: Vector,
     ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
         self.main_content.as_widget_mut().overlay(
-            tree,
+            tree.children.iter_mut().next().unwrap(),
             layout.children().next().unwrap(),
             renderer,
             translation,

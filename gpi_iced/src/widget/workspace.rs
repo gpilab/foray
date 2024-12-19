@@ -232,20 +232,6 @@ where
         let bounds = workspace_layout.bounds();
         let workspace_offset = Vector::new(bounds.position().x, bounds.position().y);
 
-        //// Draw Elements
-        {
-            //TODO: apply zoom transform
-            //// Render Children in a layer that is bounded to the size of the workspace
-            let elements = self.contents.0.values().zip(&tree.children);
-            for ((shape, tree), c_layout) in elements.zip(workspace_layout.children()) {
-                renderer.with_layer(workspace_layout.bounds(), |renderer| {
-                    shape
-                        .state
-                        .as_widget()
-                        .draw(tree, renderer, theme, style, c_layout, cursor, &bounds);
-                });
-            }
-        }
         //// Draw saved curves
         let mut frame = renderer.new_frame(bounds.size());
 
@@ -260,6 +246,20 @@ where
                 renderer.draw_geometry(frame.into_geometry())
             });
         });
+        //// Draw Elements
+        {
+            //TODO: apply zoom transform
+            //// Render Children in a layer that is bounded to the size of the workspace
+            let elements = self.contents.0.values().zip(&tree.children);
+            for ((shape, tree), c_layout) in elements.zip(workspace_layout.children()) {
+                renderer.with_layer(workspace_layout.bounds(), |renderer| {
+                    shape
+                        .state
+                        .as_widget()
+                        .draw(tree, renderer, theme, style, c_layout, cursor, &bounds);
+                });
+            }
+        }
     }
 
     //// Move children based on input events

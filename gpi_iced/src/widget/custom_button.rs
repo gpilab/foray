@@ -272,7 +272,6 @@ where
                             self.on_release_self.as_ref().map(OnInteract::get)
                         {
                             //if cursor.is_over(bounds) {
-                            dbg!("on release self");
                             shell.publish(on_release_self);
                             //}
 
@@ -282,7 +281,6 @@ where
                         self.on_release_other.as_ref().map(OnInteract::get)
                     {
                         if cursor.is_over(bounds) {
-                            dbg!("on release other");
                             shell.publish(on_release_other);
                             return event::Status::Captured;
                         }
