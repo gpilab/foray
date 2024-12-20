@@ -3,7 +3,7 @@ use iced::{Theme, Vector};
 use crate::{
     app,
     graph::{PortRef, IO},
-    node::{NODE_HEIGHT, NODE_RADIUS, NODE_WIDTH, PORT_RADIUS},
+    nodes::{NODE_HEIGHT, NODE_RADIUS, NODE_WIDTH, PORT_RADIUS},
 };
 
 /// Determine where a port should be positioned relative to the origin of the node

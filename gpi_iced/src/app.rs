@@ -1,11 +1,12 @@
 use std::iter::once;
 
 use crate::graph::{Graph, PortRef, IO};
-use crate::math_nodes::{
-    add, constant_node, linspace_node, multiply, Node, Operation, PortData, PortType,
-};
-use crate::node::{
-    format_node_output, node_display, NODE_HEIGHT, NODE_RADIUS, NODE_WIDTH, PORT_RADIUS,
+use crate::nodes::constant::constant_node;
+use crate::nodes::linspace::linspace_node;
+use crate::nodes::{
+    format_node_output,
+    math_nodes::{add, multiply, Node, Operation, PortData, PortType},
+    node_display, NODE_HEIGHT, NODE_RADIUS, NODE_WIDTH, PORT_RADIUS,
 };
 use crate::widget::custom_button;
 use crate::widget::node_container::NodeContainer;

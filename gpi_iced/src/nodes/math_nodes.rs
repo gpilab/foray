@@ -60,6 +60,7 @@ pub enum Operation {
         stop: f64,
         num: i64,
     },
+    Plot,
 }
 
 #[allow(clippy::complexity)]
@@ -116,52 +117,5 @@ pub fn identity_node(port_type: PortType) -> GraphNode<Node, PortType, PortData>
         vec![("in", &port_type)],
         vec![("out", &port_type)],
         Box::new(|a, _| [("out".into(), a["in"].borrow().clone())].into()),
-    )
-}
-
-pub fn constant_node(value: f64) -> GraphNode<Node, PortType, PortData> {
-    GraphNode::new(
-        Node {
-            short_name: "const".to_string(),
-            full_name: "Constant".to_string(),
-            operation: Operation::Constant(value),
-        },
-        vec![],
-        vec![("out", &PortType::Real)],
-        Box::new(move |_, node_data| {
-            //TODO: make a node trait that implements compute, so we have a guarenteed Operation
-            //type? Operation would be a type on the trait rather than in an enum
-            if let Operation::Constant(value) = node_data.operation {
-                [("out".into(), PortData::Real(vec![value].into()))].into()
-            } else {
-                panic!("Constant Operation is invalid {:?}", node_data)
-            }
-        }),
-    )
-}
-
-pub fn linspace_node(start: f64, stop: f64, num: i64) -> GraphNode<Node, PortType, PortData> {
-    GraphNode::new(
-        //initial node
-        Node {
-            short_name: "Linspace".to_string(),
-            full_name: "Linspace".to_string(),
-            operation: Operation::Linspace { start, stop, num },
-        },
-        vec![],
-        vec![("out", &PortType::Real)],
-        Box::new(move |_, node_data| {
-            //node after potential modifications
-            if let Operation::Linspace { start, stop, num } = node_data.operation {
-                let data: Vec<_> = (0..=num)
-                    .map(|i| (i as f64 / num as f64))
-                    .map(|c| start + (1. - c) * stop)
-                    .collect();
-
-                [("out".into(), PortData::Real(data.clone().into()))].into()
-            } else {
-                panic!("Linspace Operation is invalid {:?}", node_data)
-            }
-        }),
     )
 }
