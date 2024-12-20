@@ -358,21 +358,25 @@ where
                 }
                 Event::Mouse(WheelScrolled { delta }) => {
                     if let Some(pan) = &self.pan {
-                        let offset = match delta {
-                            ScrollDelta::Lines { x, y } => {
-                                if inner_state.modifiers.shift() {
-                                    //scale scrolled lines to be equivalent to 16 pixels
-                                    Vector::new(y, x) * 16.
-                                } else {
-                                    Vector::new(x, y) * 16.
+                        if bounds.contains(cursor_position) {
+                            let offset = match delta {
+                                ScrollDelta::Lines { x, y } => {
+                                    if inner_state.modifiers.shift() {
+                                        //scale scrolled lines to be equivalent to 16 pixels
+                                        Vector::new(y, x) * 16.
+                                    } else {
+                                        Vector::new(x, y) * 16.
+                                    }
                                 }
-                            }
-                            ScrollDelta::Pixels { x, y } => Vector::new(x, y),
-                        };
-                        //// publish event
-                        shell.publish(pan(offset));
-                        //// capture event
-                        event::Status::Captured
+                                ScrollDelta::Pixels { x, y } => Vector::new(x, y),
+                            };
+                            //// publish event
+                            shell.publish(pan(offset));
+                            //// capture event
+                            event::Status::Captured
+                        } else {
+                            event::Status::Ignored
+                        }
                     } else {
                         event::Status::Ignored
                     }

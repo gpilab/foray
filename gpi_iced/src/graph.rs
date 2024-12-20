@@ -11,7 +11,7 @@ pub struct GraphNode<NodeData, PortType, WireData> {
     pub inputs: OrderMap<PortName, PortType>,
     pub outputs: OrderMap<PortName, PortType>,
     #[debug(skip)]
-    pub compute: Compute<WireData>,
+    pub compute: Compute<NodeData, WireData>,
 }
 
 impl<NodeData, PortType, PortData> GraphNode<NodeData, PortType, PortData>
@@ -22,7 +22,7 @@ where
         data: NodeData,
         inputs: Vec<(&str, &PortType)>,
         outputs: Vec<(&str, &PortType)>,
-        compute: Compute<PortData>,
+        compute: Compute<NodeData, PortData>,
     ) -> Self {
         Self {
             data,
@@ -57,8 +57,8 @@ type PortName = SmolStr;
 
 type NodeIndex = u32;
 
-type Compute<WireData> =
-    Box<dyn Fn(HashMap<PortName, &RefCell<WireData>>) -> HashMap<PortName, WireData>>;
+type Compute<NodeData, WireData> =
+    Box<dyn Fn(HashMap<PortName, &RefCell<WireData>>, &NodeData) -> HashMap<PortName, WireData>>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum IO {
@@ -331,7 +331,7 @@ where
 
         if let Some(inputs) = inputs {
             if inputs.len() == node.inputs.len() {
-                let outputs = (*node.compute)(inputs);
+                let outputs = (*node.compute)(inputs, &node.data);
                 self.update_wire_data(*nx, outputs);
             }
         }
@@ -372,7 +372,7 @@ mod test {
             data,
             vec![("in", port_type)],
             vec![("out", port_type)],
-            Box::new(|a| [("out".into(), a["in"].borrow().clone())].into()),
+            Box::new(|a, _| [("out".into(), a["in"].borrow().clone())].into()),
         )
     }
 
@@ -385,7 +385,7 @@ mod test {
             data,
             vec![],
             vec![("out", out_type)],
-            Box::new(move |_| [("out".into(), out_data.clone())].into()),
+            Box::new(move |_, _| [("out".into(), out_data.clone())].into()),
         )
     }
 
