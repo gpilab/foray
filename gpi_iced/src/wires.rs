@@ -37,7 +37,6 @@ pub fn wire_status(
     let will_delete = p.danger.base.color;
 
     match current_action {
-        app::Action::Idle => default_color,
         app::Action::CreatingInputWire(active_input, active_output) => {
             //// if a new wire is created at an input, any existing wires will be deleted
             if active_input == input {
@@ -61,6 +60,8 @@ pub fn wire_status(
                 default_color
             }
         }
+        app::Action::Idle => default_color,
+        _ => default_color,
     }
 }
 

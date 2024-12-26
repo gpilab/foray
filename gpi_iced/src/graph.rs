@@ -58,7 +58,7 @@ type PortName = SmolStr;
 type NodeIndex = u32;
 
 type Compute<NodeData, WireData> =
-    Box<dyn Fn(HashMap<PortName, &RefCell<WireData>>, &NodeData) -> HashMap<PortName, WireData>>;
+    Box<dyn Fn(OrderMap<PortName, &RefCell<WireData>>, &NodeData) -> OrderMap<PortName, WireData>>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum IO {
@@ -133,6 +133,19 @@ where
             })
             .collect()
     }
+    pub fn get_input_data(&self, nx: &NodeIndex) -> Option<OrderMap<SmolStr, &RefCell<WireData>>> {
+        self.get_node(*nx)
+            .inputs
+            .keys()
+            .filter_map(|port_name| {
+                self.get_parent(nx, port_name.clone()).map(|out_port| {
+                    self.wire_data
+                        .get(&(out_port.node, out_port.name))
+                        .map(|data| (port_name.clone(), data))
+                })
+            })
+            .collect()
+    }
     /// get a list of node indices
     pub fn nodes_ref(&self) -> Vec<NodeIndex> {
         self.nodes.keys().copied().collect()
@@ -143,7 +156,7 @@ where
         self.nodes.get_mut(&nx).unwrap().data = value;
     }
 
-    pub fn update_wire_data(&mut self, nx: NodeIndex, outputs: HashMap<PortName, WireData>) {
+    pub fn update_wire_data(&mut self, nx: NodeIndex, outputs: OrderMap<PortName, WireData>) {
         for (port_name, wire_data) in outputs.into_iter() {
             self.wire_data.insert((nx, port_name), wire_data.into());
         }
@@ -317,17 +330,7 @@ where
         //let incoming_edges = &self.incoming_edges(nx);
         let node = self.get_node(*nx);
         //TODO: Handle errors nicely
-        let inputs: Option<HashMap<PortName, &RefCell<WireData>>> = node
-            .inputs
-            .keys()
-            .filter_map(|port_name| {
-                self.get_parent(nx, port_name.clone()).map(|out_port| {
-                    self.wire_data
-                        .get(&(out_port.node, out_port.name))
-                        .map(|data| (port_name.clone(), data))
-                })
-            })
-            .collect();
+        let inputs = self.get_input_data(nx);
 
         if let Some(inputs) = inputs {
             if inputs.len() == node.inputs.len() {

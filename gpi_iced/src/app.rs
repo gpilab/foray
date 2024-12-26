@@ -3,6 +3,7 @@ use std::iter::once;
 use crate::graph::{Graph, PortRef, IO};
 use crate::nodes::constant::constant_node;
 use crate::nodes::linspace::linspace_node;
+use crate::nodes::plot;
 use crate::nodes::{
     format_node_output,
     math_nodes::{add, multiply, Node, Operation, PortData, PortType},
@@ -27,6 +28,7 @@ pub enum Action {
     Idle,
     CreatingInputWire(PortRef, Option<PortRef>),
     CreatingOutputWire(PortRef, Option<PortRef>),
+    AddingNode,
 }
 
 #[derive(Debug, Clone)]
@@ -62,11 +64,14 @@ impl Default for App {
         let c2 = g.node(constant_node(13.));
         let mult1 = g.node(multiply());
         let add1 = g.node(add());
+        let plot1 = g.node(plot::node());
 
         g.connect((l1, "out"), (mult1, "a"));
         g.connect((c1, "out"), (mult1, "b"));
         g.connect((mult1, "out"), (add1, "a"));
         g.connect((c2, "out"), (add1, "b"));
+        g.connect((l1, "out"), (plot1, "x"));
+        g.connect((add1, "out"), (plot1, "y"));
         g.execute_network();
 
         let shapes = [
@@ -75,6 +80,7 @@ impl Default for App {
             (c2, Point::new(400., 100.)),
             (mult1, Point::new(200., 200.)),
             (add1, Point::new(300., 300.)),
+            (plot1, Point::new(200., 400.)),
         ];
 
         Self {
@@ -185,32 +191,30 @@ impl App {
         ]
         .spacing(2.0)
         .padding([5., 10.]);
-        let config: Element<Message, Theme, Renderer> = if let Some(selected_id) =
-            self.selected_shape
-        {
-            let node = self.graph.get_node(selected_id);
-            let node_output = format_node_output(&self.graph.get_output_data(selected_id));
-            let out_port_display = container(column(node_output.into_iter().map(|(lbl, val)| {
-                row![text(lbl).size(12.), text(val).size(12.)]
-                    .spacing(5.0)
-                    .into()
-            })));
 
-            column![
-                container(text(node.data.full_name.clone()).size(20.)).center_x(Fill),
-                horizontal_rule(0),
-                vertical_space().height(10.),
-                scrollable(out_port_display)
-            ]
-            .spacing(5.)
-            .padding([10., 5.])
-            .into()
-        } else {
-            text("no node selected").into()
-        };
+        //// Config
+        let config: Element<Message, Theme, Renderer> =
+            if let Some(selected_id) = self.selected_shape {
+                let node = self.graph.get_node(selected_id);
+                let out_port_display = format_node_output(&self.graph.get_output_data(selected_id));
 
+                column![
+                    container(text(node.data.full_name.clone()).size(20.)).center_x(Fill),
+                    horizontal_rule(0),
+                    vertical_space().height(10.),
+                    scrollable(out_port_display)
+                ]
+                .spacing(5.)
+                .padding([10., 5.])
+                .into()
+            } else {
+                text("no node selected").into()
+            };
+
+        //// Canvas
         let workspace = workspace(
             &self.shapes,
+            //// Nodes
             |id| self.node_content(id),
             //// Wires
             |wire_end_node, points| self.wire_curve(wire_end_node, points),
@@ -323,7 +327,8 @@ impl App {
             in_port_buttons.chain(out_port_buttons)
         };
 
-        let node_display = node_display(node, id);
+        let input_data = self.graph.get_input_data(&id);
+        let (node_display, node_size) = node_display(node, id, input_data);
 
         //// Node
         let node_inner: Element<Message, Theme, Renderer> =
@@ -334,8 +339,8 @@ impl App {
             node_inner,
             port_buttons.collect(),
         )
-        .width(NODE_WIDTH)
-        .height(NODE_HEIGHT)
+        .width(node_size.width)
+        .height(node_size.height)
         .into();
         content
     }
