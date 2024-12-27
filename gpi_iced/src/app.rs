@@ -3,10 +3,10 @@ use std::iter::once;
 use crate::graph::{Graph, PortRef, IO};
 use crate::nodes::constant::constant_node;
 use crate::nodes::linspace::linspace_node;
-use crate::nodes::plot;
+use crate::nodes::{self, plot, Node, PortData, PortType, NODE_BORDER_WIDTH};
 use crate::nodes::{
     format_node_output,
-    math_nodes::{add, multiply, Node, Operation, PortData, PortType},
+    math_nodes::{add, multiply, Operation},
     node_display, NODE_HEIGHT, NODE_RADIUS, NODE_WIDTH, PORT_RADIUS,
 };
 use crate::widget::custom_button;
@@ -37,12 +37,14 @@ pub enum Message {
     OnMove(Point),
     Pan(Vector),
     Config(f32),
-    OnSelect(ShapeId),
+    OnSelect(Option<ShapeId>),
     PortPress(PortRef),
     PortStartHover(PortRef),
     PortEndHover(PortRef),
     PortRelease,
     UpdateNodeData(u32, Operation),
+    AddNode(Operation),
+    ToggleDebug,
 }
 
 pub struct App {
@@ -53,6 +55,7 @@ pub struct App {
     config: f32,
     theme: Theme,
     action: Action,
+    debug: bool,
 }
 
 impl Default for App {
@@ -91,6 +94,7 @@ impl Default for App {
             config: 50.,
             theme: Theme::Ferra,
             action: Default::default(),
+            debug: false,
         }
     }
 }
@@ -104,9 +108,11 @@ impl App {
             }
             Message::Config(v) => self.config = v,
             Message::OnMove(cursor_position) => self.cursor_position = cursor_position,
-            Message::OnSelect(shape_id) => {
-                self.selected_shape = Some(shape_id);
-                self.graph.exectute_sub_network(shape_id);
+            Message::OnSelect(maybe_id) => {
+                self.selected_shape = maybe_id;
+                if let Some(shape_id) = maybe_id {
+                    self.graph.exectute_sub_network(shape_id);
+                }
             }
             Message::OnDrag(shape_index, cursor_position) => {
                 *self
@@ -162,6 +168,12 @@ impl App {
 
                 self.graph.exectute_sub_network(id);
             }
+            Message::AddNode(_operation) => {
+                todo!()
+            }
+            Message::ToggleDebug => {
+                self.debug = !self.debug;
+            }
         };
     }
 
@@ -176,18 +188,25 @@ impl App {
 
         let file_commands = row![
             horizontal_space(),
-            button(text("New").line_height(0.6))
+            button(text("New"))
                 .on_press(Message::Config(20.))
+                .padding([1.0, 4.0])
                 .style(button_style),
             horizontal_space(),
-            button(text("Load").line_height(0.6))
+            button(text("Load"))
                 .on_press(Message::Config(40.))
+                .padding([1.0, 4.0])
                 .style(button_style),
             horizontal_space(),
-            button(text("Save").line_height(0.6))
+            button(text("Save"))
                 .on_press(Message::Config(60.))
+                .padding([1.0, 4.0])
                 .style(button_style),
             horizontal_space(),
+            button(text("Dbg"))
+                .padding([1.0, 4.0])
+                .on_press(Message::ToggleDebug)
+                .style(button_style),
         ]
         .spacing(2.0)
         .padding([5., 10.]);
@@ -208,7 +227,16 @@ impl App {
                 .padding([10., 5.])
                 .into()
             } else {
-                text("no node selected").into()
+                let node_list = nodes::available_nodes_view();
+                column![
+                    container(text("Add Node").size(20.)).center_x(Fill),
+                    horizontal_rule(0),
+                    vertical_space().height(10.),
+                    scrollable(node_list)
+                ]
+                .spacing(5.)
+                .padding([10., 5.])
+                .into()
             };
 
         //// Canvas
@@ -233,7 +261,12 @@ impl App {
                     ////
                     horizontal_rule(SEPERATOR),
                     //// Config
-                    config,
+                    // config
+                    if self.debug {
+                        config.explain(Color::from_rgba(0.7, 0.7, 0.8, 0.2))
+                    } else {
+                        config
+                    }
                 ]
                 .height(Length::Fill)
                 .width(250.),
@@ -264,7 +297,11 @@ impl App {
                 false => t.extended_palette().secondary.strong.color,
             };
             container::transparent(t)
-                .border(rounded(NODE_RADIUS).color(outline_color).width(2.))
+                .border(
+                    rounded(NODE_RADIUS)
+                        .color(outline_color)
+                        .width(NODE_BORDER_WIDTH),
+                )
                 .background(self.theme.palette().background)
         };
 
@@ -335,8 +372,11 @@ impl App {
             container(center(node_display)).style(node_style).into();
 
         let content: Element<Message, Theme, Renderer> = NodeContainer::new(
-            //node_inner.explain(Color::from_rgba(0.7, 0.7, 0.8, 0.2)),
-            node_inner,
+            if self.debug {
+                node_inner.explain(Color::from_rgba(0.7, 0.7, 0.8, 0.2))
+            } else {
+                node_inner
+            },
             port_buttons.collect(),
         )
         .width(node_size.width)

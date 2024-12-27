@@ -8,10 +8,7 @@ use iced::{
 use crate::{app::Message, graph::GraphNode};
 
 use super::math_nodes::Operation;
-use super::{
-    math_nodes::{Node, PortData, PortType},
-    NetworkNode,
-};
+use super::{NetworkNode, Node, PortData, PortType};
 
 pub fn constant_node(value: f64) -> NetworkNode {
     GraphNode::new(

@@ -2,51 +2,13 @@ use std::ops::Deref;
 
 use derive_more::derive::Display;
 use ndarray::Array1;
+use strum::{EnumIter, VariantNames};
 
 use crate::graph::GraphNode;
 
-#[derive(Debug)]
-pub struct Node {
-    pub short_name: String,
-    pub full_name: String,
-    pub operation: Operation,
-}
+use super::{Node, PortData, PortType};
 
-#[derive(Clone, Debug)]
-pub enum PortType {
-    Integer,
-    Real,
-    Complex,
-}
-
-#[derive(Debug, Clone)]
-pub enum PortData {
-    Integer(Array1<i64>),
-    Real(Array1<f64>),
-    Complex(Array1<(f64, f64)>),
-}
-
-impl From<&PortData> for PortType {
-    fn from(value: &PortData) -> Self {
-        match value {
-            PortData::Integer(_) => PortType::Integer,
-            PortData::Real(_) => PortType::Real,
-            PortData::Complex(_) => PortType::Complex,
-        }
-    }
-}
-
-impl std::fmt::Display for PortData {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Integer(data) => write!(f, "{:?}", data.to_vec()),
-            Self::Real(data) => write!(f, "{:.2?}", data.to_vec()),
-            Self::Complex(data) => write!(f, "{:.2?}", data.to_vec()),
-        }
-    }
-}
-
-#[derive(Display, Debug, Clone)]
+#[derive(Display, Debug, Clone, VariantNames, EnumIter)]
 pub enum Operation {
     Add,
     Subtract,
@@ -101,7 +63,7 @@ pub fn subtract() -> GraphNode<Node, PortType, PortData> {
     )
 }
 pub fn multiply() -> GraphNode<Node, PortType, PortData> {
-    binary_operation("x", "Multiply", Operation::Multiply, Box::new(|a, b| a * b))
+    binary_operation("*", "Multiply", Operation::Multiply, Box::new(|a, b| a * b))
 }
 pub fn divide() -> GraphNode<Node, PortType, PortData> {
     binary_operation("÷", "Divide", Operation::Divide, Box::new(|a, b| a / b))

@@ -9,10 +9,7 @@ use iced::{
 
 use crate::{app::Message, graph::GraphNode, math::linspace, nodes::math_nodes::Operation};
 
-use super::{
-    math_nodes::{Node, PortData, PortType},
-    NetworkNode,
-};
+use super::{NetworkNode, Node, PortData, PortType};
 
 pub fn linspace_node(start: f32, stop: f32, num: i32) -> NetworkNode {
     GraphNode::new(

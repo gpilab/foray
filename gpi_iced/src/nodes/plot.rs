@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 
 use iced::widget::canvas::{Path, Stroke};
+use iced::widget::container;
 use iced::Length::Fill;
 use iced::{mouse, Color, Point};
 use iced::{widget::canvas, Element};
@@ -11,10 +12,8 @@ use smol_str::SmolStr;
 use crate::math::linspace_delta;
 use crate::{app::Message, graph::GraphNode};
 
-use super::{
-    math_nodes::{Node, Operation, PortData, PortType},
-    NetworkNode,
-};
+use super::{math_nodes::Operation, NetworkNode};
+use super::{Node, PortData, PortType, NODE_BORDER_WIDTH};
 
 pub fn node() -> NetworkNode {
     GraphNode::new(
@@ -46,7 +45,9 @@ pub fn view<'a>(
     } else {
         (vec![], vec![])
     };
-    canvas(Plot { x, y }).width(Fill).height(Fill).into()
+    container(canvas(Plot { x, y }).width(Fill).height(Fill))
+        .padding(NODE_BORDER_WIDTH)
+        .into()
 }
 
 #[derive(Debug)]

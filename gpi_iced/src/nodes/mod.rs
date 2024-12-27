@@ -4,23 +4,77 @@ pub mod math_nodes;
 pub mod plot;
 
 use iced::{
-    widget::{canvas::path::lyon_path::math::Size, column, container, row, text},
-    Element,
+    widget::{button, column, container, container::bordered_box, horizontal_rule, row, text},
+    Alignment::Center,
+    Color, Element,
+    Length::Fill,
+    Size,
 };
 
-pub type NetworkNode = GraphNode<Node, PortType, PortData>;
-
-use math_nodes::{Node, Operation, PortData, PortType};
+use math_nodes::Operation;
+use ndarray::Array1;
 use ordermap::OrderMap;
 use smol_str::SmolStr;
 use std::cell::RefCell;
+use strum::{IntoEnumIterator, VariantNames};
 
-use crate::{app::Message, graph::GraphNode};
+use crate::{app::Message, graph::GraphNode, style};
 
 pub const NODE_WIDTH: f32 = 100.;
 pub const NODE_HEIGHT: f32 = 60.;
 pub const PORT_RADIUS: f32 = 7.5;
 pub const NODE_RADIUS: f32 = 5.0;
+pub const NODE_BORDER_WIDTH: f32 = 1.0;
+
+#[derive(Debug)]
+pub struct Node {
+    pub short_name: String,
+    pub full_name: String,
+    pub operation: Operation,
+}
+
+pub type NetworkNode = GraphNode<Node, PortType, PortData>;
+#[derive(Clone, Debug)]
+pub enum PortType {
+    Integer,
+    Real,
+    Complex,
+}
+
+#[derive(Debug, Clone)]
+pub enum PortData {
+    Integer(Array1<i64>),
+    Real(Array1<f64>),
+    Complex(Array1<(f64, f64)>),
+}
+
+impl From<&PortData> for PortType {
+    fn from(value: &PortData) -> Self {
+        match value {
+            PortData::Integer(_) => PortType::Integer,
+            PortData::Real(_) => PortType::Real,
+            PortData::Complex(_) => PortType::Complex,
+        }
+    }
+}
+
+impl std::fmt::Display for PortData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Integer(data) => write!(f, "{:?}", data.to_vec()),
+            Self::Real(data) => write!(f, "{:.2?}", data.to_vec()),
+            Self::Complex(data) => write!(f, "{:.2?}", data.to_vec()),
+        }
+    }
+}
+
+pub trait GUINode {
+    type Config: Default;
+    type NodeData: Default;
+
+    fn network_node(config: Self::Config) -> NetworkNode;
+    fn view<'a>(id: u32, config: Self::Config) -> Element<'a, Message>;
+}
 
 pub fn node_display<'a>(
     node: &NetworkNode,
@@ -40,7 +94,7 @@ pub fn node_display<'a>(
         | Operation::Divide
         | Operation::Identity => (
             text(node.data.short_name.clone()).size(30.).into(),
-            default_node_size,
+            Size::new(60., 60.),
         ),
     }
 }
@@ -62,5 +116,32 @@ pub fn format_node_output<'a>(
             .spacing(5.0)
             .into()
     })))
+    .into()
+}
+
+pub(crate) fn available_nodes_view<'a>() -> Element<'a, Message> {
+    container(
+        container(
+            column(
+                math_nodes::Operation::iter()
+                    .zip(Operation::VARIANTS)
+                    .map(|(o, name)| {
+                        button(
+                            row![horizontal_rule(0.0), container(text(*name)).padding(4.0)]
+                                //.spacing(4.0)
+                                .align_y(Center),
+                        )
+                        .padding(0.)
+                        .on_press(Message::AddNode(o))
+                        .width(Fill)
+                        .style(style::button::list)
+                        .into()
+                    }),
+            )
+            .width(150.),
+        )
+        .style(|t| bordered_box(t).background(Color::TRANSPARENT)),
+    )
+    .center_x(Fill)
     .into()
 }

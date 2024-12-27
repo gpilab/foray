@@ -42,7 +42,7 @@ where
     pan: Option<Box<dyn Fn(Vector) -> Message + 'a>>,
     zoom: Option<Box<dyn Fn(f32) -> Message + 'a>>,
     on_cursor_move: Option<Box<dyn Fn(Point) -> Message + 'a>>,
-    on_shape_click: Option<Box<dyn Fn(ShapeId) -> Message + 'a>>,
+    on_click: Option<Box<dyn Fn(Option<ShapeId>) -> Message + 'a>>,
     on_shape_drag: Option<Box<dyn Fn(ShapeId, Point) -> Message + 'a>>,
     on_shape_release: Option<Box<dyn Fn(ShapeId) -> Message + 'a>>,
 }
@@ -115,7 +115,7 @@ where
             pan: None,
             zoom: None,
             on_cursor_move: None,
-            on_shape_click: None,
+            on_click: None,
             on_shape_drag: None,
             on_shape_release: None,
         }
@@ -131,8 +131,8 @@ where
         self
     }
 
-    pub fn on_press(mut self, on_press: impl Fn(ShapeId) -> Message + 'a) -> Self {
-        self.on_shape_click = Some(Box::new(on_press));
+    pub fn on_press(mut self, on_press: impl Fn(Option<ShapeId>) -> Message + 'a) -> Self {
+        self.on_click = Some(Box::new(on_press));
         self
     }
 
@@ -313,15 +313,23 @@ where
                     ////Find the first coliding shape
                     if let Some((id, offset)) = self.contents.find_shape(cursor_position, layout) {
                         //// publish event
-                        if let Some(on_shape_click) = &self.on_shape_click {
-                            shell.publish(on_shape_click(id));
+                        if let Some(on_shape_click) = &self.on_click {
+                            shell.publish(on_shape_click(Some(id)));
                         }
                         //// update inner state
                         inner_state.action = Action::Drag(id, offset);
                         //// capture event
                         event::Status::Captured
                     } else {
-                        event::Status::Ignored
+                        //// deselect
+                        if bounds.contains(cursor_position) {
+                            if let Some(on_shape_click) = &self.on_click {
+                                shell.publish(on_shape_click(None));
+                            }
+                            event::Status::Captured
+                        } else {
+                            event::Status::Ignored
+                        }
                     }
                 }
                 Event::Mouse(ButtonReleased(mouse::Button::Left))
