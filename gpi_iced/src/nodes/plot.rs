@@ -12,16 +12,12 @@ use smol_str::SmolStr;
 use crate::math::linspace_delta;
 use crate::{app::Message, graph::GraphNode};
 
-use super::{math_nodes::Operation, NetworkNode};
+use super::NetworkNode;
 use super::{Node, PortData, PortType, NODE_BORDER_WIDTH};
 
 pub fn node() -> NetworkNode {
     GraphNode::new(
-        Node {
-            short_name: "Plot".into(),
-            full_name: "Plot".into(),
-            operation: Operation::Plot,
-        },
+        Node::Plot,
         vec![("x", &PortType::Real), ("y", &PortType::Real)],
         vec![("out", &PortType::Real)],
         Box::new(|_inputs, _| [].into()),
@@ -31,16 +27,20 @@ pub fn view<'a>(
     _id: u32,
     input_data: Option<OrderMap<SmolStr, &RefCell<PortData>>>,
 ) -> Element<'a, Message> {
-    let (x, y) = if let Some(input) = input_data {
-        if let (PortData::Real(x), PortData::Real(y)) =
-            (input["x"].borrow().clone(), input["y"].borrow().clone())
-        {
-            (
-                x.to_vec().into_iter().map(|f| f as f32).collect(),
-                y.to_vec().into_iter().map(|f| f as f32).collect(),
-            )
+    let (x, y) = if let Some(i) = input_data {
+        if let (Some(x_port), Some(y_port)) = (i.get("x"), i.get("y")) {
+            if let (PortData::Real(x), PortData::Real(y)) =
+                (x_port.borrow().clone(), y_port.borrow().clone())
+            {
+                (
+                    x.to_vec().into_iter().map(|f| f as f32).collect(),
+                    y.to_vec().into_iter().map(|f| f as f32).collect(),
+                )
+            } else {
+                panic!("unsuported plot types ") //, //input_data.clone())
+            }
         } else {
-            panic!("unsuported plot types ") //, //input_data.clone())
+            (vec![], vec![])
         }
     } else {
         (vec![], vec![])

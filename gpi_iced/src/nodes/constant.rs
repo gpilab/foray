@@ -7,23 +7,18 @@ use iced::{
 
 use crate::{app::Message, graph::GraphNode};
 
-use super::math_nodes::Operation;
 use super::{NetworkNode, Node, PortData, PortType};
 
 pub fn constant_node(value: f64) -> NetworkNode {
     GraphNode::new(
-        Node {
-            short_name: "const".to_string(),
-            full_name: "Constant".to_string(),
-            operation: Operation::Constant(value),
-        },
+        Node::Constant(value),
         vec![],
         vec![("out", &PortType::Real)],
         Box::new(move |_, node_data| {
             //TODO: make a node trait that implements compute, so we have a guarenteed Operation
             //type? Operation would be a type on the trait rather than in an enum
-            if let Operation::Constant(value) = node_data.operation {
-                [("out".into(), PortData::Real(vec![value].into()))].into()
+            if let Node::Constant(value) = node_data {
+                [("out".into(), PortData::Real(vec![*value].into()))].into()
             } else {
                 panic!("Constant Operation is invalid {:?}", node_data)
             }
@@ -35,7 +30,7 @@ pub fn view<'a>(id: u32, value: f64) -> Element<'a, Message> {
         row![
             text(value),
             slider(-100.0..=100., value, move |value| {
-                Message::UpdateNodeData(id, Operation::Constant(value))
+                Message::UpdateNodeData(id, Node::Constant(value))
             })
             .width(40.),
         ]

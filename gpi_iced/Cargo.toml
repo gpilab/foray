@@ -6,6 +6,7 @@ edition = "2021"
 
 [dependencies]
 derive_more = { version = "1.0.0", features = ["debug","display"] }
+dyn-clone = "1.0.17"
 iced = { version = "0.13.1", features = [
 	"debug",
 	"lazy",

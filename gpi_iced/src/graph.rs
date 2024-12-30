@@ -107,6 +107,15 @@ where
         id
     }
 
+    /// Remove a node and all edges associated with it
+    pub fn delete_node(&mut self, id: NodeIndex) {
+        dbg!(id);
+        dbg!(&self.nodes);
+        dbg!(&self.edges);
+        self.nodes.remove(&id);
+        self.edges
+            .retain(|(from, to)| from.node != id && to.node != id)
+    }
     ///Get the node value at a given index
     ///panics if index is not valid!
     ///Use the index returned from `add_node` to ensure it exists

@@ -2,12 +2,13 @@ use std::iter::once;
 
 use crate::graph::{Graph, PortRef, IO};
 use crate::nodes::constant::constant_node;
-use crate::nodes::linspace::linspace_node;
-use crate::nodes::{self, plot, Node, PortData, PortType, NODE_BORDER_WIDTH};
+use crate::nodes::linspace::linspace_node_network;
+use crate::nodes::math_nodes::identity_node_network;
+use crate::nodes::{self, plot, GUINode, Node, PortData, PortType, NODE_BORDER_WIDTH};
 use crate::nodes::{
     format_node_output,
-    math_nodes::{add, multiply, Operation},
-    node_display, NODE_HEIGHT, NODE_RADIUS, NODE_WIDTH, PORT_RADIUS,
+    math_nodes::{add, multiply},
+    NODE_HEIGHT, NODE_RADIUS, NODE_WIDTH, PORT_RADIUS,
 };
 use crate::widget::custom_button;
 use crate::widget::node_container::NodeContainer;
@@ -21,6 +22,11 @@ use iced::border::{radius, rounded};
 use iced::widget::{column, *};
 use iced::*;
 use ordermap::OrderMap;
+
+//#[derive(Clone, Debug)]
+//pub enum NodeType {
+//    Identity(dyn GUINode),
+//}
 
 #[derive(Default)]
 pub enum Action {
@@ -42,8 +48,9 @@ pub enum Message {
     PortStartHover(PortRef),
     PortEndHover(PortRef),
     PortRelease,
-    UpdateNodeData(u32, Operation),
-    AddNode(Operation),
+    UpdateNodeData(u32, Node),
+    AddNode(Node),
+    DeleteNode(u32),
     ToggleDebug,
 }
 
@@ -62,12 +69,13 @@ impl Default for App {
     fn default() -> App {
         let mut g = Graph::<Node, PortType, PortData>::new();
 
-        let l1 = g.node(linspace_node(0., 10., 10));
+        let l1 = g.node(linspace_node_network(0., 10., 10));
         let c1 = g.node(constant_node(9.));
         let c2 = g.node(constant_node(13.));
         let mult1 = g.node(multiply());
         let add1 = g.node(add());
         let plot1 = g.node(plot::node());
+        let identity = g.node(identity_node_network(PortType::Real));
 
         g.connect((l1, "out"), (mult1, "a"));
         g.connect((c1, "out"), (mult1, "b"));
@@ -84,6 +92,7 @@ impl Default for App {
             (mult1, Point::new(200., 200.)),
             (add1, Point::new(300., 300.)),
             (plot1, Point::new(200., 400.)),
+            (identity, Point::new(100., 300.)),
         ];
 
         Self {
@@ -162,14 +171,20 @@ impl App {
                 }
                 _ => {}
             },
-            Message::UpdateNodeData(id, operation) => {
-                let node = self.graph.get_mut_node(id);
-                node.data.operation = operation;
+            Message::UpdateNodeData(id, node) => {
+                let graph_node = self.graph.get_mut_node(id);
+                graph_node.data = node;
 
                 self.graph.exectute_sub_network(id);
             }
-            Message::AddNode(_operation) => {
-                todo!()
+            Message::AddNode(node) => {
+                let id = self.graph.node(node.network_node());
+                self.shapes.shape_positions.insert(id, (100., 500.).into());
+            }
+            Message::DeleteNode(id) => {
+                self.graph.delete_node(id);
+                self.shapes.shape_positions.remove(&id);
+                self.selected_shape = None;
             }
             Message::ToggleDebug => {
                 self.debug = !self.debug;
@@ -218,10 +233,11 @@ impl App {
                 let out_port_display = format_node_output(&self.graph.get_output_data(selected_id));
 
                 column![
-                    container(text(node.data.full_name.clone()).size(20.)).center_x(Fill),
+                    container(text(node.data.name().clone()).size(20.)).center_x(Fill),
                     horizontal_rule(0),
                     vertical_space().height(10.),
-                    scrollable(out_port_display)
+                    scrollable(out_port_display),
+                    row![button("delete node").on_press(Message::DeleteNode(selected_id))]
                 ]
                 .spacing(5.)
                 .padding([10., 5.])
@@ -365,11 +381,13 @@ impl App {
         };
 
         let input_data = self.graph.get_input_data(&id);
-        let (node_display, node_size) = node_display(node, id, input_data);
+        //let (node_display, node_size) = node_display(node, id, input_data);
 
         //// Node
         let node_inner: Element<Message, Theme, Renderer> =
-            container(center(node_display)).style(node_style).into();
+            container(center(node.data.view(id, input_data)))
+                .style(node_style)
+                .into();
 
         let content: Element<Message, Theme, Renderer> = NodeContainer::new(
             if self.debug {
@@ -379,8 +397,8 @@ impl App {
             },
             port_buttons.collect(),
         )
-        .width(node_size.width)
-        .height(node_size.height)
+        .width(NODE_WIDTH)
+        .height(NODE_HEIGHT)
         .into();
         content
     }

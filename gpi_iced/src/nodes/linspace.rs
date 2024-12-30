@@ -7,28 +7,27 @@ use iced::{
     Length::{Fill, Shrink},
 };
 
-use crate::{app::Message, graph::GraphNode, math::linspace, nodes::math_nodes::Operation};
+use crate::{app::Message, graph::GraphNode, math::linspace};
 
 use super::{NetworkNode, Node, PortData, PortType};
 
-pub fn linspace_node(start: f32, stop: f32, num: i32) -> NetworkNode {
+//TODO: try implementing GUI_NODE for a struct linspace,
+//and define a list an enum in app that holds linspace + other things that implement guinode?
+
+pub fn linspace_node_network(start: f32, stop: f32, num: i32) -> NetworkNode {
     GraphNode::new(
         //initial node
-        Node {
-            short_name: "Linspace".to_string(),
-            full_name: "Linspace".to_string(),
-            operation: Operation::Linspace {
-                start: start.into(),
-                stop: stop.into(),
-                num: num.into(),
-            },
+        Node::Linspace {
+            start: start.into(),
+            stop: stop.into(),
+            num: num.into(),
         },
         vec![],
         vec![("out", &PortType::Real)],
         Box::new(move |_, node_data| {
             //node after potential modifications
-            if let Operation::Linspace { start, stop, num } = node_data.operation {
-                let data: Vec<_> = linspace(start as f32, stop as f32, num as i32);
+            if let Node::Linspace { start, stop, num } = node_data {
+                let data: Vec<_> = linspace(*start as f32, *stop as f32, *num as i32);
 
                 [(
                     "out".into(),
@@ -72,7 +71,7 @@ pub fn view<'a>(id: u32, start: f64, stop: f64, num: i64) -> Element<'a, Message
     let start_input = numeric_input(text_input("0", &start.to_string()).on_input(move |value| {
         Message::UpdateNodeData(
             id,
-            Operation::Linspace {
+            Node::Linspace {
                 start: value.parse().unwrap_or(0.),
                 stop,
                 num,
@@ -82,7 +81,7 @@ pub fn view<'a>(id: u32, start: f64, stop: f64, num: i64) -> Element<'a, Message
     let stop_input = numeric_input(text_input("10", &stop.to_string()).on_input(move |value| {
         Message::UpdateNodeData(
             id,
-            Operation::Linspace {
+            Node::Linspace {
                 start,
                 stop: value.parse().unwrap_or(0.),
                 num,
@@ -92,7 +91,7 @@ pub fn view<'a>(id: u32, start: f64, stop: f64, num: i64) -> Element<'a, Message
     let num_input = numeric_input(text_input("100", &num.to_string()).on_input(move |value| {
         Message::UpdateNodeData(
             id,
-            Operation::Linspace {
+            Node::Linspace {
                 start,
                 stop,
                 num: value.parse().unwrap_or(0),
