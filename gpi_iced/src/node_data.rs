@@ -3,7 +3,7 @@ use crate::graph::GraphNode;
 use crate::nodes::linspace::LinspaceConfig;
 use crate::nodes::math_nodes::binary_operation;
 use crate::nodes::plot::Plot;
-use crate::nodes::{constant, GUINode, PortData, PortType};
+use crate::nodes::{constant, default_node_size, GUINode, PortData, PortType};
 use iced::widget::text;
 use ordermap::OrderMap;
 use strum::{EnumIter, VariantNames};
@@ -104,16 +104,17 @@ impl GUINode for NodeData {
         &'a self,
         id: u32,
         input_data: Option<OrderMap<String, &std::cell::RefCell<PortData>>>,
-    ) -> iced::Element<'a, Message> {
+    ) -> (iced::Size, iced::Element<'a, Message>) {
+        let dft = default_node_size();
         match self {
-            NodeData::Constant(value) => constant::view(id, *value),
-            NodeData::Linspace(linspace_config) => linspace_config.view(id),
-            NodeData::Plot(plot) => plot.view(id, input_data),
-            NodeData::Add => text("+").size(20).into(),
-            NodeData::Subtract => text("-").size(20).into(),
-            NodeData::Multiply => text("*").size(20).into(),
-            NodeData::Divide => text("/").size(20).into(),
-            _ => text(self.name()).into(),
+            NodeData::Constant(value) => (dft, constant::view(id, *value)),
+            NodeData::Linspace(linspace_config) => (dft, linspace_config.view(id)),
+            NodeData::Plot(plot) => (dft * 2., plot.view(id, input_data)),
+            NodeData::Add => (dft, text("+").size(20).into()),
+            NodeData::Subtract => (dft, text("-").size(20).into()),
+            NodeData::Multiply => (dft, text("*").size(20).into()),
+            NodeData::Divide => (dft, text("/").size(20).into()),
+            _ => (dft, text(self.name()).into()),
         }
     }
 }

@@ -20,6 +20,10 @@ pub const PORT_RADIUS: f32 = 7.5;
 pub const NODE_RADIUS: f32 = 5.0;
 pub const NODE_BORDER_WIDTH: f32 = 1.0;
 
+pub fn default_node_size() -> iced::Size {
+    iced::Size::new(NODE_WIDTH, NODE_HEIGHT)
+}
+
 #[derive(Clone, Debug, Default)]
 pub enum PortType {
     Integer,
@@ -69,8 +73,8 @@ pub trait GUINode: derive_more::Debug {
         &'a self,
         _id: u32,
         _input_data: Option<OrderMap<String, &RefCell<PortData>>>,
-    ) -> Element<'a, Message> {
-        text("default").into()
+    ) -> (iced::Size, Element<'a, Message>) {
+        (default_node_size(), text("default").into())
     }
 }
 

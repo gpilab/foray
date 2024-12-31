@@ -372,12 +372,14 @@ impl App {
         };
 
         let input_data = self.graph.get_input_data(&id);
+        let (node_size, node_view) = node.view(id, input_data);
 
         //// Node
-        let node_inner: Element<Message, Theme, Renderer> =
-            container(center(node.view(id, input_data)))
-                .style(node_style)
-                .into();
+        let node_inner: Element<Message, Theme, Renderer> = container(node_view)
+            .style(node_style)
+            .center_x(node_size.width)
+            .center_y(node_size.height)
+            .into();
 
         let content: Element<Message, Theme, Renderer> = NodeContainer::new(
             if self.debug {
@@ -387,8 +389,8 @@ impl App {
             },
             port_buttons.collect(),
         )
-        .width(NODE_WIDTH)
-        .height(NODE_HEIGHT)
+        .width(node_size.width)
+        .height(node_size.height)
         .into();
         content
     }

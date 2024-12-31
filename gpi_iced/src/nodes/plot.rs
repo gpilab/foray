@@ -1,9 +1,8 @@
-use super::{PortData, NODE_BORDER_WIDTH};
+use super::{PortData, NODE_BORDER_WIDTH, NODE_HEIGHT, NODE_WIDTH};
 use crate::app::Message;
 use crate::math::linspace_delta;
 use iced::widget::canvas::{Path, Stroke};
 use iced::widget::container;
-use iced::Length::Fill;
 use iced::{mouse, Color, Point};
 use iced::{widget::canvas, Element};
 use iced::{Rectangle, Renderer, Theme};
@@ -37,9 +36,15 @@ impl Plot {
         } else {
             (vec![], vec![])
         };
-        container(canvas(PlotCanvas { x, y }).width(Fill).height(Fill))
-            .padding(NODE_BORDER_WIDTH)
-            .into()
+        container(
+            canvas(PlotCanvas { x, y })
+                .width(NODE_WIDTH * 2.)
+                .height(NODE_HEIGHT * 2.),
+        )
+        .padding(NODE_BORDER_WIDTH)
+        .width(NODE_WIDTH * 2.)
+        .height(NODE_HEIGHT * 2.)
+        .into()
     }
 }
 
