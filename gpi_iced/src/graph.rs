@@ -65,9 +65,6 @@ where
 
     /// Remove a node and all edges associated with it
     pub fn delete_node(&mut self, id: NodeIndex) {
-        dbg!(id);
-        //dbg!(&self.nodes);
-        dbg!(&self.edges);
         self.nodes.remove(&id);
         self.edges
             .retain(|(from, to)| from.node != id && to.node != id)
@@ -274,8 +271,6 @@ where
         let node = self.get_node(*nx);
         //TODO: Handle errors nicely
         let inputs = self.get_input_data(nx);
-        dbg!(nx);
-        //dbg!(inputs);
         if let Some(inputs) = inputs {
             if inputs.len() == node.inputs().len() {
                 let outputs = node.compute(inputs);
@@ -350,7 +345,6 @@ mod test {
         }
 
         fn compute(&self, inputs: OrderMap<String, &RefCell<u32>>) -> OrderMap<String, u32> {
-            dbg!(&inputs);
             match self {
                 Node::Identity(_node) => [("out".to_string(), *inputs["in"].borrow())].into(),
                 Node::Constant(node) => [("out".to_string(), node.value)].into(),
@@ -397,8 +391,6 @@ mod test {
         g.connect((n1, "out"), (n2, "in"));
         g.connect((n3, "out"), (n4, "in"));
 
-        dbg!(&g.edges);
-        dbg!(&g.nodes);
         //Propogate values
         g.execute_network();
 
