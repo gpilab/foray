@@ -1,10 +1,9 @@
-use iced::{Theme, Vector};
-
 use crate::{
     app,
     graph::{PortRef, IO},
     nodes::{NODE_HEIGHT, NODE_RADIUS, NODE_WIDTH, PORT_RADIUS},
 };
+use iced::{Theme, Vector};
 
 /// Determine where a port should be positioned relative to the origin of the node
 pub fn find_port_offset(port_ref: &PortRef, port_index: usize) -> Vector {

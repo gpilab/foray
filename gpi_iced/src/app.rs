@@ -1,15 +1,11 @@
 use std::iter::once;
 
-use crate::graph::{Graph, PortRef, IO};
-use crate::nodes::constant::constant_node;
-use crate::nodes::linspace::linspace_node_network;
-use crate::nodes::math_nodes::identity_node_network;
-use crate::nodes::{self, plot, GUINode, Node, PortData, PortType, NODE_BORDER_WIDTH};
-use crate::nodes::{
-    format_node_output,
-    math_nodes::{add, multiply},
-    NODE_HEIGHT, NODE_RADIUS, NODE_WIDTH, PORT_RADIUS,
-};
+use crate::graph::{Graph, GraphNode, PortRef, IO};
+use crate::node_data::NodeData;
+use crate::nodes::linspace::LinspaceConfig;
+use crate::nodes::plot::Plot;
+use crate::nodes::{self, GUINode, PortData, PortType, NODE_BORDER_WIDTH};
+use crate::nodes::{format_node_output, NODE_HEIGHT, NODE_RADIUS, NODE_WIDTH, PORT_RADIUS};
 use crate::widget::custom_button;
 use crate::widget::node_container::NodeContainer;
 use crate::widget::pin::Pin;
@@ -23,11 +19,6 @@ use iced::widget::{column, *};
 use iced::*;
 use ordermap::OrderMap;
 
-//#[derive(Clone, Debug)]
-//pub enum NodeType {
-//    Identity(dyn GUINode),
-//}
-
 #[derive(Default)]
 pub enum Action {
     #[default]
@@ -37,7 +28,7 @@ pub enum Action {
     AddingNode,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub enum Message {
     OnDrag(ShapeId, Point),
     OnMove(Point),
@@ -48,14 +39,14 @@ pub enum Message {
     PortStartHover(PortRef),
     PortEndHover(PortRef),
     PortRelease,
-    UpdateNodeData(u32, Node),
-    AddNode(Node),
+    UpdateNodeData(u32, NodeData),
+    AddNode(NodeData),
     DeleteNode(u32),
     ToggleDebug,
 }
 
 pub struct App {
-    graph: Graph<Node, PortType, PortData>,
+    graph: Graph<NodeData, PortType, PortData>,
     shapes: workspace::State,
     selected_shape: Option<ShapeId>,
     cursor_position: Point,
@@ -67,15 +58,15 @@ pub struct App {
 
 impl Default for App {
     fn default() -> App {
-        let mut g = Graph::<Node, PortType, PortData>::new();
+        let mut g = Graph::<NodeData, PortType, PortData>::new();
 
-        let l1 = g.node(linspace_node_network(0., 10., 10));
-        let c1 = g.node(constant_node(9.));
-        let c2 = g.node(constant_node(13.));
-        let mult1 = g.node(multiply());
-        let add1 = g.node(add());
-        let plot1 = g.node(plot::node());
-        let identity = g.node(identity_node_network(PortType::Real));
+        let l1 = g.node(NodeData::Linspace(LinspaceConfig::new(0., 10., 10)));
+        let c1 = g.node(NodeData::Constant(9.));
+        let c2 = g.node(NodeData::Constant(13.));
+        let mult1 = g.node(NodeData::Multiply);
+        let add1 = g.node(NodeData::Add);
+        let plot1 = g.node(NodeData::Plot(Plot::default()));
+        let identity = g.node(NodeData::Identity);
 
         g.connect((l1, "out"), (mult1, "a"));
         g.connect((c1, "out"), (mult1, "b"));
@@ -173,12 +164,12 @@ impl App {
             },
             Message::UpdateNodeData(id, node) => {
                 let graph_node = self.graph.get_mut_node(id);
-                graph_node.data = node;
+                *graph_node = node;
 
                 self.graph.exectute_sub_network(id);
             }
             Message::AddNode(node) => {
-                let id = self.graph.node(node.network_node());
+                let id = self.graph.node(node);
                 self.shapes.shape_positions.insert(id, (100., 500.).into());
             }
             Message::DeleteNode(id) => {
@@ -231,9 +222,8 @@ impl App {
             if let Some(selected_id) = self.selected_shape {
                 let node = self.graph.get_node(selected_id);
                 let out_port_display = format_node_output(&self.graph.get_output_data(selected_id));
-
                 column![
-                    container(text(node.data.name().clone()).size(20.)).center_x(Fill),
+                    container(text(node.name().clone()).size(20.)).center_x(Fill),
                     horizontal_rule(0),
                     vertical_space().height(10.),
                     scrollable(out_port_display),
@@ -277,7 +267,6 @@ impl App {
                     ////
                     horizontal_rule(SEPERATOR),
                     //// Config
-                    // config
                     if self.debug {
                         config.explain(Color::from_rgba(0.7, 0.7, 0.8, 0.2))
                     } else {
@@ -323,10 +312,13 @@ impl App {
 
         //TODO: clean up this function, use something similar to wires.rs
         let port_x = |i: usize| i as f32 * (NODE_WIDTH / 4.) + NODE_RADIUS * 2.;
+
         //// Ports
+        let inputs = node.inputs();
+        let outputs = node.outputs();
+
         let port_buttons = {
-            let in_port_buttons = node
-                .inputs
+            let in_port_buttons = inputs
                 .iter()
                 .enumerate()
                 .map(|(i, port)| (Point::new(port_x(i), -PORT_RADIUS), port))
@@ -351,8 +343,7 @@ impl App {
                     .position(point)
                     .into()
                 });
-            let out_port_buttons = node
-                .outputs
+            let out_port_buttons = outputs
                 .iter()
                 .enumerate()
                 .map(|(i, port)| (Point::new(port_x(i), NODE_HEIGHT - PORT_RADIUS), port))
@@ -381,11 +372,10 @@ impl App {
         };
 
         let input_data = self.graph.get_input_data(&id);
-        //let (node_display, node_size) = node_display(node, id, input_data);
 
         //// Node
         let node_inner: Element<Message, Theme, Renderer> =
-            container(center(node.data.view(id, input_data)))
+            container(center(node.view(id, input_data)))
                 .style(node_style)
                 .into();
 
@@ -409,7 +399,7 @@ impl App {
         };
 
         //// Handle currently active wire
-        // TODO: account for wire postion that are not the first
+        // TODO: test nodes with multiple out ports
         let active_wire = match &self.action {
             Action::CreatingInputWire(input, Some(tentative_output)) => {
                 Some((port_position(input), port_position(tentative_output)))

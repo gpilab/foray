@@ -1,5 +1,6 @@
-use std::cell::RefCell;
-
+use super::{PortData, NODE_BORDER_WIDTH};
+use crate::app::Message;
+use crate::math::linspace_delta;
 use iced::widget::canvas::{Path, Stroke};
 use iced::widget::container;
 use iced::Length::Fill;
@@ -7,56 +8,48 @@ use iced::{mouse, Color, Point};
 use iced::{widget::canvas, Element};
 use iced::{Rectangle, Renderer, Theme};
 use ordermap::OrderMap;
-use smol_str::SmolStr;
+use std::cell::RefCell;
 
-use crate::math::linspace_delta;
-use crate::{app::Message, graph::GraphNode};
+#[derive(Debug, Default, Clone)]
+pub struct Plot {}
 
-use super::NetworkNode;
-use super::{Node, PortData, PortType, NODE_BORDER_WIDTH};
-
-pub fn node() -> NetworkNode {
-    GraphNode::new(
-        Node::Plot,
-        vec![("x", &PortType::Real), ("y", &PortType::Real)],
-        vec![("out", &PortType::Real)],
-        Box::new(|_inputs, _| [].into()),
-    )
-}
-pub fn view<'a>(
-    _id: u32,
-    input_data: Option<OrderMap<SmolStr, &RefCell<PortData>>>,
-) -> Element<'a, Message> {
-    let (x, y) = if let Some(i) = input_data {
-        if let (Some(x_port), Some(y_port)) = (i.get("x"), i.get("y")) {
-            if let (PortData::Real(x), PortData::Real(y)) =
-                (x_port.borrow().clone(), y_port.borrow().clone())
-            {
-                (
-                    x.to_vec().into_iter().map(|f| f as f32).collect(),
-                    y.to_vec().into_iter().map(|f| f as f32).collect(),
-                )
+impl Plot {
+    pub fn view<'a>(
+        &self,
+        _id: u32,
+        input_data: Option<OrderMap<String, &RefCell<PortData>>>,
+    ) -> Element<'a, Message> {
+        let (x, y) = if let Some(i) = input_data {
+            if let (Some(x_port), Some(y_port)) = (i.get("x"), i.get("y")) {
+                if let (PortData::Real(x), PortData::Real(y)) =
+                    (x_port.borrow().clone(), y_port.borrow().clone())
+                {
+                    (
+                        x.to_vec().into_iter().map(|f| f as f32).collect(),
+                        y.to_vec().into_iter().map(|f| f as f32).collect(),
+                    )
+                } else {
+                    panic!("unsuported plot types ")
+                }
             } else {
-                panic!("unsuported plot types ") //, //input_data.clone())
+                (vec![], vec![])
             }
         } else {
             (vec![], vec![])
-        }
-    } else {
-        (vec![], vec![])
-    };
-    container(canvas(Plot { x, y }).width(Fill).height(Fill))
-        .padding(NODE_BORDER_WIDTH)
-        .into()
+        };
+        container(canvas(PlotCanvas { x, y }).width(Fill).height(Fill))
+            .padding(NODE_BORDER_WIDTH)
+            .into()
+    }
 }
 
 #[derive(Debug)]
-struct Plot {
+struct PlotCanvas {
     x: Vec<f32>,
     y: Vec<f32>,
 }
 
-impl<Message> canvas::Program<Message> for Plot {
+impl<Message> canvas::Program<Message> for PlotCanvas {
     // No internal state
     type State = ();
 

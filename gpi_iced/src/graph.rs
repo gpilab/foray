@@ -1,64 +1,19 @@
-use derive_more::Debug;
-use smol_str::SmolStr;
 use std::{cell::RefCell, collections::HashMap};
 
 use ordermap::OrderMap;
 
-/// Graph node is a template for for types of nodes stored in the graph
-#[derive(Debug)]
-pub struct GraphNode<NodeData, PortType, WireData> {
-    pub data: NodeData,
-    pub inputs: OrderMap<PortName, PortType>,
-    pub outputs: OrderMap<PortName, PortType>,
-    #[debug(skip)]
-    pub compute: Compute<NodeData, WireData>,
-}
-
-impl<NodeData, PortType, PortData> GraphNode<NodeData, PortType, PortData>
+pub trait GraphNode<NodeData, PortType, WireData>: dyn_clone::DynClone
 where
     PortType: Clone,
 {
-    pub fn new(
-        data: NodeData,
-        inputs: Vec<(&str, &PortType)>,
-        outputs: Vec<(&str, &PortType)>,
-        compute: Compute<NodeData, PortData>,
-    ) -> Self {
-        Self {
-            data,
-            inputs: inputs
-                .into_iter()
-                .map(|(port_name, port_type)| (port_name.into(), port_type.clone()))
-                .collect(),
-            outputs: outputs
-                .into_iter()
-                .map(|(port_name, port_type)| (port_name.into(), port_type.clone()))
-                .collect(),
-            compute,
-        }
-    }
+    fn inputs(&self) -> OrderMap<String, PortType>;
+    fn outputs(&self) -> OrderMap<String, PortType>;
+    fn compute(&self, inputs: OrderMap<String, &RefCell<WireData>>) -> OrderMap<String, WireData>;
 }
 
-//#[derive(Clone, Debug, PartialEq)]
-//pub enum PortId {
-//    In(NodeIndex, PortName),
-//    Out(NodeIndex, PortName),
-//}
-//impl From<PortId> for (NodeIndex, PortName) {
-//    fn from(value: PortId) -> Self {
-//        match value {
-//            PortId::In(nx, name) => (nx, name),
-//            PortId::Out(nx, name) => (nx, name),
-//        }
-//    }
-//}
-
-type PortName = SmolStr;
+type PortName = String;
 
 type NodeIndex = u32;
-
-type Compute<NodeData, WireData> =
-    Box<dyn Fn(OrderMap<PortName, &RefCell<WireData>>, &NodeData) -> OrderMap<PortName, WireData>>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum IO {
@@ -73,22 +28,22 @@ pub struct PortRef {
 }
 type Edge = (PortRef, PortRef);
 
-#[derive(Default, Debug)]
 pub struct Graph<NodeData, PortType, WireData>
 where
+    NodeData: GraphNode<NodeData, PortType, WireData>,
     PortType: Clone,
 {
-    nodes: ordermap::OrderMap<NodeIndex, GraphNode<NodeData, PortType, WireData>>,
+    nodes: ordermap::OrderMap<NodeIndex, NodeData>,
     edges: Vec<Edge>,
     wire_data: HashMap<(NodeIndex, PortName), RefCell<WireData>>,
     next_id: NodeIndex,
+    phantom: std::marker::PhantomData<PortType>,
 }
 
 impl<NodeData, PortType, WireData> Graph<NodeData, PortType, WireData>
 where
-    PortType: Clone + Debug,
-    WireData: Debug,
-    NodeData: Debug,
+    NodeData: GraphNode<NodeData, PortType, WireData>,
+    PortType: Clone,
 {
     pub fn new() -> Self {
         Self {
@@ -96,11 +51,12 @@ where
             edges: vec![],
             wire_data: HashMap::new(),
             next_id: 0,
+            phantom: std::marker::PhantomData,
         }
     }
 
     /// Add a new node to the graph, returns the node's index
-    pub fn node(&mut self, node: GraphNode<NodeData, PortType, WireData>) -> NodeIndex {
+    pub fn node(&mut self, node: NodeData) -> NodeIndex {
         let id = self.next_id;
         self.nodes.insert(id, node);
         self.next_id += 1;
@@ -110,7 +66,7 @@ where
     /// Remove a node and all edges associated with it
     pub fn delete_node(&mut self, id: NodeIndex) {
         dbg!(id);
-        dbg!(&self.nodes);
+        //dbg!(&self.nodes);
         dbg!(&self.edges);
         self.nodes.remove(&id);
         self.edges
@@ -119,19 +75,19 @@ where
     ///Get the node value at a given index
     ///panics if index is not valid!
     ///Use the index returned from `add_node` to ensure it exists
-    pub fn get_node(&self, nx: NodeIndex) -> &GraphNode<NodeData, PortType, WireData> {
+    pub fn get_node(&self, nx: NodeIndex) -> &NodeData {
         &self.nodes[&nx]
     }
 
     ///Get a mutable reference  to a node value at a given index
     ///panics if index is not valid
     ///Use the index returned from `add_node` to ensure it exists
-    pub fn get_mut_node(&mut self, nx: NodeIndex) -> &mut GraphNode<NodeData, PortType, WireData> {
+    pub fn get_mut_node(&mut self, nx: NodeIndex) -> &mut NodeData {
         self.nodes.get_mut(&nx).unwrap()
     }
-    pub fn get_output_data(&self, nx: NodeIndex) -> OrderMap<SmolStr, Option<&RefCell<WireData>>> {
+    pub fn get_output_data(&self, nx: NodeIndex) -> OrderMap<String, Option<&RefCell<WireData>>> {
         self.get_node(nx)
-            .outputs
+            .outputs()
             .clone()
             .into_iter()
             .map(|(port_name, _)| {
@@ -142,9 +98,9 @@ where
             })
             .collect()
     }
-    pub fn get_input_data(&self, nx: &NodeIndex) -> Option<OrderMap<SmolStr, &RefCell<WireData>>> {
+    pub fn get_input_data(&self, nx: &NodeIndex) -> Option<OrderMap<String, &RefCell<WireData>>> {
         self.get_node(*nx)
-            .inputs
+            .inputs()
             .keys()
             .filter_map(|port_name| {
                 self.get_parent(nx, port_name.clone()).map(|out_port| {
@@ -161,8 +117,12 @@ where
     }
 
     ///Set the node value of an existing node
-    pub fn set_node_data(&mut self, nx: NodeIndex, value: NodeData) {
-        self.nodes.get_mut(&nx).unwrap().data = value;
+    pub fn set_node_data(
+        &mut self,
+        nx: NodeIndex,
+        value: NodeData, //GenGraphNode<NodeData, PortType, WireData>,
+    ) {
+        *self.nodes.get_mut(&nx).unwrap() = value;
     }
 
     pub fn update_wire_data(&mut self, nx: NodeIndex, outputs: OrderMap<PortName, WireData>) {
@@ -221,7 +181,7 @@ where
         match port.io {
             IO::In => self
                 .get_node(port.node)
-                .inputs
+                .inputs()
                 .iter()
                 .position(|n| *n.0 == *port.name)
                 .unwrap_or_else(|| {
@@ -229,7 +189,7 @@ where
                 }),
             IO::Out => self
                 .get_node(port.node)
-                .outputs
+                .outputs()
                 .iter()
                 .position(|n| *n.0 == *port.name)
                 .unwrap_or_else(|| {
@@ -237,7 +197,7 @@ where
                 }),
         }
     }
-    ///Find a nodes direct parents and the associated labels
+    /// Find a nodes direct parents and the associated labels
     pub fn incoming_edges(&self, nx: &NodeIndex) -> Vec<(PortRef, PortRef)> {
         self.edges
             .iter()
@@ -251,7 +211,7 @@ where
             .collect()
     }
 
-    /// find the edges that that originate at `nx`
+    /// Find the edges that that originate at `nx`
     pub fn outgoing_edges(&self, nx: &NodeIndex) -> Vec<PortRef> {
         self.edges
             .iter()
@@ -263,39 +223,14 @@ where
                 }
             })
             .collect()
-        // loop over all nodes, and ports and find the Nodes and ports that
-        // connect to `nx`
-        //self.nodes
-        //    .iter()
-        //    .filter_map(|(possible_descendent_id, possible_descendent)| {
-        //        possible_descendent
-        //            .inputs
-        //            .iter()
-        //            .filter_map(|p| p.connection.clone())
-        //            .find(|(from_nx, _pt)| *nx == *from_nx)
-        //            .map(|(_, p_id)| (*possible_descendent_id, p_id))
-        //    })
-        //    .collect()
     }
 
-    /// topological sort using Kahn's algorithm
+    /// Topological sort using Kahn's algorithm
     /// returns a list of NodeIndices
     pub fn topological_sort(&self) -> Vec<NodeIndex> {
         let mut sorted = vec![];
         let mut working_edges = self.edges.clone();
-        //let mut working_edges: Vec<((NodeIndex, PortName), (NodeIndex, PortName))> = self
-        //    .nodes
-        //    .iter()
-        //    .flat_map(|(nx, node)| {
-        //        node.inputs.iter().flat_map(|p| {
-        //            p.connection
-        //                .clone()
-        //                .map(|(parent_node_id, parent_port_id)| {
-        //                    ((parent_node_id, parent_port_id), (*nx, p.name.clone()))
-        //                })
-        //        })
-        //    })
-        //    .collect();
+
         let mut no_incoming: Vec<_> = self
             .nodes
             .keys()
@@ -336,14 +271,14 @@ where
     }
 
     fn compute_node(&mut self, nx: &NodeIndex) {
-        //let incoming_edges = &self.incoming_edges(nx);
         let node = self.get_node(*nx);
         //TODO: Handle errors nicely
         let inputs = self.get_input_data(nx);
-
+        dbg!(nx);
+        //dbg!(inputs);
         if let Some(inputs) = inputs {
-            if inputs.len() == node.inputs.len() {
-                let outputs = (*node.compute)(inputs, &node.data);
+            if inputs.len() == node.inputs().len() {
+                let outputs = node.compute(inputs);
                 self.update_wire_data(*nx, outputs);
             }
         }
@@ -359,15 +294,25 @@ where
         }
     }
 
-    /// determine if a node has any incoming connections
+    /// Determine if a node has any incoming connections
     fn has_incoming(nx: &NodeIndex, edges: &[Edge]) -> bool {
         edges.iter().any(|(_from, to)| to.node == *nx)
     }
 
-    /// find the index of `edges` corresponding to the first
+    /// Find the index of `edges` corresponding to the first
     /// connection starting from `nx` (if it exists)
     fn next_connected_edge(nx: &NodeIndex, edges: &[Edge]) -> Option<usize> {
         edges.iter().position(|(from, _to)| from.node == *nx)
+    }
+}
+
+impl<NodeData, PortType, WireData> Default for Graph<NodeData, PortType, WireData>
+where
+    NodeData: GraphNode<NodeData, PortType, WireData>,
+    PortType: Clone + Default,
+{
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -376,43 +321,55 @@ mod test {
 
     use super::*;
 
-    fn identity_node<NodeData, PortType: Clone, WireData: Clone>(
-        data: NodeData,
-        port_type: &PortType,
-    ) -> GraphNode<NodeData, PortType, WireData> {
-        GraphNode::new(
-            data,
-            vec![("in", port_type)],
-            vec![("out", port_type)],
-            Box::new(|a, _| [("out".into(), a["in"].borrow().clone())].into()),
-        )
+    #[derive(Clone, Debug)]
+    struct IdentityNode {}
+    #[derive(Clone, Debug)]
+    struct ConstantNode {
+        value: u32,
     }
 
-    fn constant_node<NodeData: 'static, PortType: Clone + 'static, WireData: Clone + 'static>(
-        data: NodeData,
-        out_data: WireData,
-        out_type: &PortType,
-    ) -> GraphNode<NodeData, PortType, WireData> {
-        GraphNode::new(
-            data,
-            vec![],
-            vec![("out", out_type)],
-            Box::new(move |_, _| [("out".into(), out_data.clone())].into()),
-        )
+    #[derive(Clone, Debug)]
+    enum Node {
+        Identity(IdentityNode),
+        Constant(ConstantNode),
+    }
+
+    impl GraphNode<Node, (), u32> for Node {
+        fn inputs(&self) -> OrderMap<String, ()> {
+            match self {
+                Node::Identity(_node) => [("in".to_string(), ())].into(),
+                Node::Constant(_node) => [].into(),
+            }
+        }
+
+        fn outputs(&self) -> OrderMap<String, ()> {
+            match self {
+                Node::Identity(_node) => [("out".to_string(), ())].into(),
+                Node::Constant(_node) => [("out".to_string(), ())].into(),
+            }
+        }
+
+        fn compute(&self, inputs: OrderMap<String, &RefCell<u32>>) -> OrderMap<String, u32> {
+            dbg!(&inputs);
+            match self {
+                Node::Identity(_node) => [("out".to_string(), *inputs["in"].borrow())].into(),
+                Node::Constant(node) => [("out".to_string(), node.value)].into(),
+            }
+        }
     }
 
     #[test]
     fn sort() {
-        let mut g: Graph<u32, (), ()> = Graph::new();
+        let mut g: Graph<Node, (), u32> = Graph::new();
 
-        let n8 = g.node(identity_node(8, &()));
-        let n7 = g.node(identity_node(7, &()));
-        let n6 = g.node(identity_node(6, &()));
-        let n5 = g.node(identity_node(5, &()));
-        let n4 = g.node(identity_node(4, &()));
-        let n3 = g.node(identity_node(3, &()));
-        let n2 = g.node(identity_node(2, &()));
-        let n1 = g.node(identity_node(1, &()));
+        let n8 = g.node(Node::Identity(IdentityNode {}));
+        let n7 = g.node(Node::Identity(IdentityNode {}));
+        let n6 = g.node(Node::Identity(IdentityNode {}));
+        let n5 = g.node(Node::Identity(IdentityNode {}));
+        let n4 = g.node(Node::Identity(IdentityNode {}));
+        let n3 = g.node(Node::Identity(IdentityNode {}));
+        let n2 = g.node(Node::Identity(IdentityNode {}));
+        let n1 = g.node(Node::Identity(IdentityNode {}));
 
         g.connect((n1, "out"), (n3, "in"));
         g.connect((n1, "out"), (n2, "in"));
@@ -426,19 +383,22 @@ mod test {
 
     #[test]
     fn process() {
-        let mut g: Graph<(), (), u32> = Graph::new();
+        let mut g: Graph<Node, (), u32> = Graph::new();
 
-        let n1 = g.node(constant_node((), 7, &()));
-        let n2 = g.node(identity_node((), &()));
-        let n3 = g.node(identity_node((), &()));
-        let n4 = g.node(identity_node((), &()));
+        let n1 = g.node(Node::Constant(ConstantNode { value: 7 }));
+        let n2 = g.node(Node::Identity(IdentityNode {}));
+        let n3 = g.node(Node::Identity(IdentityNode {}));
+        let n4 = g.node(Node::Identity(IdentityNode {}));
+
         // leave a node unconnected to check that it doesn't get a value propogated
-        let n_unconnected = g.node(identity_node((), &()));
+        let n_unconnected = g.node(Node::Identity(IdentityNode {}));
 
         g.connect((n1, "out"), (n3, "in"));
         g.connect((n1, "out"), (n2, "in"));
         g.connect((n3, "out"), (n4, "in"));
 
+        dbg!(&g.edges);
+        dbg!(&g.nodes);
         //Propogate values
         g.execute_network();
 
@@ -447,49 +407,50 @@ mod test {
         assert_eq!(g.get_wire_data(&n3, "out"), Some(RefCell::new(7)).as_ref());
         assert_eq!(g.get_wire_data(&n_unconnected, "out"), None);
     }
-    //#[test]
-    //fn vertex() {
-    //    type Node<'a> = HashMap<&'a str, Vec<u32>>;
-    //
-    //    let mut g: Graph<Vec<u32>, &str, ()> = Graph::new();
-    //    let n1 = g.add_node([("out", vec![1, 2, 3])].into());
-    //    let n2 = g.add_node([("out", vec![4, 5, 6])].into());
-    //    let n3 = g.add_node([("out", vec![])].into());
-    //    let n4 = g.add_node([("out", vec![])].into());
-    //
-    //    g.add_edge((n1, "o1"), (n2, "i2"));
-    //    g.add_edge((n1, "o1"), (n3, "i3"));
-    //    g.add_edge((n2, "o2"), (n3, "i3"));
-    //    g.add_edge((n3, "o3"), (n4, "i4"));
-    //
-    //    g.topological_sort().iter_mut().for_each(|nx| {
-    //        let new_vec: Vec<_> = g
-    //            .incoming_edges(nx)
-    //            .into_iter()
-    //            .flat_map(|(from, _to)| g.get_node(from.0)["out"].clone())
-    //            .collect();
-    //
-    //        let node = g.get_mut_node(*nx);
-    //        node.get_mut("out").unwrap().extend(new_vec);
-    //    });
-    //    assert_eq!(*g.get_node(n1)["out"], vec![1, 2, 3]);
-    //    assert_eq!(*g.get_node(n2)["out"], vec![4, 5, 6, 1, 2, 3]);
-    //    assert_eq!(*g.get_node(n3)["out"], vec![1, 2, 3, 4, 5, 6, 1, 2, 3]);
-    //    assert_eq!(*g.get_node(n4)["out"], vec![1, 2, 3, 4, 5, 6, 1, 2, 3]);
-    //}
-    //
-    //use numpy::PyArrayMethods;
-    //use pyo3::{prepare_freethreaded_python, Python};
-    //
-    //#[test]
-    //fn simple_ndarray() {
-    //    prepare_freethreaded_python();
-    //
-    //    Python::with_gil(|py| {
-    //        let res = get_array(py).readonly();
-    //        let slice = res.as_slice().unwrap();
-    //
-    //        assert_eq!(&[1, 2, 3], slice);
-    //    })
-    //}
 }
+//#[test]
+//fn vertex() {
+//    type Node<'a> = HashMap<&'a str, Vec<u32>>;
+//
+//    let mut g: Graph<Vec<u32>, &str, ()> = Graph::new();
+//    let n1 = g.add_node([("out", vec![1, 2, 3])].into());
+//    let n2 = g.add_node([("out", vec![4, 5, 6])].into());
+//    let n3 = g.add_node([("out", vec![])].into());
+//    let n4 = g.add_node([("out", vec![])].into());
+//
+//    g.add_edge((n1, "o1"), (n2, "i2"));
+//    g.add_edge((n1, "o1"), (n3, "i3"));
+//    g.add_edge((n2, "o2"), (n3, "i3"));
+//    g.add_edge((n3, "o3"), (n4, "i4"));
+//
+//    g.topological_sort().iter_mut().for_each(|nx| {
+//        let new_vec: Vec<_> = g
+//            .incoming_edges(nx)
+//            .into_iter()
+//            .flat_map(|(from, _to)| g.get_node(from.0)["out"].clone())
+//            .collect();
+//
+//        let node = g.get_mut_node(*nx);
+//        node.get_mut("out").unwrap().extend(new_vec);
+//    });
+//    assert_eq!(*g.get_node(n1)["out"], vec![1, 2, 3]);
+//    assert_eq!(*g.get_node(n2)["out"], vec![4, 5, 6, 1, 2, 3]);
+//    assert_eq!(*g.get_node(n3)["out"], vec![1, 2, 3, 4, 5, 6, 1, 2, 3]);
+//    assert_eq!(*g.get_node(n4)["out"], vec![1, 2, 3, 4, 5, 6, 1, 2, 3]);
+//}
+//
+//use numpy::PyArrayMethods;
+//use pyo3::{prepare_freethreaded_python, Python};
+//
+//#[test]
+//fn simple_ndarray() {
+//    prepare_freethreaded_python();
+//
+//    Python::with_gil(|py| {
+//        let res = get_array(py).readonly();
+//        let slice = res.as_slice().unwrap();
+//
+//        assert_eq!(&[1, 2, 3], slice);
+//    })
+//}
+//}
