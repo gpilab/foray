@@ -1,11 +1,12 @@
-use gpi_iced::app::App;
-use iced::{application, Font, Theme};
+use gpi_iced::app::{subscriptions, theme, App};
+use iced::{application, Font};
 
 pub fn main() -> iced::Result {
     #[cfg(target_arch = "wasm32")]
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
     application("gpi_v2", App::update, App::view)
+        .subscription(subscriptions)
         .antialiasing(true)
         .theme(theme)
         .window(iced::window::Settings {
@@ -20,8 +21,4 @@ pub fn main() -> iced::Result {
         .font(include_bytes!("../data/DejaVuMathTeXGyre.ttf").as_slice()) // "DejaVu Math TeX Gyre"
         .default_font(Font::with_name("Canterell"))
         .run()
-}
-
-fn theme(_state: &App) -> Theme {
-    Theme::Ferra
 }

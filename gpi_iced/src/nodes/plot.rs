@@ -12,12 +12,12 @@ use iced::{
     Element,
 };
 use iced::{Rectangle, Renderer, Theme};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 
 // Rectanlge specified by center position, width and height
 // y is up
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Rect {
     pub center: Vector,
     pub width: f32,
@@ -41,13 +41,13 @@ impl Default for Rect {
     fn default() -> Self {
         Rect {
             center: [0., 0.].into(),
-            width: 200.,
-            height: 200. * (INNER_NODE_HEIGHT / INNER_NODE_WIDTH),
+            width: 20.,
+            height: 20. * (INNER_NODE_HEIGHT / INNER_NODE_WIDTH),
         }
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, Serialize)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
 pub struct Plot {
     rect: Rect,
 }
@@ -201,15 +201,15 @@ impl<Message> canvas::Program<Message> for PlotCanvas {
                 .with_color(theme.palette().primary.scale_alpha(0.01))
                 .with_width(1.);
 
-            grid_path(self.config.rect, 1000.)
+            grid_path(self.config.rect, 100.)
                 .into_iter()
                 .for_each(|p| frame.stroke(&p, main_grid_stroke));
 
-            grid_path(self.config.rect, 100.)
+            grid_path(self.config.rect, 10.)
                 .into_iter()
                 .for_each(|p| frame.stroke(&p, secondary_grid_stroke));
 
-            grid_path(self.config.rect, 10.)
+            grid_path(self.config.rect, 1.)
                 .into_iter()
                 .for_each(|p| frame.stroke(&p, tertiary_grid_strok));
         }

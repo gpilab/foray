@@ -2,12 +2,12 @@
     graph: (
         nodes: {
             0: Linspace((
-                start: -100.0,
-                stop: 100.0,
+                start: -10.0,
+                stop: 10.0,
                 num: 100,
             )),
-            1: Constant(0.5),
-            2: Constant(-2.0),
+            1: Constant(0.7000000000000002),
+            2: Constant(0.3000000000000007),
             3: Multiply,
             4: Add,
             5: Plot((
@@ -16,67 +16,122 @@
                         x: 0.0,
                         y: 0.0,
                     ),
-                    width: 200.0,
-                    height: 100.0,
+                    width: 20.0,
+                    height: 10.0,
                 ),
             )),
-            6: Identity,
+            7: Multiply,
         },
         edges: [((
             node: 0,
             name: "out",
-            io: Out2,
+            io: Out,
         ), (
             node: 3,
             name: "a",
-            io: In2,
+            io: In,
         )), ((
             node: 1,
             name: "out",
-            io: Out2,
+            io: Out,
         ), (
             node: 3,
             name: "b",
-            io: In2,
-        )), ((
-            node: 3,
-            name: "out",
-            io: Out2,
-        ), (
-            node: 4,
-            name: "a",
-            io: In2,
+            io: In,
         )), ((
             node: 2,
             name: "out",
-            io: Out2,
+            io: Out,
         ), (
             node: 4,
             name: "b",
-            io: In2,
+            io: In,
         )), ((
             node: 0,
             name: "out",
-            io: Out2,
+            io: Out,
         ), (
             node: 5,
             name: "x",
-            io: In2,
+            io: In,
         )), ((
             node: 4,
             name: "out",
-            io: Out2,
+            io: Out,
         ), (
             node: 5,
             name: "y",
-            io: In2,
+            io: In,
+        )), ((
+            node: 3,
+            name: "out",
+            io: Out,
+        ), (
+            node: 7,
+            name: "a",
+            io: In,
+        )), ((
+            node: 3,
+            name: "out",
+            io: Out,
+        ), (
+            node: 7,
+            name: "b",
+            io: In,
+        )), ((
+            node: 7,
+            name: "out",
+            io: Out,
+        ), (
+            node: 4,
+            name: "a",
+            io: In,
         ))],
-        next_id: 7,
+        next_id: 8,
     ),
-    selected_shape: None,
+    shapes: (
+        camera: (
+            position: (
+                x: 0.0,
+                y: 0.0,
+            ),
+            zoom: 1.0,
+        ),
+        shape_positions: {
+            0: (
+                x: 100.0,
+                y: 100.0,
+            ),
+            1: (
+                x: 261.66248,
+                y: 109.50938,
+            ),
+            2: (
+                x: 350.2531,
+                y: 241.22812,
+            ),
+            3: (
+                x: 157.02185,
+                y: 194.52188,
+            ),
+            4: (
+                x: 275.59674,
+                y: 385.9125,
+            ),
+            5: (
+                x: 114.14691,
+                y: 468.85004,
+            ),
+            7: (
+                x: 164.85938,
+                y: 286.34372,
+            ),
+        },
+    ),
+    selected_shape: Some(5),
     cursor_position: (
-        x: -55.393753,
-        y: 21.05,
+        x: -83.73125,
+        y: 19.640625,
     ),
     config: 50.0,
     debug: false,

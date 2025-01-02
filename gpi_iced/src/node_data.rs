@@ -6,10 +6,10 @@ use crate::nodes::plot::Plot;
 use crate::nodes::{constant, default_node_size, GUINode, PortData, PortType};
 use crate::OrderMap;
 use iced::widget::text;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use strum::{EnumIter, VariantNames};
 
-#[derive(Clone, Debug, EnumIter, VariantNames, Serialize)]
+#[derive(Clone, Debug, EnumIter, VariantNames, Serialize, Deserialize)]
 pub enum NodeData {
     Identity,
     Constant(f64),

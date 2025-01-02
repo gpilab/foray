@@ -1,6 +1,7 @@
+use std::fs::read_to_string;
 use std::iter::once;
 
-use crate::graph::{Graph, GraphNode, PortRef, IO2};
+use crate::graph::{Graph, GraphNode, PortRef, IO};
 use crate::math::{Point, Vector};
 use crate::node_data::NodeData;
 use crate::nodes::linspace::LinspaceConfig;
@@ -19,10 +20,13 @@ use crate::OrderMap;
 use canvas::{Path, Stroke};
 use iced::advanced::graphics::core::Element;
 use iced::border::{radius, rounded};
+use iced::event::listen_with;
+use iced::keyboard::key::Named;
+use iced::keyboard::{Key, Modifiers};
 use iced::widget::{column, *};
 use iced::Length::Fill;
-use iced::{Alignment, Color};
-use serde::Serialize;
+use iced::{Alignment, Color, Subscription, Task};
+use serde::{Deserialize, Serialize};
 
 #[derive(Default)]
 pub enum Action {
@@ -49,18 +53,21 @@ pub enum Message {
     DeleteNode(u32),
     ToggleDebug,
     Save,
+    Load,
+    FocusNext,
+    FocusPrevious,
 }
-#[derive(Serialize)]
+
+#[derive(Serialize, Deserialize)]
 pub struct App {
     graph: Graph<NodeData, PortType, PortData>,
-    #[serde(skip_serializing)]
     shapes: workspace::State,
     selected_shape: Option<ShapeId>,
     cursor_position: Point,
     config: f32,
-    #[serde(skip_serializing)]
+    #[serde(skip, default = "default_theme")]
     theme: Theme,
-    #[serde(skip_serializing)]
+    #[serde(skip)]
     action: Action,
     debug: bool,
 }
@@ -111,7 +118,7 @@ impl Default for App {
 }
 
 impl App {
-    pub fn update(&mut self, message: Message) {
+    pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Pan(delta) => {
                 self.shapes.camera.position.x -= delta.x * 2.;
@@ -133,8 +140,8 @@ impl App {
                     .expect("Shape index must exist") = cursor_position
             }
             Message::PortPress(port) => match port.io {
-                IO2::In2 => self.action = Action::CreatingInputWire(port, None),
-                IO2::Out2 => self.action = Action::CreatingOutputWire(port, None),
+                IO::In => self.action = Action::CreatingInputWire(port, None),
+                IO::Out => self.action = Action::CreatingOutputWire(port, None),
             },
             Message::PortRelease => {
                 match &self.action {
@@ -202,7 +209,15 @@ impl App {
                 )
                 .expect("Could not save to file");
             }
+            Message::Load => {
+                *self = ron::from_str(&read_to_string("network.ron").expect("Could not read file"))
+                    .expect("could not parse file");
+                self.graph.execute_network();
+            }
+            Message::FocusNext => return focus_next(),
+            Message::FocusPrevious => return focus_previous(),
         };
+        Task::none()
     }
 
     pub fn view(&self) -> Element<Message, Theme, Renderer> {
@@ -222,7 +237,7 @@ impl App {
                 .style(button_style),
             horizontal_space(),
             button(text("Load"))
-                .on_press(Message::Config(40.))
+                .on_press(Message::Load)
                 .padding([1.0, 4.0])
                 .style(button_style),
             horizontal_space(),
@@ -355,7 +370,7 @@ impl App {
                     let in_port = PortRef {
                         node: id,
                         name: port.0.clone(),
-                        io: IO2::In2,
+                        io: IO::In,
                     };
                     Pin::new(
                         mouse_area(
@@ -380,7 +395,7 @@ impl App {
                     let out_port = PortRef {
                         node: id,
                         name: port.0.clone(),
-                        io: IO2::Out2,
+                        io: IO::Out,
                     };
                     Pin::new(
                         mouse_area(
@@ -479,4 +494,28 @@ impl App {
             })
             .collect()
     }
+}
+
+pub fn theme(_state: &App) -> Theme {
+    default_theme()
+}
+fn default_theme() -> Theme {
+    Theme::Ferra
+}
+
+pub fn subscriptions(_state: &App) -> Subscription<Message> {
+    listen_with(|event, _status, _id| match event {
+        iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
+            key: Key::Named(Named::Tab),
+            modifiers,
+            ..
+        }) => {
+            if modifiers.contains(Modifiers::SHIFT) {
+                Some(Message::FocusPrevious)
+            } else {
+                Some(Message::FocusNext)
+            }
+        }
+        _ => None,
+    })
 }

@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::OrderMap;
 
@@ -17,22 +17,22 @@ type PortName = String;
 
 type NodeIndex = u32;
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-pub enum IO2 {
-    In2,
-    Out2,
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum IO {
+    In,
+    Out,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PortRef {
     pub node: u32,
     pub name: PortName,
-    pub io: IO2,
+    pub io: IO,
 }
 
 type Edge = (PortRef, PortRef);
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Graph<NodeData, PortType, WireData>
 where
     NodeData: GraphNode<NodeData, PortType, WireData>,
@@ -40,13 +40,16 @@ where
 {
     nodes: crate::OrderMap<NodeIndex, NodeData>,
     edges: Vec<Edge>,
-    #[serde(skip_serializing)]
+    #[serde(skip, default = "default_wire_data")]
     wire_data: HashMap<(NodeIndex, PortName), RefCell<WireData>>,
     next_id: NodeIndex,
-    #[serde(skip_serializing)]
+    #[serde(skip)]
     phantom: std::marker::PhantomData<PortType>,
 }
 
+fn default_wire_data<K, V>() -> HashMap<K, V> {
+    HashMap::new()
+}
 impl<NodeData, PortType, WireData> Graph<NodeData, PortType, WireData>
 where
     NodeData: GraphNode<NodeData, PortType, WireData>,
@@ -141,8 +144,8 @@ where
 
     /// create a connection between two port references
     pub fn add_edge_from_ref(&mut self, from: &PortRef, to: &PortRef) {
-        assert!(from.io == IO2::Out2);
-        assert!(to.io == IO2::In2);
+        assert!(from.io == IO::Out);
+        assert!(to.io == IO::In);
         self.connect((from.node, from.name.clone()), (to.node, to.name.clone()));
     }
     /// create a connection between two ports
@@ -154,12 +157,12 @@ where
         let from = PortRef {
             node: from.0,
             name: from.1.into(),
-            io: IO2::Out2,
+            io: IO::Out,
         };
         let to = PortRef {
             node: to.0,
             name: to.1.into(),
-            io: IO2::In2,
+            io: IO::In,
         };
 
         //TODO: check for compatiablity, or if the edge alread exists
@@ -183,7 +186,7 @@ where
     /// panics if `port` is not valid
     pub fn port_index(&self, port: &PortRef) -> usize {
         match port.io {
-            IO2::In2 => self
+            IO::In => self
                 .get_node(port.node)
                 .inputs()
                 .iter()
@@ -191,7 +194,7 @@ where
                 .unwrap_or_else(|| {
                     panic!("PortId must have valid input node index and port id {port:?}",)
                 }),
-            IO2::Out2 => self
+            IO::Out => self
                 .get_node(port.node)
                 .outputs()
                 .iter()
