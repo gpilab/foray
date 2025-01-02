@@ -1,6 +1,6 @@
 use super::{PortData, INNER_NODE_HEIGHT, INNER_NODE_WIDTH, NODE_BORDER_WIDTH};
 use crate::app::Message;
-use crate::math::linspace_delta;
+use crate::math::{linspace_delta, Vector};
 use crate::node_data::NodeData;
 use iced::widget::canvas::{Path, Stroke};
 use iced::widget::{container, horizontal_space, row, text, text_input};
@@ -18,7 +18,7 @@ use std::cell::RefCell;
 // y is up
 #[derive(Debug, Clone, Copy)]
 pub struct Rect {
-    pub center: iced::Vector,
+    pub center: Vector,
     pub width: f32,
     pub height: f32,
 }
@@ -181,7 +181,7 @@ impl<Message> canvas::Program<Message> for PlotCanvas {
         ]);
 
         //move the center point to the center of our canvas
-        frame.translate(-self.config.rect.center);
+        frame.translate((-self.config.rect.center).into());
 
         // The frame is now centered on center, and goes from:
         // rect.left   -> rect.right
@@ -190,7 +190,7 @@ impl<Message> canvas::Program<Message> for PlotCanvas {
         //// Grid
         {
             let main_grid_stroke = Stroke::default()
-                .with_color(theme.palette().primary.scale_alpha(0.5))
+                .with_color(theme.palette().primary.scale_alpha(0.3))
                 .with_width(1.);
 
             let secondary_grid_stroke = Stroke::default()

@@ -1,6 +1,7 @@
 use std::iter::once;
 
-use crate::graph::{Graph, GraphNode, PortRef, IO};
+use crate::graph::{Graph, GraphNode, PortRef, IO2};
+use crate::math::{Point, Vector};
 use crate::node_data::NodeData;
 use crate::nodes::linspace::LinspaceConfig;
 use crate::nodes::plot::Plot;
@@ -14,11 +15,12 @@ use crate::widget::pin::Pin;
 use crate::widget::shapes::ShapeId;
 use crate::widget::workspace::{self, workspace};
 use crate::wires::{active_wire_color, find_port_offset, wire_status};
-use advanced::graphics::core::Element;
 use canvas::{Path, Stroke};
+use iced::advanced::graphics::core::Element;
 use iced::border::{radius, rounded};
 use iced::widget::{column, *};
-use iced::*;
+use iced::Length::Fill;
+use iced::{Alignment, Color};
 use ordermap::OrderMap;
 
 #[derive(Default)]
@@ -46,13 +48,13 @@ pub enum Message {
     DeleteNode(u32),
     ToggleDebug,
 }
-
 pub struct App {
     graph: Graph<NodeData, PortType, PortData>,
     shapes: workspace::State,
     selected_shape: Option<ShapeId>,
     cursor_position: Point,
     config: f32,
+    //#[serde(skip_serializing)]
     theme: Theme,
     action: Action,
     debug: bool,
@@ -124,8 +126,8 @@ impl App {
                     .expect("Shape index must exist") = cursor_position
             }
             Message::PortPress(port) => match port.io {
-                IO::In => self.action = Action::CreatingInputWire(port, None),
-                IO::Out => self.action = Action::CreatingOutputWire(port, None),
+                IO2::In2 => self.action = Action::CreatingInputWire(port, None),
+                IO2::Out2 => self.action = Action::CreatingOutputWire(port, None),
             },
             Message::PortRelease => {
                 match &self.action {
@@ -274,7 +276,7 @@ impl App {
             container(
                 column![
                     //// File
-                    file_commands.align_y(Alignment::Center).width(Length::Fill),
+                    file_commands.align_y(Alignment::Center).width(Fill),
                     ////
                     horizontal_rule(SEPERATOR),
                     //// Config
@@ -284,13 +286,11 @@ impl App {
                         config
                     }
                 ]
-                .height(Length::Fill)
+                .height(Fill)
                 .width(200.),
             ),
             vertical_rule(SEPERATOR),
-            container(workspace)
-                .height(Length::Fill)
-                .width(Length::Fill)
+            container(workspace).height(Fill).width(Fill)
         ]
         .into()
     }
@@ -337,7 +337,7 @@ impl App {
                     let in_port = PortRef {
                         node: id,
                         name: port.0.clone(),
-                        io: IO::In,
+                        io: IO2::In2,
                     };
                     Pin::new(
                         mouse_area(
@@ -362,7 +362,7 @@ impl App {
                     let out_port = PortRef {
                         node: id,
                         name: port.0.clone(),
-                        io: IO::Out,
+                        io: IO2::Out2,
                     };
                     Pin::new(
                         mouse_area(
@@ -408,7 +408,7 @@ impl App {
 
     fn wire_curve(&self, wire_end_node: u32, points: &OrderMap<u32, Point>) -> Vec<(Path, Stroke)> {
         let port_position = |port: &PortRef| {
-            points[&port.node] + find_port_offset(port, self.graph.port_index(port))
+            points[&port.node] + find_port_offset(port, self.graph.port_index(port)).into()
         };
 
         //// Handle currently active wire
@@ -445,12 +445,12 @@ impl App {
             .map(|((from, to), color)| {
                 (
                     Path::new(|builder| {
-                        builder.move_to(from);
+                        builder.move_to(from.into());
                         let mid = f32::abs((to.y - from.y) * 0.5).max(PORT_RADIUS * 2.);
                         builder.bezier_curve_to(
                             (from.x, from.y - mid).into(),
                             (to.x, to.y + mid).into(),
-                            to,
+                            to.into(),
                         );
                     }),
                     Stroke::default()

@@ -13,14 +13,14 @@ iced = { version = "0.13.1", features = [
 	"canvas",
 ] }
 ndarray = "0.16.1"
-ordermap = "0.5.4"
-smol_str = { version = "0.3.2", features = ["serde"] }
+ordermap = { version = "0.5.4", features = ["serde"] }
+serde = { version = "1.0.217", features = ["serde_derive"] }
 strum = { version = "0.26.3", features = ["derive"] }
 
 [target.'cfg(target_arch="wasm32")'.dependencies]
 iced = { version = "0.13.1", features = ["webgl", "web-colors"] }
 console_error_panic_hook = "0.1.7"
 
-# [profile.dev]
-# debug = 0
-# codegen-backend = "cranelift"
+[profile.dev]
+debug = 0
+codegen-backend = "cranelift"

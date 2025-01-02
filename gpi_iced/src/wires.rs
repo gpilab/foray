@@ -1,6 +1,6 @@
 use crate::{
     app,
-    graph::{PortRef, IO},
+    graph::{PortRef, IO2},
     nodes::{INNER_NODE_HEIGHT, INNER_NODE_WIDTH, NODE_RADIUS, PORT_RADIUS},
 };
 use iced::{Theme, Vector};
@@ -9,8 +9,10 @@ use iced::{Theme, Vector};
 pub fn find_port_offset(port_ref: &PortRef, port_index: usize) -> Vector {
     let port_x = |i: usize| i as f32 * (INNER_NODE_WIDTH / 4.) + NODE_RADIUS * 2.;
     match port_ref.io {
-        IO::In => Vector::new(port_x(port_index), 0.) + Vector::new(PORT_RADIUS, -PORT_RADIUS / 2.),
-        IO::Out => {
+        IO2::In2 => {
+            Vector::new(port_x(port_index), 0.) + Vector::new(PORT_RADIUS, -PORT_RADIUS / 2.)
+        }
+        IO2::Out2 => {
             Vector::new(port_x(port_index), INNER_NODE_HEIGHT)
                 + Vector::new(PORT_RADIUS, PORT_RADIUS / 2.)
         }
@@ -26,8 +28,8 @@ pub fn wire_status(
     current_action: &app::Action,
     theme: &Theme,
 ) -> iced::Color {
-    assert!(output.io == IO::Out);
-    assert!(input.io == IO::In);
+    assert!(output.io == IO2::Out2);
+    assert!(input.io == IO2::In2);
 
     let p = theme.extended_palette();
 

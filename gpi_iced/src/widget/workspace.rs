@@ -7,10 +7,12 @@ use iced::mouse::ScrollDelta;
 use iced::touch::Event::{FingerLifted, FingerLost, FingerMoved, FingerPressed};
 
 use iced::widget::canvas::{Path, Stroke};
-use iced::{event, keyboard, mouse, Color, Point, Theme, Vector};
+use iced::{event, keyboard, mouse, Color, Theme};
 use iced::{Element, Event};
 use iced::{Length, Rectangle, Size};
 use ordermap::OrderMap;
+
+use crate::math::{Point, Vector};
 
 use super::shapes::{Shape, ShapeId, Shapes};
 
@@ -23,7 +25,7 @@ pub struct Camera {
 impl Default for Camera {
     fn default() -> Self {
         Self {
-            position: Vector::ZERO,
+            position: [0., 0.].into(),
             zoom: 1.0,
         }
     }
@@ -53,7 +55,6 @@ enum Action {
     /// ShapeId and offset of the cursor with respect to the shape position
     Drag(ShapeId, Vector),
 }
-
 pub struct State {
     pub camera: Camera,
     pub shape_positions: OrderMap<ShapeId, Point>,
@@ -235,14 +236,14 @@ where
         //// Draw saved curves
         let mut frame = renderer.new_frame(bounds.size());
 
-        frame.translate(-self.camera.position);
+        frame.translate((self.camera.position * -1.0).into());
 
         self.connections
             .iter()
             .for_each(|(p, s)| frame.stroke(p, *s));
 
         renderer.with_layer(workspace_layout.bounds(), |renderer| {
-            renderer.with_translation(workspace_offset, |renderer| {
+            renderer.with_translation(workspace_offset.into(), |renderer| {
                 renderer.draw_geometry(frame.into_geometry())
             });
         });
@@ -311,7 +312,9 @@ where
                 Event::Mouse(ButtonPressed(mouse::Button::Left))
                 | Event::Touch(FingerPressed { .. }) => {
                     ////Find the first coliding shape
-                    if let Some((id, offset)) = self.contents.find_shape(cursor_position, layout) {
+                    if let Some((id, offset)) =
+                        self.contents.find_shape(cursor_position.into(), layout)
+                    {
                         //// publish event
                         if let Some(on_shape_click) = &self.on_click {
                             shell.publish(on_shape_click(Some(id)));
@@ -353,13 +356,13 @@ where
                     if let Action::Drag(id, offset) = &inner_state.action {
                         //// publish event
                         if let Some(on_drag) = &self.on_shape_drag {
-                            shell.publish(on_drag(*id, cursor_position - *offset));
+                            shell.publish(on_drag(*id, Point::from(cursor_position) - *offset));
                         }
                         //// capture event
                         event::Status::Captured
                     } else {
                         if let Some(on_move) = &self.on_cursor_move {
-                            shell.publish(on_move(cursor_position - workspace_offset));
+                            shell.publish(on_move(Point::from(cursor_position) - workspace_offset));
                         }
                         event::Status::Ignored
                     }

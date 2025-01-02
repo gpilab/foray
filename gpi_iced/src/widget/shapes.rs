@@ -1,5 +1,7 @@
-use iced::{advanced::layout, Point, Vector};
+use iced::advanced::layout;
 use ordermap::OrderMap;
+
+use crate::math::{Point, Vector};
 
 pub type ShapeId = u32;
 pub struct Shape<T> {
@@ -31,7 +33,7 @@ impl<T> Shapes<T> {
             .zip(layout.children())
             .find_map(|((id, shape), layout)| {
                 let bounds = layout.bounds();
-                if bounds.contains(point) {
+                if bounds.contains(point.into()) {
                     Some((*id, point - shape.position))
                 } else {
                     None

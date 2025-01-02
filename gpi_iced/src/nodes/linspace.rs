@@ -9,9 +9,10 @@ use iced::{
     Length::{Fill, Shrink},
 };
 use ordermap::OrderMap;
+use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LinspaceConfig {
     start: f64,
     stop: f64,
