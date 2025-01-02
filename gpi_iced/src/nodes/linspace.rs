@@ -1,4 +1,5 @@
 use super::PortData;
+use crate::OrderMap;
 use crate::{app::Message, math::linspace, node_data::NodeData};
 use iced::{
     widget::{
@@ -8,7 +9,6 @@ use iced::{
     Color, Element,
     Length::{Fill, Shrink},
 };
-use ordermap::OrderMap;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 

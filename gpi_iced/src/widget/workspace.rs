@@ -10,13 +10,14 @@ use iced::widget::canvas::{Path, Stroke};
 use iced::{event, keyboard, mouse, Color, Theme};
 use iced::{Element, Event};
 use iced::{Length, Rectangle, Size};
-use ordermap::OrderMap;
+use serde::Serialize;
 
 use crate::math::{Point, Vector};
+use crate::OrderMap;
 
 use super::shapes::{Shape, ShapeId, Shapes};
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Camera {
     pub position: Vector,
     pub zoom: f32,
@@ -55,6 +56,8 @@ enum Action {
     /// ShapeId and offset of the cursor with respect to the shape position
     Drag(ShapeId, Vector),
 }
+
+#[derive(Serialize)]
 pub struct State {
     pub camera: Camera,
     pub shape_positions: OrderMap<ShapeId, Point>,

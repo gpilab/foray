@@ -1,0 +1,83 @@
+(
+    graph: (
+        nodes: {
+            0: Linspace((
+                start: -100.0,
+                stop: 100.0,
+                num: 100,
+            )),
+            1: Constant(0.5),
+            2: Constant(-2.0),
+            3: Multiply,
+            4: Add,
+            5: Plot((
+                rect: (
+                    center: (
+                        x: 0.0,
+                        y: 0.0,
+                    ),
+                    width: 200.0,
+                    height: 100.0,
+                ),
+            )),
+            6: Identity,
+        },
+        edges: [((
+            node: 0,
+            name: "out",
+            io: Out2,
+        ), (
+            node: 3,
+            name: "a",
+            io: In2,
+        )), ((
+            node: 1,
+            name: "out",
+            io: Out2,
+        ), (
+            node: 3,
+            name: "b",
+            io: In2,
+        )), ((
+            node: 3,
+            name: "out",
+            io: Out2,
+        ), (
+            node: 4,
+            name: "a",
+            io: In2,
+        )), ((
+            node: 2,
+            name: "out",
+            io: Out2,
+        ), (
+            node: 4,
+            name: "b",
+            io: In2,
+        )), ((
+            node: 0,
+            name: "out",
+            io: Out2,
+        ), (
+            node: 5,
+            name: "x",
+            io: In2,
+        )), ((
+            node: 4,
+            name: "out",
+            io: Out2,
+        ), (
+            node: 5,
+            name: "y",
+            io: In2,
+        ))],
+        next_id: 7,
+    ),
+    selected_shape: None,
+    cursor_position: (
+        x: -55.393753,
+        y: 21.05,
+    ),
+    config: 50.0,
+    debug: false,
+)

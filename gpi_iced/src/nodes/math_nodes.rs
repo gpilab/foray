@@ -1,6 +1,6 @@
 use super::PortData;
+use crate::OrderMap;
 use ndarray::Array1;
-use ordermap::OrderMap;
 use std::ops::Deref;
 
 #[allow(clippy::type_complexity)]

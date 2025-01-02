@@ -1,6 +1,6 @@
-//use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(PartialEq, Debug, Clone, Copy, Serialize)]
 pub struct Vector {
     pub x: f32,
     pub y: f32,
@@ -66,7 +66,7 @@ impl std::ops::Mul<f32> for Vector {
     }
 }
 
-#[derive(Default, PartialEq, Debug, Clone, Copy)]
+#[derive(Default, PartialEq, Debug, Clone, Copy, Serialize)]
 pub struct Point {
     pub x: f32,
     pub y: f32,

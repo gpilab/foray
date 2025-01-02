@@ -4,11 +4,12 @@ use crate::nodes::linspace::LinspaceConfig;
 use crate::nodes::math_nodes::binary_operation;
 use crate::nodes::plot::Plot;
 use crate::nodes::{constant, default_node_size, GUINode, PortData, PortType};
+use crate::OrderMap;
 use iced::widget::text;
-use ordermap::OrderMap;
+use serde::Serialize;
 use strum::{EnumIter, VariantNames};
 
-#[derive(Clone, Debug, EnumIter, VariantNames)]
+#[derive(Clone, Debug, EnumIter, VariantNames, Serialize)]
 pub enum NodeData {
     Identity,
     Constant(f64),

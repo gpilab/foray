@@ -3,6 +3,7 @@ pub mod linspace;
 pub mod math_nodes;
 pub mod plot;
 
+use crate::OrderMap;
 use crate::{app::Message, node_data::NodeData, style};
 use iced::{
     widget::{button, column, container, container::bordered_box, horizontal_rule, row, text},
@@ -11,7 +12,7 @@ use iced::{
     Length::Fill,
 };
 use ndarray::Array1;
-use ordermap::OrderMap;
+use serde::Serialize;
 use std::cell::RefCell;
 use strum::IntoEnumIterator;
 pub const INNER_NODE_WIDTH: f32 = 120.;
@@ -26,7 +27,7 @@ pub fn default_node_size() -> iced::Size {
     iced::Size::new(OUTER_NODE_WIDTH, OUTER_NODE_HEIGHT)
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize)]
 pub enum PortType {
     Integer,
     #[default]

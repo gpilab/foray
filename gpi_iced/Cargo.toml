@@ -14,6 +14,7 @@ iced = { version = "0.13.1", features = [
 ] }
 ndarray = "0.16.1"
 ordermap = { version = "0.5.4", features = ["serde"] }
+ron = { version = "0.8.1", features = ["indexmap"] }
 serde = { version = "1.0.217", features = ["serde_derive"] }
 strum = { version = "0.26.3", features = ["derive"] }
 

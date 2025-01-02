@@ -1,5 +1,5 @@
+use crate::OrderMap;
 use iced::advanced::layout;
-use ordermap::OrderMap;
 
 use crate::math::{Point, Vector};
 

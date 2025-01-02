@@ -15,13 +15,14 @@ use crate::widget::pin::Pin;
 use crate::widget::shapes::ShapeId;
 use crate::widget::workspace::{self, workspace};
 use crate::wires::{active_wire_color, find_port_offset, wire_status};
+use crate::OrderMap;
 use canvas::{Path, Stroke};
 use iced::advanced::graphics::core::Element;
 use iced::border::{radius, rounded};
 use iced::widget::{column, *};
 use iced::Length::Fill;
 use iced::{Alignment, Color};
-use ordermap::OrderMap;
+use serde::Serialize;
 
 #[derive(Default)]
 pub enum Action {
@@ -47,15 +48,19 @@ pub enum Message {
     AddNode(NodeData),
     DeleteNode(u32),
     ToggleDebug,
+    Save,
 }
+#[derive(Serialize)]
 pub struct App {
     graph: Graph<NodeData, PortType, PortData>,
+    #[serde(skip_serializing)]
     shapes: workspace::State,
     selected_shape: Option<ShapeId>,
     cursor_position: Point,
     config: f32,
-    //#[serde(skip_serializing)]
+    #[serde(skip_serializing)]
     theme: Theme,
+    #[serde(skip_serializing)]
     action: Action,
     debug: bool,
 }
@@ -91,14 +96,16 @@ impl Default for App {
         ];
 
         Self {
-            graph: g,
-            shapes: workspace::State::new(shapes.into()),
+            debug: false,
+            theme: Theme::Ferra,
+            config: 50.,
+
             selected_shape: None,
             cursor_position: Default::default(),
-            config: 50.,
-            theme: Theme::Ferra,
             action: Default::default(),
-            debug: false,
+
+            shapes: workspace::State::new(shapes.into()),
+            graph: g,
         }
     }
 }
@@ -184,6 +191,17 @@ impl App {
             Message::ToggleDebug => {
                 self.debug = !self.debug;
             }
+            Message::Save => {
+                std::fs::write(
+                    "network.ron",
+                    ron::ser::to_string_pretty(
+                        &self,
+                        ron::ser::PrettyConfig::default().compact_arrays(true),
+                    )
+                    .unwrap(),
+                )
+                .expect("Could not save to file");
+            }
         };
     }
 
@@ -209,7 +227,7 @@ impl App {
                 .style(button_style),
             horizontal_space(),
             button(text("Save"))
-                .on_press(Message::Config(60.))
+                .on_press(Message::Save)
                 .padding([1.0, 4.0])
                 .style(button_style),
             horizontal_space(),

@@ -1,6 +1,8 @@
 use std::{cell::RefCell, collections::HashMap};
 
-use ordermap::OrderMap;
+use serde::Serialize;
+
+use crate::OrderMap;
 
 pub trait GraphNode<NodeData, PortType, WireData>
 where
@@ -15,13 +17,13 @@ type PortName = String;
 
 type NodeIndex = u32;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub enum IO2 {
     In2,
     Out2,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct PortRef {
     pub node: u32,
     pub name: PortName,
@@ -30,16 +32,18 @@ pub struct PortRef {
 
 type Edge = (PortRef, PortRef);
 
+#[derive(Serialize)]
 pub struct Graph<NodeData, PortType, WireData>
 where
     NodeData: GraphNode<NodeData, PortType, WireData>,
     PortType: Clone,
 {
-    nodes: ordermap::OrderMap<NodeIndex, NodeData>,
+    nodes: crate::OrderMap<NodeIndex, NodeData>,
     edges: Vec<Edge>,
-    //#[serde(skip_serializing)]
+    #[serde(skip_serializing)]
     wire_data: HashMap<(NodeIndex, PortName), RefCell<WireData>>,
     next_id: NodeIndex,
+    #[serde(skip_serializing)]
     phantom: std::marker::PhantomData<PortType>,
 }
 
@@ -89,8 +93,8 @@ where
         self.get_node(nx)
             .outputs()
             .clone()
-            .into_iter()
-            .map(|(port_name, _)| {
+            .into_keys()
+            .map(|port_name| {
                 (
                     port_name.clone(),
                     self.wire_data.get(&(nx, port_name.clone())),

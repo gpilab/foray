@@ -2,6 +2,7 @@ use super::{PortData, INNER_NODE_HEIGHT, INNER_NODE_WIDTH, NODE_BORDER_WIDTH};
 use crate::app::Message;
 use crate::math::{linspace_delta, Vector};
 use crate::node_data::NodeData;
+use crate::OrderMap;
 use iced::widget::canvas::{Path, Stroke};
 use iced::widget::{container, horizontal_space, row, text, text_input};
 use iced::Alignment::Center;
@@ -11,12 +12,12 @@ use iced::{
     Element,
 };
 use iced::{Rectangle, Renderer, Theme};
-use ordermap::OrderMap;
+use serde::Serialize;
 use std::cell::RefCell;
 
 // Rectanlge specified by center position, width and height
 // y is up
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize)]
 pub struct Rect {
     pub center: Vector,
     pub width: f32,
@@ -46,7 +47,7 @@ impl Default for Rect {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Serialize)]
 pub struct Plot {
     rect: Rect,
 }
