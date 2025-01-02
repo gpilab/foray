@@ -217,7 +217,7 @@ impl App {
                 .style(button_style),
         ]
         .spacing(2.0)
-        .padding([5., 10.]);
+        .padding([5., 5.]);
 
         //// Config
         let config: Element<Message, Theme, Renderer> =
@@ -285,7 +285,7 @@ impl App {
                     }
                 ]
                 .height(Length::Fill)
-                .width(250.),
+                .width(200.),
             ),
             vertical_rule(SEPERATOR),
             container(workspace)
