@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap};
 
 use ordermap::OrderMap;
 
-pub trait GraphNode<NodeData, PortType, WireData>: dyn_clone::DynClone
+pub trait GraphNode<NodeData, PortType, WireData>
 where
     PortType: Clone,
 {
