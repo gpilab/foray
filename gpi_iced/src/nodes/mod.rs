@@ -14,14 +14,16 @@ use ndarray::Array1;
 use ordermap::OrderMap;
 use std::cell::RefCell;
 use strum::IntoEnumIterator;
-pub const NODE_WIDTH: f32 = 100.;
-pub const NODE_HEIGHT: f32 = 60.;
+pub const INNER_NODE_WIDTH: f32 = 120.;
+pub const INNER_NODE_HEIGHT: f32 = 60.;
 pub const PORT_RADIUS: f32 = 7.5;
 pub const NODE_RADIUS: f32 = 5.0;
-pub const NODE_BORDER_WIDTH: f32 = 1.0;
+pub const NODE_BORDER_WIDTH: f32 = 2.0;
+pub const OUTER_NODE_WIDTH: f32 = INNER_NODE_WIDTH + NODE_BORDER_WIDTH;
+pub const OUTER_NODE_HEIGHT: f32 = INNER_NODE_HEIGHT + NODE_BORDER_WIDTH;
 
 pub fn default_node_size() -> iced::Size {
-    iced::Size::new(NODE_WIDTH, NODE_HEIGHT)
+    iced::Size::new(OUTER_NODE_WIDTH, OUTER_NODE_HEIGHT)
 }
 
 #[derive(Clone, Debug, Default)]
@@ -75,6 +77,14 @@ pub trait GUINode: derive_more::Debug {
         _input_data: Option<OrderMap<String, &RefCell<PortData>>>,
     ) -> (iced::Size, Element<'a, Message>) {
         (default_node_size(), text("default").into())
+    }
+
+    fn config_view<'a>(
+        &'a self,
+        _id: u32,
+        _input_data: Option<OrderMap<String, &RefCell<PortData>>>,
+    ) -> Option<Element<'a, Message>> {
+        None
     }
 }
 

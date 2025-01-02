@@ -77,9 +77,9 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
                 [("out".to_string(), PortData::Real(vec![*value].into()))].into()
             }
             NodeData::Add => binary_operation(inputs, Box::new(|a, b| a + b)),
-            NodeData::Subtract => binary_operation(inputs, Box::new(|a, b| a + b)),
-            NodeData::Multiply => binary_operation(inputs, Box::new(|a, b| a + b)),
-            NodeData::Divide => binary_operation(inputs, Box::new(|a, b| a + b)),
+            NodeData::Subtract => binary_operation(inputs, Box::new(|a, b| a - b)),
+            NodeData::Multiply => binary_operation(inputs, Box::new(|a, b| a * b)),
+            NodeData::Divide => binary_operation(inputs, Box::new(|a, b| a / b)),
             NodeData::Linspace(linspace_config) => linspace_config.compute(inputs),
             NodeData::Plot(_) => [].into(),
         }
@@ -115,6 +115,17 @@ impl GUINode for NodeData {
             NodeData::Multiply => (dft, text("*").size(20).into()),
             NodeData::Divide => (dft, text("/").size(20).into()),
             _ => (dft, text(self.name()).into()),
+        }
+    }
+
+    fn config_view<'a>(
+        &'a self,
+        id: u32,
+        input_data: Option<OrderMap<String, &std::cell::RefCell<PortData>>>,
+    ) -> Option<iced::Element<'a, Message>> {
+        match self {
+            NodeData::Plot(plot) => plot.config_view(id, input_data),
+            _ => None,
         }
     }
 }

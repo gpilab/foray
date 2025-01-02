@@ -69,10 +69,10 @@ impl LinspaceConfig {
                         }
                     })
                     .align_x(Center),
-                container(horizontal_rule(0)).width(20.).height(1),
+                container(horizontal_rule(0)).padding(4.).height(1),
             ]
             .height(Shrink)
-            .width(30.)
+            .width(Fill)
             .align_x(Center)
             .into()
         }
@@ -111,17 +111,11 @@ impl LinspaceConfig {
         ));
 
         column![
-            row![
-                horizontal_space(),
-                start_input,
-                text(".."),
-                stop_input,
-                horizontal_space()
-            ]
-            .width(Fill)
-            .align_y(Center)
-            .padding(5.)
-            .spacing(2.),
+            row![start_input, text(".."), stop_input,]
+                .width(Fill)
+                .align_y(Center)
+                .padding(5.)
+                .spacing(2.),
             row![horizontal_space(), text("#"), num_input, horizontal_space()].align_y(Center)
         ]
         .into()

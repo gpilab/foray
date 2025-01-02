@@ -6,6 +6,9 @@ fn n_in_range(start: f32, stop: f32, delta: f32) -> i32 {
 /// delta
 pub fn linspace_delta(start: f32, stop: f32, delta: f32) -> Vec<f32> {
     let n = n_in_range(start, stop, delta);
+    if start.is_nan() || stop.is_nan() || delta.is_nan() {
+        panic!("Encountered nan!{:?}", (start, stop, delta))
+    }
 
     let dir_delta = (stop - start).signum() * delta;
     (0..=n)
@@ -19,6 +22,9 @@ pub fn linspace_delta(start: f32, stop: f32, delta: f32) -> Vec<f32> {
 
 /// create a vector of linearly spaced values in the range start..=stop
 pub fn linspace(start: f32, stop: f32, num: i32) -> Vec<f32> {
+    if start.is_nan() || stop.is_nan() {
+        panic!("Encountered nan!{:?}", (start, stop, num))
+    }
     //dbg!((start, stop, num));
     (0..num)
         .map(|i| (i as f32 / (num - 1).max(1) as f32))

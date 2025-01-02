@@ -5,7 +5,9 @@ use crate::node_data::NodeData;
 use crate::nodes::linspace::LinspaceConfig;
 use crate::nodes::plot::Plot;
 use crate::nodes::{self, GUINode, PortData, PortType, NODE_BORDER_WIDTH};
-use crate::nodes::{format_node_output, NODE_HEIGHT, NODE_RADIUS, NODE_WIDTH, PORT_RADIUS};
+use crate::nodes::{
+    format_node_output, INNER_NODE_HEIGHT, INNER_NODE_WIDTH, NODE_RADIUS, PORT_RADIUS,
+};
 use crate::widget::custom_button;
 use crate::widget::node_container::NodeContainer;
 use crate::widget::pin::Pin;
@@ -60,9 +62,9 @@ impl Default for App {
     fn default() -> App {
         let mut g = Graph::<NodeData, PortType, PortData>::new();
 
-        let l1 = g.node(NodeData::Linspace(LinspaceConfig::new(0., 10., 10)));
-        let c1 = g.node(NodeData::Constant(9.));
-        let c2 = g.node(NodeData::Constant(13.));
+        let l1 = g.node(NodeData::Linspace(LinspaceConfig::default()));
+        let c1 = g.node(NodeData::Constant(0.5));
+        let c2 = g.node(NodeData::Constant(-2.));
         let mult1 = g.node(NodeData::Multiply);
         let add1 = g.node(NodeData::Add);
         let plot1 = g.node(NodeData::Plot(Plot::default()));
@@ -221,14 +223,23 @@ impl App {
         let config: Element<Message, Theme, Renderer> =
             if let Some(selected_id) = self.selected_shape {
                 let node = self.graph.get_node(selected_id);
+                let input_data = self.graph.get_input_data(&selected_id);
                 let out_port_display = format_node_output(&self.graph.get_output_data(selected_id));
                 column![
                     container(text(node.name().clone()).size(20.)).center_x(Fill),
                     horizontal_rule(0),
                     vertical_space().height(10.),
-                    scrollable(out_port_display),
+                    node.config_view(selected_id, input_data)
+                        .unwrap_or(text("...").into()),
+                    vertical_space(),
+                    scrollable(if self.debug {
+                        out_port_display
+                    } else {
+                        text("").into()
+                    }),
                     row![button("delete node").on_press(Message::DeleteNode(selected_id))]
                 ]
+                .height(Fill)
                 .spacing(5.)
                 .padding([10., 5.])
                 .into()
@@ -311,7 +322,7 @@ impl App {
         };
 
         //TODO: clean up this function, use something similar to wires.rs
-        let port_x = |i: usize| i as f32 * (NODE_WIDTH / 4.) + NODE_RADIUS * 2.;
+        let port_x = |i: usize| i as f32 * (INNER_NODE_WIDTH / 4.) + NODE_RADIUS * 2.;
 
         //// Ports
         let inputs = node.inputs();
@@ -346,7 +357,7 @@ impl App {
             let out_port_buttons = outputs
                 .iter()
                 .enumerate()
-                .map(|(i, port)| (Point::new(port_x(i), NODE_HEIGHT - PORT_RADIUS), port))
+                .map(|(i, port)| (Point::new(port_x(i), INNER_NODE_HEIGHT - PORT_RADIUS), port))
                 .map(|(point, port)| {
                     let out_port = PortRef {
                         node: id,

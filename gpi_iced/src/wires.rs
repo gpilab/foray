@@ -1,17 +1,17 @@
 use crate::{
     app,
     graph::{PortRef, IO},
-    nodes::{NODE_HEIGHT, NODE_RADIUS, NODE_WIDTH, PORT_RADIUS},
+    nodes::{INNER_NODE_HEIGHT, INNER_NODE_WIDTH, NODE_RADIUS, PORT_RADIUS},
 };
 use iced::{Theme, Vector};
 
 /// Determine where a port should be positioned relative to the origin of the node
 pub fn find_port_offset(port_ref: &PortRef, port_index: usize) -> Vector {
-    let port_x = |i: usize| i as f32 * (NODE_WIDTH / 4.) + NODE_RADIUS * 2.;
+    let port_x = |i: usize| i as f32 * (INNER_NODE_WIDTH / 4.) + NODE_RADIUS * 2.;
     match port_ref.io {
         IO::In => Vector::new(port_x(port_index), 0.) + Vector::new(PORT_RADIUS, -PORT_RADIUS / 2.),
         IO::Out => {
-            Vector::new(port_x(port_index), NODE_HEIGHT)
+            Vector::new(port_x(port_index), INNER_NODE_HEIGHT)
                 + Vector::new(PORT_RADIUS, PORT_RADIUS / 2.)
         }
     }
