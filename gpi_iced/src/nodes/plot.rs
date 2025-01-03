@@ -221,8 +221,35 @@ impl<Message> canvas::Program<Message> for PlotCanvas {
             .clone()
             .into_iter()
             .zip(self.y.clone())
-            .map_windows(|[from, to]| Path::line(Point::from(*from), Point::from(*to)))
-            .for_each(|p| frame.stroke(&p, line_stroke));
+            .map_windows(|[from, to]| {
+                if from.0.is_finite() && from.1.is_finite() && to.0.is_finite() && to.1.is_finite()
+                {
+                    (
+                        Path::line(Point::from(*from), Point::from(*to)),
+                        line_stroke,
+                    )
+                } else if from.0.is_finite() && to.0.is_finite() {
+                    (
+                        Path::line(
+                            Point::from((from.0, self.config.rect.center.y)),
+                            Point::from((to.0, self.config.rect.center.y)),
+                        ),
+                        line_stroke.with_color(theme.palette().danger),
+                    )
+                } else {
+                    (
+                        Path::circle(
+                            Point::from((
+                                self.config.rect.right() - 1.,
+                                self.config.rect.top() - 1.,
+                            )),
+                            0.75,
+                        ),
+                        line_stroke.with_color(theme.palette().danger),
+                    )
+                }
+            })
+            .for_each(|(path, stroke)| frame.stroke(&path, stroke));
 
         frame.pop_transform();
 

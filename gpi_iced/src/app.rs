@@ -72,51 +72,6 @@ pub struct App {
     debug: bool,
 }
 
-impl Default for App {
-    fn default() -> App {
-        let mut g = Graph::<NodeData, PortType, PortData>::new();
-
-        let l1 = g.node(NodeData::Linspace(LinspaceConfig::default()));
-        let c1 = g.node(NodeData::Constant(0.5));
-        let c2 = g.node(NodeData::Constant(-2.));
-        let mult1 = g.node(NodeData::Multiply);
-        let add1 = g.node(NodeData::Add);
-        let plot1 = g.node(NodeData::Plot(Plot::default()));
-        let identity = g.node(NodeData::Identity);
-
-        g.connect((l1, "out"), (mult1, "a"));
-        g.connect((c1, "out"), (mult1, "b"));
-        g.connect((mult1, "out"), (add1, "a"));
-        g.connect((c2, "out"), (add1, "b"));
-        g.connect((l1, "out"), (plot1, "x"));
-        g.connect((add1, "out"), (plot1, "y"));
-        g.execute_network();
-
-        let shapes = [
-            (l1, Point::new(100., 100.)),
-            (c1, Point::new(250., 80.)),
-            (c2, Point::new(400., 100.)),
-            (mult1, Point::new(200., 200.)),
-            (add1, Point::new(300., 300.)),
-            (plot1, Point::new(200., 400.)),
-            (identity, Point::new(100., 300.)),
-        ];
-
-        Self {
-            debug: false,
-            theme: Theme::Ferra,
-            config: 50.,
-
-            selected_shape: None,
-            cursor_position: Default::default(),
-            action: Default::default(),
-
-            shapes: workspace::State::new(shapes.into()),
-            graph: g,
-        }
-    }
-}
-
 impl App {
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
@@ -145,13 +100,11 @@ impl App {
             },
             Message::PortRelease => {
                 match &self.action {
-                    Action::CreatingInputWire(input, Some(output)) => {
+                    Action::CreatingInputWire(input, Some(output))
+                    | Action::CreatingOutputWire(output, Some(input)) => {
                         self.graph.remove_edge(input);
-                        self.graph.add_edge_from_ref(output, input)
-                    }
-                    Action::CreatingOutputWire(output, Some(input)) => {
-                        self.graph.remove_edge(input);
-                        self.graph.add_edge_from_ref(output, input)
+                        self.graph.add_edge_from_ref(output, input);
+                        self.graph.exectute_sub_network(output.node);
                     }
                     _ => {}
                 }
@@ -518,4 +471,60 @@ pub fn subscriptions(_state: &App) -> Subscription<Message> {
         }
         _ => None,
     })
+}
+
+impl Default for App {
+    fn default() -> App {
+        // try to load file
+        match read_to_string("network.ron").map(|s| ron::from_str::<App>(&s)) {
+            Ok(Ok(app)) => {
+                let mut app = app;
+                app.graph.execute_network();
+                app
+            }
+            _ => {
+                println!("Failed to load file, loading defaults");
+                let mut g = Graph::<NodeData, PortType, PortData>::new();
+
+                let l1 = g.node(NodeData::Linspace(LinspaceConfig::default()));
+                let c1 = g.node(NodeData::Constant(0.5));
+                let c2 = g.node(NodeData::Constant(-2.));
+                let mult1 = g.node(NodeData::Multiply);
+                let add1 = g.node(NodeData::Add);
+                let plot1 = g.node(NodeData::Plot(Plot::default()));
+                let identity = g.node(NodeData::Identity);
+
+                g.connect((l1, "out"), (mult1, "a"));
+                g.connect((c1, "out"), (mult1, "b"));
+                g.connect((mult1, "out"), (add1, "a"));
+                g.connect((c2, "out"), (add1, "b"));
+                g.connect((l1, "out"), (plot1, "x"));
+                g.connect((add1, "out"), (plot1, "y"));
+                g.execute_network();
+
+                let shapes = [
+                    (l1, Point::new(100., 100.)),
+                    (c1, Point::new(250., 80.)),
+                    (c2, Point::new(400., 100.)),
+                    (mult1, Point::new(200., 200.)),
+                    (add1, Point::new(300., 300.)),
+                    (plot1, Point::new(200., 400.)),
+                    (identity, Point::new(100., 300.)),
+                ];
+
+                Self {
+                    debug: false,
+                    theme: Theme::Ferra,
+                    config: 50.,
+
+                    selected_shape: None,
+                    cursor_position: Default::default(),
+                    action: Default::default(),
+
+                    shapes: workspace::State::new(shapes.into()),
+                    graph: g,
+                }
+            }
+        }
+    }
 }

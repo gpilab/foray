@@ -6,10 +6,7 @@
                 stop: 10.0,
                 num: 100,
             )),
-            1: Constant(0.7000000000000002),
-            2: Constant(0.3000000000000007),
-            3: Multiply,
-            4: Add,
+            1: Constant(3.5999999999999996),
             5: Plot((
                 rect: (
                     center: (
@@ -21,32 +18,51 @@
                 ),
             )),
             7: Multiply,
+            8: Sinc,
+            11: Multiply,
+            12: Constant(1.9000000000000004),
+            16: Linspace((
+                start: 0.0,
+                stop: 200.0,
+                num: 2000,
+            )),
+            17: Cos,
+            18: Sin,
+            19: Plot((
+                rect: (
+                    center: (
+                        x: 0.0,
+                        y: 0.0,
+                    ),
+                    width: 20.0,
+                    height: 10.0,
+                ),
+            )),
+            20: Multiply,
+            21: Constant(0.5),
+            23: Multiply,
+            24: Multiply,
+            29: Multiply,
+            30: Constant(-1.0),
+            31: Multiply,
+            34: Join,
+            35: Join,
+            36: Plot((
+                rect: (
+                    center: (
+                        x: 0.0,
+                        y: 0.0,
+                    ),
+                    width: 20.0,
+                    height: 10.0,
+                ),
+            )),
+            38: Reverse,
+            39: Reverse,
+            40: Identity,
+            41: Identity,
         },
         edges: [((
-            node: 0,
-            name: "out",
-            io: Out,
-        ), (
-            node: 3,
-            name: "a",
-            io: In,
-        )), ((
-            node: 1,
-            name: "out",
-            io: Out,
-        ), (
-            node: 3,
-            name: "b",
-            io: In,
-        )), ((
-            node: 2,
-            name: "out",
-            io: Out,
-        ), (
-            node: 4,
-            name: "b",
-            io: In,
-        )), ((
             node: 0,
             name: "out",
             io: Out,
@@ -55,7 +71,15 @@
             name: "x",
             io: In,
         )), ((
-            node: 4,
+            node: 11,
+            name: "out",
+            io: Out,
+        ), (
+            node: 8,
+            name: "a",
+            io: In,
+        )), ((
+            node: 7,
             name: "out",
             io: Out,
         ), (
@@ -63,7 +87,7 @@
             name: "y",
             io: In,
         )), ((
-            node: 3,
+            node: 8,
             name: "out",
             io: Out,
         ), (
@@ -71,7 +95,7 @@
             name: "a",
             io: In,
         )), ((
-            node: 3,
+            node: 1,
             name: "out",
             io: Out,
         ), (
@@ -79,59 +103,331 @@
             name: "b",
             io: In,
         )), ((
-            node: 7,
+            node: 0,
             name: "out",
             io: Out,
         ), (
-            node: 4,
+            node: 11,
             name: "a",
             io: In,
+        )), ((
+            node: 12,
+            name: "out",
+            io: Out,
+        ), (
+            node: 11,
+            name: "b",
+            io: In,
+        )), ((
+            node: 16,
+            name: "out",
+            io: Out,
+        ), (
+            node: 18,
+            name: "a",
+            io: In,
+        )), ((
+            node: 16,
+            name: "out",
+            io: Out,
+        ), (
+            node: 17,
+            name: "a",
+            io: In,
+        )), ((
+            node: 16,
+            name: "out",
+            io: Out,
+        ), (
+            node: 24,
+            name: "a",
+            io: In,
+        )), ((
+            node: 21,
+            name: "out",
+            io: Out,
+        ), (
+            node: 24,
+            name: "b",
+            io: In,
+        )), ((
+            node: 24,
+            name: "out",
+            io: Out,
+        ), (
+            node: 23,
+            name: "b",
+            io: In,
+        )), ((
+            node: 24,
+            name: "out",
+            io: Out,
+        ), (
+            node: 20,
+            name: "a",
+            io: In,
+        )), ((
+            node: 17,
+            name: "out",
+            io: Out,
+        ), (
+            node: 23,
+            name: "a",
+            io: In,
+        )), ((
+            node: 18,
+            name: "out",
+            io: Out,
+        ), (
+            node: 20,
+            name: "b",
+            io: In,
+        )), ((
+            node: 30,
+            name: "out",
+            io: Out,
+        ), (
+            node: 29,
+            name: "a",
+            io: In,
+        )), ((
+            node: 23,
+            name: "out",
+            io: Out,
+        ), (
+            node: 19,
+            name: "x",
+            io: In,
+        )), ((
+            node: 30,
+            name: "out",
+            io: Out,
+        ), (
+            node: 31,
+            name: "a",
+            io: In,
+        )), ((
+            node: 20,
+            name: "out",
+            io: Out,
+        ), (
+            node: 19,
+            name: "y",
+            io: In,
+        )), ((
+            node: 34,
+            name: "out",
+            io: Out,
+        ), (
+            node: 36,
+            name: "x",
+            io: In,
+        )), ((
+            node: 35,
+            name: "out",
+            io: Out,
+        ), (
+            node: 36,
+            name: "y",
+            io: In,
+        )), ((
+            node: 29,
+            name: "out",
+            io: Out,
+        ), (
+            node: 38,
+            name: "a",
+            io: In,
+        )), ((
+            node: 38,
+            name: "out",
+            io: Out,
+        ), (
+            node: 34,
+            name: "a",
+            io: In,
+        )), ((
+            node: 31,
+            name: "out",
+            io: Out,
+        ), (
+            node: 39,
+            name: "a",
+            io: In,
+        )), ((
+            node: 39,
+            name: "out",
+            io: Out,
+        ), (
+            node: 35,
+            name: "a",
+            io: In,
+        )), ((
+            node: 23,
+            name: "out",
+            io: Out,
+        ), (
+            node: 40,
+            name: "a",
+            io: In,
+        )), ((
+            node: 40,
+            name: "out",
+            io: Out,
+        ), (
+            node: 29,
+            name: "b",
+            io: In,
+        )), ((
+            node: 40,
+            name: "out",
+            io: Out,
+        ), (
+            node: 34,
+            name: "b",
+            io: In,
+        )), ((
+            node: 20,
+            name: "out",
+            io: Out,
+        ), (
+            node: 41,
+            name: "a",
+            io: In,
+        )), ((
+            node: 41,
+            name: "out",
+            io: Out,
+        ), (
+            node: 31,
+            name: "b",
+            io: In,
+        )), ((
+            node: 41,
+            name: "out",
+            io: Out,
+        ), (
+            node: 35,
+            name: "b",
+            io: In,
         ))],
-        next_id: 8,
+        next_id: 42,
     ),
     shapes: (
         camera: (
             position: (
-                x: 0.0,
-                y: 0.0,
+                x: -481.38135,
+                y: -120.02246,
             ),
             zoom: 1.0,
         ),
         shape_positions: {
             0: (
-                x: 100.0,
-                y: 100.0,
+                x: 340.21884,
+                y: 138.56873,
             ),
             1: (
-                x: 261.66248,
-                y: 109.50938,
-            ),
-            2: (
-                x: 350.2531,
-                y: 241.22812,
-            ),
-            3: (
-                x: 157.02185,
-                y: 194.52188,
-            ),
-            4: (
-                x: 275.59674,
-                y: 385.9125,
+                x: 652.62494,
+                y: 301.50955,
             ),
             5: (
-                x: 114.14691,
-                y: 468.85004,
+                x: 339.5751,
+                y: 450.10938,
             ),
             7: (
-                x: 164.85938,
-                y: 286.34372,
+                x: 515.2844,
+                y: 303.56564,
+            ),
+            8: (
+                x: 382.99066,
+                y: 303.1843,
+            ),
+            11: (
+                x: 471.6656,
+                y: 157.54063,
+            ),
+            12: (
+                x: 604.653,
+                y: 133.74062,
+            ),
+            16: (
+                x: -97.18756,
+                y: 121.11246,
+            ),
+            17: (
+                x: -176.37177,
+                y: 323.70313,
+            ),
+            18: (
+                x: 124.72504,
+                y: 329.2499,
+            ),
+            19: (
+                x: -7.9000854,
+                y: 551.76874,
+            ),
+            20: (
+                x: 59.0,
+                y: 425.325,
+            ),
+            21: (
+                x: 2.3374634,
+                y: 220.84991,
+            ),
+            23: (
+                x: -107.471985,
+                y: 427.62494,
+            ),
+            24: (
+                x: -34.206207,
+                y: 323.42188,
+            ),
+            29: (
+                x: -398.66245,
+                y: 652.2751,
+            ),
+            30: (
+                x: -408.5406,
+                y: 455.3843,
+            ),
+            31: (
+                x: -263.51566,
+                y: 653.52185,
+            ),
+            34: (
+                x: -397.7188,
+                y: 836.2969,
+            ),
+            35: (
+                x: -263.4281,
+                y: 838.5375,
+            ),
+            36: (
+                x: -294.46875,
+                y: 953.87195,
+            ),
+            38: (
+                x: -397.8937,
+                y: 743.4281,
+            ),
+            39: (
+                x: -263.3188,
+                y: 741.725,
+            ),
+            40: (
+                x: -368.6656,
+                y: 566.16565,
+            ),
+            41: (
+                x: -232.77179,
+                y: 566.2344,
             ),
         },
     ),
-    selected_shape: Some(5),
+    selected_shape: Some(30),
     cursor_position: (
-        x: -83.73125,
-        y: 19.640625,
+        x: -81.46875,
+        y: 15.725,
     ),
     config: 50.0,
     debug: false,
