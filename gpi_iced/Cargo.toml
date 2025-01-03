@@ -6,6 +6,7 @@ edition = "2021"
 
 [dependencies]
 derive_more = { version = "1.0.0", features = ["debug", "display"] }
+float-cmp = "0.10.0"
 iced = { version = "0.13.1", features = [
 	"debug",
 	"lazy",
