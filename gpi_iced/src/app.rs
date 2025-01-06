@@ -45,6 +45,7 @@ pub enum Message {
     Config(f32),
     OnSelect(Option<ShapeId>),
     PortPress(PortRef),
+    PortDelete(PortRef),
     PortStartHover(PortRef),
     PortEndHover(PortRef),
     PortRelease,
@@ -98,6 +99,7 @@ impl App {
                 IO::In => self.action = Action::CreatingInputWire(port, None),
                 IO::Out => self.action = Action::CreatingOutputWire(port, None),
             },
+            Message::PortDelete(port) => self.graph.remove_edge(&port),
             Message::PortRelease => {
                 match &self.action {
                     Action::CreatingInputWire(input, Some(output))
@@ -329,6 +331,7 @@ impl App {
                         mouse_area(
                             custom_button::Button::new("")
                                 .on_press(Message::PortPress(in_port.clone()))
+                                .on_right_press(Message::PortDelete(in_port.clone()))
                                 .on_release_self(Message::PortRelease)
                                 .style(port_style)
                                 .width(PORT_RADIUS * 2.)
@@ -354,6 +357,7 @@ impl App {
                         mouse_area(
                             custom_button::Button::new(vertical_space())
                                 .on_press(Message::PortPress(out_port.clone()))
+                                .on_right_press(Message::PortDelete(out_port.clone()))
                                 .on_release_self(Message::PortRelease)
                                 .style(port_style)
                                 .width(PORT_RADIUS * 2.)

@@ -160,9 +160,9 @@ impl GUINode for NodeData {
             NodeData::Subtract => (dft, operation("−")),
             NodeData::Multiply => (dft, operation("×")),
             NodeData::Divide => (dft, operation("÷")),
-            NodeData::Cos => (dft, trig("cos(𝑥)")),
-            NodeData::Sin => (dft, trig("sin(𝑥)")),
-            NodeData::Sinc => (dft, trig("sinc(𝑥)")),
+            NodeData::Cos => (dft, trig("cos(α)")),
+            NodeData::Sin => (dft, trig("sin(α)")),
+            NodeData::Sinc => (dft, trig("sinc(α)")),
             _ => (dft, text(self.name()).into()),
         }
     }

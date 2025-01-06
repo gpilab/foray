@@ -20,6 +20,7 @@ where
     content: Element<'a, Message, Theme, Renderer>,
     on_hover: Option<OnInteract<'a, Message>>,
     on_press: Option<OnInteract<'a, Message>>,
+    on_right_press: Option<OnInteract<'a, Message>>,
     on_release_self: Option<OnInteract<'a, Message>>,
     on_release_other: Option<OnInteract<'a, Message>>,
     width: Length,
@@ -57,6 +58,7 @@ where
             content,
             on_hover: None,
             on_press: None,
+            on_right_press: None,
             on_release_self: None,
             on_release_other: None,
             width: size.width.fluid(),
@@ -88,6 +90,11 @@ where
     /// Sets the message that will be produced when the [`Button`] is pressed.
     pub fn on_press(mut self, on_press: Message) -> Self {
         self.on_press = Some(OnInteract::Direct(on_press));
+        self
+    }
+    /// Sets the message that will be produced when the right [`Button`] is pressed.
+    pub fn on_right_press(mut self, on_right_press: Message) -> Self {
+        self.on_right_press = Some(OnInteract::Direct(on_right_press));
         self
     }
     /// Sets the message that will be produced when the [`Button`] is released
@@ -252,6 +259,22 @@ where
                         state.is_pressed = true;
                         if cursor.is_over(bounds) {
                             shell.publish(on_press);
+                        }
+
+                        return event::Status::Captured;
+                    }
+                }
+            }
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Right)) => {
+                if let Some(on_right_press) = self.on_right_press.as_ref().map(OnInteract::get) {
+                    let bounds = layout.bounds();
+
+                    if cursor.is_over(bounds) {
+                        let state = tree.state.downcast_mut::<State>();
+
+                        state.is_pressed = false;
+                        if cursor.is_over(bounds) {
+                            shell.publish(on_right_press);
                         }
 
                         return event::Status::Captured;

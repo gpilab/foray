@@ -1,4 +1,7 @@
-/// Find the nearest (rounded *away* from zero)  "nice" number.
+/// Find the nearest "nice" number.
+///
+/// Rounded *away* from zero
+///
 /// nice numbers:
 /// 1x10^n,
 /// 2x10^n,
@@ -7,7 +10,7 @@
 pub fn round_nice(x: f32) -> f32 {
     let nice = 10.0f32.powf(x.abs().log10().ceil());
 
-    let scale = if x.abs() <= 0.2 * dbg!(nice) {
+    let scale = if x.abs() <= 0.2 * nice {
         0.2
     } else if x.abs() <= 0.5 * nice {
         0.5
