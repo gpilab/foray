@@ -2,6 +2,10 @@ pub mod constant;
 pub mod linspace;
 pub mod math_nodes;
 pub mod plot;
+pub mod port;
+
+pub use port::PortData;
+pub use port::PortType;
 
 use crate::OrderMap;
 use crate::{app::Message, node_data::NodeData, style};
@@ -11,8 +15,6 @@ use iced::{
     Color, Element,
     Length::Fill,
 };
-use ndarray::Array1;
-use serde::Serialize;
 use std::cell::RefCell;
 use strum::IntoEnumIterator;
 pub const INNER_NODE_WIDTH: f32 = 120.;
@@ -25,41 +27,6 @@ pub const OUTER_NODE_HEIGHT: f32 = INNER_NODE_HEIGHT + NODE_BORDER_WIDTH;
 
 pub fn default_node_size() -> iced::Size {
     iced::Size::new(OUTER_NODE_WIDTH, OUTER_NODE_HEIGHT)
-}
-
-#[derive(Clone, Debug, Default, Serialize)]
-pub enum PortType {
-    Integer,
-    #[default]
-    Real,
-    Complex,
-}
-
-#[derive(Debug, Clone)]
-pub enum PortData {
-    Integer(Array1<i64>),
-    Real(Array1<f64>),
-    Complex(Array1<(f64, f64)>),
-}
-
-impl From<&PortData> for PortType {
-    fn from(value: &PortData) -> Self {
-        match value {
-            PortData::Integer(_) => PortType::Integer,
-            PortData::Real(_) => PortType::Real,
-            PortData::Complex(_) => PortType::Complex,
-        }
-    }
-}
-
-impl std::fmt::Display for PortData {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Integer(data) => write!(f, "{:?}", data.to_vec()),
-            Self::Real(data) => write!(f, "{:.2?}", data.to_vec()),
-            Self::Complex(data) => write!(f, "{:.2?}", data.to_vec()),
-        }
-    }
 }
 
 pub trait GUINode: derive_more::Debug {

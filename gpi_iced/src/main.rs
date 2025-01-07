@@ -19,6 +19,7 @@ pub fn main() -> iced::Result {
         .scale_factor(|_| 1.25)
         .font(include_bytes!("../data/Cantarell-VF.otf").as_slice()) // "Canterell"
         .font(include_bytes!("../data/DejaVuMathTeXGyre.ttf").as_slice()) // "DejaVu Math TeX Gyre"
-        .default_font(Font::with_name("Canterell"))
+        .font(include_bytes!("../data/CaskaydiaCoveNerdFont.ttf").as_slice())
+        .default_font(Font::with_name("CaskaydiaCoveNerdFont"))
         .run()
 }

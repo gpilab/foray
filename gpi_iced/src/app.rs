@@ -1,34 +1,24 @@
-use std::fs::read_to_string;
-use std::iter::once;
-
-use crate::graph::{Graph, GraphNode, PortRef, IO};
+use crate::graph::{Graph, PortRef, IO};
+use crate::interface::{side_bar::side_bar, SEPERATOR};
 use crate::math::{Point, Vector};
 use crate::node_data::NodeData;
 use crate::nodes::linspace::LinspaceConfig;
 use crate::nodes::plot::Plot;
-use crate::nodes::{self, GUINode, PortData, PortType, NODE_BORDER_WIDTH};
-use crate::nodes::{
-    format_node_output, INNER_NODE_HEIGHT, INNER_NODE_WIDTH, NODE_RADIUS, PORT_RADIUS,
-};
-use crate::widget::custom_button;
-use crate::widget::node_container::NodeContainer;
-use crate::widget::pin::Pin;
+use crate::nodes::{PortData, PortType};
 use crate::widget::shapes::ShapeId;
 use crate::widget::workspace::{self, workspace};
-use crate::wires::{active_wire_color, find_port_offset, wire_status};
 use crate::OrderMap;
-use canvas::{Path, Stroke};
 use iced::advanced::graphics::core::Element;
-use iced::border::{radius, rounded};
 use iced::event::listen_with;
 use iced::keyboard::key::Named;
 use iced::keyboard::{Key, Modifiers};
-use iced::widget::{column, *};
+use iced::widget::*;
 use iced::Length::Fill;
-use iced::{Alignment, Color, Subscription, Task};
+use iced::{Subscription, Task};
 use serde::{Deserialize, Serialize};
+use std::fs::read_to_string;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub enum Action {
     #[default]
     Idle,
@@ -37,82 +27,83 @@ pub enum Action {
     AddingNode,
 }
 
-#[derive(Clone, Debug)]
-pub enum Message {
-    OnDrag(ShapeId, Point),
-    OnMove(Point),
-    Pan(Vector),
-    Config(f32),
-    OnSelect(Option<ShapeId>),
-    PortPress(PortRef),
-    PortDelete(PortRef),
-    PortStartHover(PortRef),
-    PortEndHover(PortRef),
-    PortRelease,
-    UpdateNodeData(u32, NodeData),
-    AddNode(NodeData),
-    DeleteNode(u32),
-    ToggleDebug,
-    Save,
-    Load,
-    FocusNext,
-    FocusPrevious,
-}
+type UndoStash = Vec<(
+    Graph<NodeData, PortType, PortData>,
+    OrderMap<ShapeId, Point>,
+)>;
 
 #[derive(Serialize, Deserialize)]
 pub struct App {
-    graph: Graph<NodeData, PortType, PortData>,
-    shapes: workspace::State,
-    selected_shape: Option<ShapeId>,
-    cursor_position: Point,
-    config: f32,
+    pub graph: Graph<NodeData, PortType, PortData>,
+    pub shapes: workspace::State,
+    pub selected_shape: Option<ShapeId>,
+    pub cursor_position: Point,
+    pub config: f32,
+    pub debug: bool,
     #[serde(skip, default = "default_theme")]
-    theme: Theme,
+    pub theme: Theme,
     #[serde(skip)]
-    action: Action,
-    debug: bool,
+    pub action: Action,
+    #[serde(skip)]
+    pub undo_stack: UndoStash,
+    #[serde(skip)]
+    pub redo_stack: UndoStash,
+}
+
+#[derive(Clone, Debug)]
+pub enum Message {
+    //// Workspace
+    OnDrag(ShapeId, Point),
+    OnMove(Point),
+    Pan(Vector),
+
+    //// Port
+    PortStartHover(PortRef),
+    PortEndHover(PortRef),
+    PortPress(PortRef),
+    PortRelease,
+    PortDelete(PortRef),
+
+    //// Node
+    OnSelect(Option<ShapeId>),
+    UpdateNodeData(u32, NodeData),
+    AddNode(NodeData),
+    DeleteNode(u32),
+
+    //// Application
+    Config(f32),
+    ToggleDebug,
+    Save,
+    Load,
+
+    //// Focus
+    FocusNext,
+    FocusPrevious,
+
+    //// History
+    Undo,
+    Redo,
 }
 
 impl App {
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::Pan(delta) => {
-                self.shapes.camera.position.x -= delta.x * 2.;
-                self.shapes.camera.position.y -= delta.y * 2.;
-            }
-            Message::Config(v) => self.config = v,
-            Message::OnMove(cursor_position) => self.cursor_position = cursor_position,
-            Message::OnSelect(maybe_id) => {
-                self.selected_shape = maybe_id;
-                if let Some(shape_id) = maybe_id {
-                    self.graph.exectute_sub_network(shape_id);
-                }
-            }
+            //// Workspace
             Message::OnDrag(shape_index, cursor_position) => {
+                //TODO: how to handle undo/redo? Drag End event?
                 *self
                     .shapes
                     .shape_positions
                     .get_mut(&shape_index)
                     .expect("Shape index must exist") = cursor_position
             }
-            Message::PortPress(port) => match port.io {
-                IO::In => self.action = Action::CreatingInputWire(port, None),
-                IO::Out => self.action = Action::CreatingOutputWire(port, None),
-            },
-            Message::PortDelete(port) => self.graph.remove_edge(&port),
-            Message::PortRelease => {
-                match &self.action {
-                    Action::CreatingInputWire(input, Some(output))
-                    | Action::CreatingOutputWire(output, Some(input)) => {
-                        self.graph.remove_edge(input);
-                        self.graph.add_edge_from_ref(output, input);
-                        self.graph.exectute_sub_network(output.node);
-                    }
-                    _ => {}
-                }
-
-                self.action = Action::Idle;
+            Message::OnMove(cursor_position) => self.cursor_position = cursor_position,
+            Message::Pan(delta) => {
+                self.shapes.camera.position.x -= delta.x * 2.;
+                self.shapes.camera.position.y -= delta.y * 2.;
             }
+
+            //// Port
             Message::PortStartHover(hover_port) => match &self.action {
                 Action::CreatingInputWire(input, _) => {
                     if *input != hover_port {
@@ -135,21 +126,58 @@ impl App {
                 }
                 _ => {}
             },
-            Message::UpdateNodeData(id, node) => {
-                let graph_node = self.graph.get_mut_node(id);
-                *graph_node = node;
+            Message::PortPress(port) => match port.io {
+                IO::In => self.action = Action::CreatingInputWire(port, None),
+                IO::Out => self.action = Action::CreatingOutputWire(port, None),
+            },
+            Message::PortRelease => {
+                match &self.action.clone() {
+                    Action::CreatingInputWire(input, Some(output))
+                    | Action::CreatingOutputWire(output, Some(input)) => {
+                        self.stash_state();
+                        self.graph.remove_edge(input);
+                        self.graph.add_edge_from_ref(output, input);
+                        self.graph.exectute_sub_network(output.node);
+                    }
+                    _ => {}
+                }
 
+                self.action = Action::Idle;
+            }
+            Message::PortDelete(port) => {
+                self.stash_state();
+                self.graph.remove_edge(&port)
+            }
+
+            //// Node
+            Message::OnSelect(maybe_id) => {
+                self.selected_shape = maybe_id;
+                if let Some(shape_id) = maybe_id {
+                    self.graph.exectute_sub_network(shape_id);
+                }
+            }
+
+            Message::UpdateNodeData(id, node) => {
+                self.stash_state();
+                *self.graph.get_mut_node(id) = node;
                 self.graph.exectute_sub_network(id);
             }
             Message::AddNode(node) => {
+                self.stash_state();
                 let id = self.graph.node(node);
                 self.shapes.shape_positions.insert(id, (100., 500.).into());
             }
             Message::DeleteNode(id) => {
+                self.stash_state();
                 self.graph.delete_node(id);
                 self.shapes.shape_positions.remove(&id);
                 self.selected_shape = None;
+                //PERF: ideally, we should only execute affected nodes
+                self.graph.execute_network();
             }
+
+            //// Application
+            Message::Config(v) => self.config = v,
             Message::ToggleDebug => {
                 self.debug = !self.debug;
             }
@@ -169,293 +197,75 @@ impl App {
                     .expect("could not parse file");
                 self.graph.execute_network();
             }
+
+            //// Focus
             Message::FocusNext => return focus_next(),
             Message::FocusPrevious => return focus_previous(),
+
+            //// History
+            Message::Undo => {
+                if let Some(prev) = self.undo_stack.pop() {
+                    self.redo_stack
+                        .push((self.graph.clone(), self.shapes.shape_positions.clone()));
+                    self.graph = prev.0;
+                    self.shapes.shape_positions = prev.1;
+                }
+            }
+            Message::Redo => {
+                if let Some(next) = self.redo_stack.pop() {
+                    self.undo_stack
+                        .push((self.graph.clone(), self.shapes.shape_positions.clone()));
+                    self.graph = next.0;
+                    self.shapes.shape_positions = next.1;
+                }
+            }
         };
         Task::none()
     }
 
+    /// App View
     pub fn view(&self) -> Element<Message, Theme, Renderer> {
-        const SEPERATOR: f32 = 1.0;
-
-        fn button_style(t: &Theme, s: button::Status) -> button::Style {
-            let mut style = button::secondary(t, s);
-            style.border.radius = radius(0.);
-            style
-        }
-
-        let file_commands = row![
-            horizontal_space(),
-            button(text("New"))
-                .on_press(Message::Config(20.))
-                .padding([1.0, 4.0])
-                .style(button_style),
-            horizontal_space(),
-            button(text("Load"))
-                .on_press(Message::Load)
-                .padding([1.0, 4.0])
-                .style(button_style),
-            horizontal_space(),
-            button(text("Save"))
-                .on_press(Message::Save)
-                .padding([1.0, 4.0])
-                .style(button_style),
-            horizontal_space(),
-            button(text("Dbg"))
-                .padding([1.0, 4.0])
-                .on_press(Message::ToggleDebug)
-                .style(button_style),
-        ]
-        .spacing(2.0)
-        .padding([5., 5.]);
-
-        //// Config
-        let config: Element<Message, Theme, Renderer> =
-            if let Some(selected_id) = self.selected_shape {
-                let node = self.graph.get_node(selected_id);
-                let input_data = self.graph.get_input_data(&selected_id);
-                let out_port_display = format_node_output(&self.graph.get_output_data(selected_id));
-                column![
-                    container(text(node.name().clone()).size(20.)).center_x(Fill),
-                    horizontal_rule(0),
-                    vertical_space().height(10.),
-                    node.config_view(selected_id, input_data)
-                        .unwrap_or(text("...").into()),
-                    vertical_space(),
-                    scrollable(if self.debug {
-                        out_port_display
-                    } else {
-                        text("").into()
-                    }),
-                    row![button("delete node").on_press(Message::DeleteNode(selected_id))]
-                ]
-                .height(Fill)
-                .spacing(5.)
-                .padding([10., 5.])
-                .into()
-            } else {
-                let node_list = nodes::available_nodes_view();
-                column![
-                    container(text("Add Node").size(20.)).center_x(Fill),
-                    horizontal_rule(0),
-                    vertical_space().height(10.),
-                    scrollable(node_list)
-                ]
-                .spacing(5.)
-                .padding([10., 5.])
-                .into()
-            };
-
-        //// Canvas
-        let workspace = workspace(
-            &self.shapes,
-            //// Nodes
-            |id| self.node_content(id),
-            //// Wires
-            |wire_end_node, points| self.wire_curve(wire_end_node, points),
-        )
-        .on_shape_drag(Message::OnDrag)
-        .on_cursor_move(Message::OnMove)
-        .on_press(Message::OnSelect)
-        .pan(Message::Pan);
-
-        //// View
         row![
-            container(
-                column![
-                    //// File
-                    file_commands.align_y(Alignment::Center).width(Fill),
-                    ////
-                    horizontal_rule(SEPERATOR),
-                    //// Config
-                    if self.debug {
-                        config.explain(Color::from_rgba(0.7, 0.7, 0.8, 0.2))
-                    } else {
-                        config
-                    }
-                ]
-                .height(Fill)
-                .width(200.),
-            ),
+            side_bar(self),
             vertical_rule(SEPERATOR),
-            container(workspace).height(Fill).width(Fill)
+            container(
+                workspace(
+                    &self.shapes,
+                    //// Node view
+                    |id| self.node_content(id),
+                    //// Wires paths
+                    |wire_end_node, points| self.wire_curve(wire_end_node, points),
+                )
+                .on_shape_drag(Message::OnDrag)
+                .on_cursor_move(Message::OnMove)
+                .on_press(Message::OnSelect)
+                .pan(Message::Pan)
+            )
+            .height(Fill)
+            .width(Fill)
         ]
         .into()
     }
 
-    fn node_content(&self, id: u32) -> Element<Message, Theme, Renderer> {
-        let node = self.graph.get_node(id);
-        let is_selected = match self.selected_shape {
-            Some(s_id) => id == s_id,
-            None => false,
-        };
+    /// stash current app state, and reset the redo stack
+    fn stash_state(&mut self) {
+        //PERF: cloning the wire data in here will be really expensive when large data is used
+        // Need to only store graph structure, and transfer data between undo/redo states.
+        // just need to carefully handle invalid data between states
+        // Also - likely need to re-execute graph after undo/redo, to make sure everything is up to
+        // date!
+        //PERF: set a stack limit!
+        self.undo_stack
+            .push((self.graph.clone(), self.shapes.shape_positions.clone()));
 
-        fn port_style(t: &Theme, s: custom_button::Status) -> custom_button::Style {
-            let mut style = custom_button::primary(t, s);
-            style.border.radius = radius(100.);
-            style
-        }
-        let node_style = move |t: &Theme| {
-            let outline_color = match is_selected {
-                true => t.extended_palette().primary.strong.color,
-                false => t.extended_palette().secondary.strong.color,
-            };
-            container::transparent(t)
-                .border(
-                    rounded(NODE_RADIUS)
-                        .color(outline_color)
-                        .width(NODE_BORDER_WIDTH),
-                )
-                .background(self.theme.palette().background)
-        };
-
-        //TODO: clean up this function, use something similar to wires.rs
-        let port_x = |i: usize| i as f32 * (INNER_NODE_WIDTH / 4.) + NODE_RADIUS * 2.;
-
-        //// Ports
-        let inputs = node.inputs();
-        let outputs = node.outputs();
-
-        let port_buttons = {
-            let in_port_buttons = inputs
-                .iter()
-                .enumerate()
-                .map(|(i, port)| (Point::new(port_x(i), -PORT_RADIUS), port))
-                .map(|(point, port)| {
-                    let in_port = PortRef {
-                        node: id,
-                        name: port.0.clone(),
-                        io: IO::In,
-                    };
-                    Pin::new(
-                        mouse_area(
-                            custom_button::Button::new("")
-                                .on_press(Message::PortPress(in_port.clone()))
-                                .on_right_press(Message::PortDelete(in_port.clone()))
-                                .on_release_self(Message::PortRelease)
-                                .style(port_style)
-                                .width(PORT_RADIUS * 2.)
-                                .height(PORT_RADIUS * 2.),
-                        )
-                        .on_enter(Message::PortStartHover(in_port.clone()))
-                        .on_exit(Message::PortEndHover(in_port.clone())),
-                    )
-                    .position(point)
-                    .into()
-                });
-            let out_port_buttons = outputs
-                .iter()
-                .enumerate()
-                .map(|(i, port)| (Point::new(port_x(i), INNER_NODE_HEIGHT - PORT_RADIUS), port))
-                .map(|(point, port)| {
-                    let out_port = PortRef {
-                        node: id,
-                        name: port.0.clone(),
-                        io: IO::Out,
-                    };
-                    Pin::new(
-                        mouse_area(
-                            custom_button::Button::new(vertical_space())
-                                .on_press(Message::PortPress(out_port.clone()))
-                                .on_right_press(Message::PortDelete(out_port.clone()))
-                                .on_release_self(Message::PortRelease)
-                                .style(port_style)
-                                .width(PORT_RADIUS * 2.)
-                                .height(PORT_RADIUS * 2.),
-                        )
-                        .on_enter(Message::PortStartHover(out_port.clone()))
-                        .on_exit(Message::PortEndHover(out_port.clone())),
-                    )
-                    .position(point)
-                    .into()
-                });
-            in_port_buttons.chain(out_port_buttons)
-        };
-
-        let input_data = self.graph.get_input_data(&id);
-        let (node_size, node_view) = node.view(id, input_data);
-
-        //// Node
-        let node_inner: Element<Message, Theme, Renderer> = container(node_view)
-            .style(node_style)
-            .center_x(node_size.width)
-            .center_y(node_size.height)
-            .into();
-
-        let content: Element<Message, Theme, Renderer> = NodeContainer::new(
-            if self.debug {
-                node_inner.explain(Color::from_rgba(0.7, 0.7, 0.8, 0.2))
-            } else {
-                node_inner
-            },
-            port_buttons.collect(),
-        )
-        .width(node_size.width)
-        .height(node_size.height)
-        .into();
-        content
-    }
-
-    fn wire_curve(&self, wire_end_node: u32, points: &OrderMap<u32, Point>) -> Vec<(Path, Stroke)> {
-        let port_position = |port: &PortRef| {
-            points[&port.node] + find_port_offset(port, self.graph.port_index(port)).into()
-        };
-
-        //// Handle currently active wire
-        // TODO: test nodes with multiple out ports
-        let active_wire = match &self.action {
-            Action::CreatingInputWire(input, Some(tentative_output)) => {
-                Some((port_position(input), port_position(tentative_output)))
-            }
-            Action::CreatingInputWire(input, None) => Some((
-                port_position(input),
-                self.cursor_position + self.shapes.camera.position,
-            )),
-            Action::CreatingOutputWire(output, Some(input)) => {
-                Some((port_position(input), port_position(output)))
-            }
-            Action::CreatingOutputWire(output, None) => Some((
-                self.cursor_position + self.shapes.camera.position,
-                port_position(output),
-            )),
-            _ => None,
-        };
-
-        //// Handle all wires
-        let incoming_wires = self.graph.incoming_edges(&wire_end_node);
-        incoming_wires
-            .iter()
-            .map(|(from, to)| {
-                let color = wire_status(from, to, &self.action, &self.theme);
-                ((port_position(to), port_position(from)), color)
-            })
-            //// include the active wire
-            .chain(once(active_wire.map(|w| (w, active_wire_color(&self.theme)))).flatten())
-            //// build the wire curves
-            .map(|((from, to), color)| {
-                (
-                    Path::new(|builder| {
-                        builder.move_to(from.into());
-                        let mid = f32::abs((to.y - from.y) * 0.5).max(PORT_RADIUS * 2.);
-                        builder.bezier_curve_to(
-                            (from.x, from.y - mid).into(),
-                            (to.x, to.y + mid).into(),
-                            to.into(),
-                        );
-                    }),
-                    Stroke::default()
-                        .with_width(3.0)
-                        .with_color(color)
-                        .with_line_cap(canvas::LineCap::Round),
-                )
-            })
-            .collect()
+        self.redo_stack.clear();
     }
 }
 
 pub fn theme(_state: &App) -> Theme {
     default_theme()
 }
+
 fn default_theme() -> Theme {
     Theme::Ferra
 }
@@ -527,6 +337,8 @@ impl Default for App {
 
                     shapes: workspace::State::new(shapes.into()),
                     graph: g,
+                    undo_stack: vec![],
+                    redo_stack: vec![],
                 }
             }
         }

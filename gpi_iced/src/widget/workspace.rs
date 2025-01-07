@@ -57,7 +57,7 @@ enum Action {
     Drag(ShapeId, Vector),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct State {
     pub camera: Camera,
     pub shape_positions: OrderMap<ShapeId, Point>,

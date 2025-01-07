@@ -32,7 +32,7 @@ pub struct PortRef {
 
 type Edge = (PortRef, PortRef);
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Graph<NodeData, PortType, WireData>
 where
     NodeData: GraphNode<NodeData, PortType, WireData>,
@@ -273,6 +273,7 @@ where
 
     /// Execute network using topological sort
     pub fn execute_network(&mut self) {
+        self.wire_data.clear();
         let mut ordered = self.topological_sort();
         ordered.iter_mut().for_each(|nx| self.compute_node(nx))
     }
