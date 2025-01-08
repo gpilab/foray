@@ -1,12 +1,17 @@
+use std::time::Instant;
+
 use crate::app::Message;
 use crate::graph::GraphNode;
 use crate::nodes::linspace::LinspaceConfig;
 use crate::nodes::math_nodes::{binary_operation, unary_operation};
 use crate::nodes::plot::Plot;
 use crate::nodes::{constant, default_node_size, GUINode, PortData, PortType};
+use crate::python::gpipy_compute;
 use crate::OrderMap;
 use iced::widget::text;
 use iced::Font;
+use numpy::{PyArray1, PyArrayMethods};
+use pyo3::Python;
 use serde::{Deserialize, Serialize};
 use strum::{EnumIter, VariantNames};
 
@@ -15,6 +20,7 @@ pub enum NodeData {
     Identity,
     Constant(f64),
     Add,
+    PyAdd,
     Subtract,
     Multiply,
     Divide,
@@ -40,6 +46,7 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
             NodeData::Identity => [("a".to_string(), PortType::Real)].into(),
             NodeData::Constant(_constant_node) => [].into(),
             NodeData::Add => binary_in,
+            NodeData::PyAdd => binary_in,
             NodeData::Subtract => binary_in,
             NodeData::Multiply => binary_in,
             NodeData::Divide => binary_in,
@@ -63,6 +70,7 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
             NodeData::Identity => real_out,
             NodeData::Constant(_constant_node) => real_out,
             NodeData::Add => real_out,
+            NodeData::PyAdd => real_out,
             NodeData::Subtract => real_out,
             NodeData::Multiply => real_out,
             NodeData::Divide => real_out,
@@ -80,12 +88,29 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
         &self,
         inputs: OrderMap<String, &std::cell::RefCell<PortData>>,
     ) -> OrderMap<String, PortData> {
-        match self {
+        let start = Instant::now();
+        let out = match self {
             NodeData::Identity => [("out".to_string(), inputs["a"].borrow().clone())].into(),
             NodeData::Constant(value) => {
                 [("out".to_string(), PortData::Real(vec![*value].into()))].into()
             }
             NodeData::Add => binary_operation(inputs, Box::new(|a, b| a + b)),
+            NodeData::PyAdd => binary_operation(
+                inputs,
+                Box::new(|a, b| {
+                    Python::with_gil(|py| {
+                        let py_a = PyArray1::from_array(py, a);
+                        let py_b = PyArray1::from_array(py, b);
+                        gpipy_compute(
+                            "add_array",
+                            [("a".to_string(), &py_a), ("b".to_string(), &py_b)].into(),
+                            py,
+                        )
+                        .unwrap()["out"]
+                            .to_owned_array()
+                    })
+                }),
+            ),
             NodeData::Subtract => binary_operation(inputs, Box::new(|a, b| a - b)),
             NodeData::Multiply => binary_operation(inputs, Box::new(|a, b| a * b)),
             NodeData::Divide => binary_operation(inputs, Box::new(|a, b| a / b)),
@@ -109,7 +134,9 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
             ),
             NodeData::Linspace(linspace_config) => linspace_config.compute(inputs),
             NodeData::Plot(_) => [].into(),
-        }
+        };
+        dbg!((self.name(), (Instant::now() - start).as_micros()));
+        out
     }
 }
 
@@ -119,6 +146,7 @@ impl GUINode for NodeData {
             NodeData::Identity => "Identity".to_string(),
             NodeData::Constant(_value) => "Constant".to_string(),
             NodeData::Add => "Add".to_string(),
+            NodeData::PyAdd => "PyAdd".to_string(),
             NodeData::Subtract => "Subtract".to_string(),
             NodeData::Multiply => "Multiply".to_string(),
             NodeData::Divide => "Divide".to_string(),

@@ -1,10 +1,10 @@
 use numpy::{
-    ndarray::{CowArray, Dim},
-    PyArray, PyArray1,
+    ndarray::{ArrayBase, ArrayView, ArrayViewMut, ArrayViewMut1, CowArray, Dim},
+    PyArray, PyArray1, PyArrayMethods, PyReadonlyArray,
 };
 use pyo3::{
     types::{IntoPyDict, PyAnyMethods},
-    Bound, Python,
+    Bound, PyResult, Python,
 };
 
 struct MyArray<'a>(CowArray<'a, i32, Dim<[usize; 1]>>);
@@ -34,7 +34,6 @@ fn get_array<'a>(py: Python<'a>) -> Bound<'a, PyArray<i32, Dim<[usize; 1]>>> {
 
 #[cfg(test)]
 mod test {
-    use numpy::PyArrayMethods;
     use pyo3::prepare_freethreaded_python;
 
     use super::*;

@@ -14,7 +14,9 @@ iced = { version = "0.13.1", features = [
 	"canvas",
 ] }
 ndarray = "0.16.1"
+numpy = "0.23.0"
 ordermap = { version = "0.5.4", features = ["serde"] }
+pyo3 = "0.23.3"
 ron = { version = "0.8.1", features = ["indexmap"] }
 serde = { version = "1.0.217", features = ["serde_derive"] }
 strum = { version = "0.26.3", features = ["derive"] }

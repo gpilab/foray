@@ -1,2 +1,6 @@
 # [build]
 # rustflags = ["-Clink-arg=-fuse-ld=lld", "-Zthreads=16"]
+
+# .cargo/config.toml
+[env]
+PYO3_PYTHON = "./nodes/.venv/bin/python"

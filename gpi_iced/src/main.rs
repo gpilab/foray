@@ -2,8 +2,12 @@ use gpi_iced::app::{subscriptions, theme, App};
 use iced::{application, Font};
 
 pub fn main() -> iced::Result {
+    assert_environment();
+
     #[cfg(target_arch = "wasm32")]
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+
+    pyo3::prepare_freethreaded_python();
 
     application("gpi_v2", App::update, App::view)
         .subscription(subscriptions)
@@ -22,4 +26,20 @@ pub fn main() -> iced::Result {
         .font(include_bytes!("../data/CaskaydiaCoveNerdFont.ttf").as_slice())
         .default_font(Font::with_name("CaskaydiaCoveNerdFont"))
         .run()
+}
+
+/// ensure that environment variables are correctly set for the python venv
+/// located at `nodes/.venv`
+//
+/// The build script `build.rs` is repsonsible for setting these variables
+///
+/// This will need to be updated when the location of the user's venv will
+/// be located
+fn assert_environment() {
+    let venv_dir = env!("CARGO_MANIFEST_DIR").to_string() + "/nodes/.venv";
+    let venv_bin = venv_dir.clone() + "/bin";
+    let path = env!("PATH");
+    let venv = env!("VIRTUAL_ENV");
+    assert!(path.contains(&venv_bin));
+    assert_eq!(venv, venv_dir);
 }

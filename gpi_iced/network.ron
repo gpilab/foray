@@ -4,9 +4,9 @@
             0: Linspace((
                 start: -10.0,
                 stop: 10.0,
-                num: 100,
+                num: 100000,
             )),
-            1: Constant(2.4000000000000004),
+            1: Constant(5.0),
             5: Plot((
                 rect: (
                     center: (
@@ -20,7 +20,7 @@
             7: Multiply,
             8: Sinc,
             11: Multiply,
-            12: Constant(1.9000000000000004),
+            12: Constant(-1.0999999999999996),
             16: Linspace((
                 start: 0.0,
                 stop: 200.0,
@@ -62,24 +62,10 @@
                     height: 10.0,
                 ),
             )),
+            44: PyAdd,
+            45: Add,
         },
         edges: [((
-            node: 0,
-            name: "out",
-            io: Out,
-        ), (
-            node: 5,
-            name: "x",
-            io: In,
-        )), ((
-            node: 7,
-            name: "out",
-            io: Out,
-        ), (
-            node: 5,
-            name: "y",
-            io: In,
-        )), ((
             node: 8,
             name: "out",
             io: Out,
@@ -311,13 +297,61 @@
             node: 43,
             name: "y",
             io: In,
+        )), ((
+            node: 0,
+            name: "out",
+            io: Out,
+        ), (
+            node: 44,
+            name: "a",
+            io: In,
+        )), ((
+            node: 7,
+            name: "out",
+            io: Out,
+        ), (
+            node: 44,
+            name: "b",
+            io: In,
+        )), ((
+            node: 44,
+            name: "out",
+            io: Out,
+        ), (
+            node: 5,
+            name: "x",
+            io: In,
+        )), ((
+            node: 7,
+            name: "out",
+            io: Out,
+        ), (
+            node: 45,
+            name: "b",
+            io: In,
+        )), ((
+            node: 0,
+            name: "out",
+            io: Out,
+        ), (
+            node: 45,
+            name: "a",
+            io: In,
+        )), ((
+            node: 45,
+            name: "out",
+            io: Out,
+        ), (
+            node: 5,
+            name: "y",
+            io: In,
         ))],
-        next_id: 44,
+        next_id: 46,
     ),
     shapes: (
         camera: (
             position: (
-                x: 168.10693,
+                x: 113.68848,
                 y: 67.359375,
             ),
             zoom: 1.0,
@@ -332,8 +366,8 @@
                 y: 301.50955,
             ),
             5: (
-                x: 347.29764,
-                y: 432.82196,
+                x: 358.6414,
+                y: 540.4563,
             ),
             7: (
                 x: 517.40424,
@@ -420,19 +454,27 @@
                 y: 559.88745,
             ),
             42: (
-                x: 112.184326,
-                y: 623.11255,
+                x: 238.61871,
+                y: 665.9813,
             ),
             43: (
                 x: -6.65625,
                 y: 544.4031,
             ),
+            44: (
+                x: 300.01254,
+                y: 411.51248,
+            ),
+            45: (
+                x: 438.5093,
+                y: 429.86877,
+            ),
         },
     ),
-    selected_shape: None,
+    selected_shape: Some(0),
     cursor_position: (
-        x: -74.225,
-        y: 14.50625,
+        x: -60.199997,
+        y: 17.05625,
     ),
     config: 50.0,
     debug: false,

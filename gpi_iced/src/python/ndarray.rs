@@ -1,21 +1,17 @@
-use numpy::{
-    ndarray::{CowArray, Dim},
-    PyArray, PyArray1,
-};
+use pyo3::ffi::c_str;
+
+use numpy::{ndarray::Dim, PyArray, PyArray1};
 use pyo3::{
     types::{IntoPyDict, PyAnyMethods},
     Bound, Python,
 };
 
-struct MyArray<'a>(CowArray<'a, i32, Dim<[usize; 1]>>);
-
-fn get_array<'a>(py: Python<'a>) -> Bound<'a, PyArray<i32, Dim<[usize; 1]>>> {
-    //-> CowArray<'a, i32, Dim<[usize; 1]>> {
-    let np = py.import_bound("numpy").unwrap();
-    let locals = [("np", np)].into_py_dict_bound(py);
+pub fn get_array(py: Python<'_>) -> Bound<'_, PyArray<i32, Dim<[usize; 1]>>> {
+    let np = py.import("numpy").unwrap();
+    let locals = [("np", np)].into_py_dict(py).unwrap();
     let pyarray = py
-        .eval_bound(
-            "np.absolute(np.array([-1, -2, -3], dtype='int32'))",
+        .eval(
+            c_str!("np.absolute(np.array([-1, -2, -3], dtype='int32'))"),
             Some(&locals),
             None,
         )
@@ -24,12 +20,6 @@ fn get_array<'a>(py: Python<'a>) -> Bound<'a, PyArray<i32, Dim<[usize; 1]>>> {
         .unwrap();
 
     pyarray
-
-    //let mut rw = pyarray.readwrite();
-    //Ok(rw.as_array_mut())
-    //let slice = readonly.as_slice()?;
-    //assert_eq!(slice, &[1, 2, 3]);
-    //Ok(readonly.to_vec().unwrap())
 }
 
 #[cfg(test)]
