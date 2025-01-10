@@ -1,9 +1,9 @@
 #![feature(iter_map_windows)]
 
 use iced::Font;
-use ordermap::OrderMap as OM;
+use indexmap::IndexMap;
 
-pub type OrderMap<K, V> = OM<K, V>;
+pub type OrderMap<K, V> = IndexMap<K, V>;
 pub const DEFAULT_FONT: Font = Font::with_name("Canterell");
 pub const MATH_FONT: Font = Font::with_name("DejaVu Math TeX Gyre");
 pub const SYMBOL_FONT: Font = Font::with_name("CaskaydiaCove Nerd Font");

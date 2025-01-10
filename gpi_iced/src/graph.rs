@@ -10,7 +10,10 @@ where
 {
     fn inputs(&self) -> OrderMap<String, PortType>;
     fn outputs(&self) -> OrderMap<String, PortType>;
-    fn compute(&self, inputs: OrderMap<String, &RefCell<WireData>>) -> OrderMap<String, WireData>;
+    fn compute<'a>(
+        &'a self,
+        inputs: OrderMap<String, &'a RefCell<WireData>>,
+    ) -> OrderMap<String, WireData>;
 }
 
 type PortName = String;
@@ -32,7 +35,7 @@ pub struct PortRef {
 
 type Edge = (PortRef, PortRef);
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct Graph<NodeData, PortType, WireData>
 where
     NodeData: GraphNode<NodeData, PortType, WireData>,
@@ -45,6 +48,22 @@ where
     next_id: NodeIndex,
     #[serde(skip)]
     phantom: std::marker::PhantomData<PortType>,
+}
+
+impl<NodeData: Clone, PortType: Clone, WireData> Clone for Graph<NodeData, PortType, WireData>
+where
+    NodeData: GraphNode<NodeData, PortType, WireData>,
+    PortType: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            nodes: self.nodes.clone(),
+            edges: self.edges.clone(),
+            wire_data: Default::default(),
+            next_id: self.next_id,
+            phantom: self.phantom,
+        }
+    }
 }
 
 fn default_wire_data<K, V>() -> HashMap<K, V> {

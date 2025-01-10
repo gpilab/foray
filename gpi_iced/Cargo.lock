@@ -1284,6 +1284,7 @@ dependencies = [
  "derive_more",
  "float-cmp",
  "iced",
+ "indexmap",
  "ndarray",
  "numpy",
  "ordermap",

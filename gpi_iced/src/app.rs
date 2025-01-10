@@ -258,6 +258,9 @@ impl App {
         self.undo_stack
             .push((self.graph.clone(), self.shapes.shape_positions.clone()));
 
+        // Don't let the stack get too big, especially while we naively store everything
+        self.undo_stack.truncate(10);
+
         self.redo_stack.clear();
     }
 }

@@ -13,6 +13,7 @@ iced = { version = "0.13.1", features = [
 	"advanced",
 	"canvas",
 ] }
+indexmap = { version = "2.7.0", features = ["serde"] }
 ndarray = "0.16.1"
 numpy = "0.23.0"
 ordermap = { version = "0.5.4", features = ["serde"] }

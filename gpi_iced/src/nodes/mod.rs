@@ -2,6 +2,7 @@ pub mod constant;
 pub mod linspace;
 pub mod math_nodes;
 pub mod plot;
+pub mod plot_complex;
 pub mod port;
 
 pub use port::PortData;
@@ -79,6 +80,8 @@ pub fn format_node_output<'a>(
 pub(crate) fn available_nodes_view<'a>() -> Element<'a, Message> {
     container(
         container(
+            //TODO: don't create new nodes on every view. store a list of Node templates in App
+            // New nodes are expensive for python nodes which need to read their source
             column(NodeData::iter().map(|node| {
                 button(
                     row![

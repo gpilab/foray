@@ -5,6 +5,7 @@ use std::ops::Deref;
 
 #[allow(clippy::type_complexity)]
 pub fn binary_operation(
+    //node: NodeData,
     inputs: OrderMap<String, &std::cell::RefCell<PortData>>,
     f: Box<dyn Fn(&Array1<f64>, &Array1<f64>) -> Array1<f64>>,
 ) -> OrderMap<String, PortData> {
@@ -17,6 +18,7 @@ pub fn binary_operation(
 }
 #[allow(clippy::type_complexity)]
 pub fn unary_operation(
+    //node: NodeData,
     inputs: OrderMap<String, &std::cell::RefCell<PortData>>,
     f: Box<dyn Fn(&Array1<f64>) -> Array1<f64>>,
 ) -> OrderMap<String, PortData> {
