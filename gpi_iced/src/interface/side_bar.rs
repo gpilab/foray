@@ -75,7 +75,7 @@ pub fn side_bar(app: &App) -> Element<Message> {
         .padding([10., 5.])
         .into()
     } else {
-        let node_list = nodes::available_nodes_view();
+        let node_list = nodes::node_list_view(&app.availble_nodes);
         column![
             container(text("Add Node").size(20.)).center_x(Fill),
             horizontal_rule(0),

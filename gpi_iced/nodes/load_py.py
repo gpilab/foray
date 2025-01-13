@@ -13,5 +13,5 @@ def compute(input):
     x = np.linspace(0, 10, 64)
     y = np.linspace(0, 10, 64)
     freq = input["freq"] * 2
-    out = np.sin(10 * freq * x[:, None]) * np.cos(freq * y)
+    out = np.sin(freq * x[:, None]) * np.cos(freq * y)
     return out

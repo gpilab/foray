@@ -84,30 +84,30 @@ pub fn format_node_output<'a>(
     .into()
 }
 
-pub(crate) fn available_nodes_view<'a>() -> Element<'a, Message> {
+pub(crate) fn available_nodes() -> Vec<NodeData> {
+    NodeData::iter().flat_map(|node| node.templates()).collect()
+}
+
+pub(crate) fn node_list_view<'a>(nodes: &[NodeData]) -> Element<'a, Message> {
     container(
         container(
             //TODO: don't create new nodes on every view. store a list of Node templates in App
             // New nodes are expensive for python nodes which need to read their source
-            column(
-                NodeData::iter()
-                    .flat_map(|node| node.templates())
-                    .map(|node| {
-                        button(
-                            row![
-                                horizontal_rule(0.0),
-                                container(text(node.name())).padding(4.0)
-                            ]
-                            //.spacing(4.0)
-                            .align_y(Center),
-                        )
-                        .padding(0.)
-                        .on_press(Message::AddNode(node))
-                        .width(Fill)
-                        .style(style::button::list)
-                        .into()
-                    }),
-            )
+            column(nodes.iter().map(|node| {
+                button(
+                    row![
+                        horizontal_rule(0.0),
+                        container(text(node.name())).padding(4.0)
+                    ]
+                    //.spacing(4.0)
+                    .align_y(Center),
+                )
+                .padding(0.)
+                .on_press(Message::AddNode(node.clone()))
+                .width(Fill)
+                .style(style::button::list)
+                .into()
+            }))
             .width(150.),
         )
         .style(|t| bordered_box(t).background(Color::TRANSPARENT)),

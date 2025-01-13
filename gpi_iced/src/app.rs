@@ -4,7 +4,7 @@ use crate::math::{Point, Vector};
 use crate::node_data::NodeData;
 use crate::nodes::linspace::LinspaceConfig;
 use crate::nodes::plot::Plot;
-use crate::nodes::{PortData, PortType};
+use crate::nodes::{available_nodes, PortData, PortType};
 use crate::widget::shapes::ShapeId;
 use crate::widget::workspace::{self, workspace};
 use crate::OrderMap;
@@ -40,6 +40,8 @@ pub struct App {
     pub cursor_position: Point,
     pub config: f32,
     pub debug: bool,
+    #[serde(skip)]
+    pub availble_nodes: Vec<NodeData>,
     #[serde(skip, default = "default_theme")]
     pub theme: Theme,
     #[serde(skip)]
@@ -297,6 +299,7 @@ impl Default for App {
         match read_to_string("network.ron").map(|s| ron::from_str::<App>(&s)) {
             Ok(Ok(app)) => {
                 let mut app = app;
+                app.availble_nodes = available_nodes();
                 app.graph.execute_network();
                 app
             }
@@ -339,6 +342,7 @@ impl Default for App {
                     cursor_position: Default::default(),
                     action: Default::default(),
 
+                    availble_nodes: dbg!(available_nodes()),
                     shapes: workspace::State::new(shapes.into()),
                     graph: g,
                     undo_stack: vec![],
