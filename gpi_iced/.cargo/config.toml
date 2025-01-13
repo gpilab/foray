@@ -3,4 +3,7 @@
 
 # .cargo/config.toml
 [env]
-PYO3_PYTHON = "./nodes/.venv/bin/python"
+#PYO3_PYTHON = "/home/john/projects/gpi_v2/gpi_iced/nodes/.venv/bin/python"
+
+[build]
+rustflags = ["-Clink-arg=-fuse-ld=lld", "-Zthreads=16"]

@@ -10,7 +10,7 @@ pub fn view<'a>(id: u32, value: f64) -> Element<'a, Message> {
     container(
         column![
             text(format!("{value:.1}")),
-            slider(-5.0..=5., value, move |value| {
+            slider(0.1..=20., value, move |value| {
                 Message::UpdateNodeData(id, NodeData::Constant(value))
             })
             .step(0.1)

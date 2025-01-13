@@ -1,0 +1,112 @@
+(
+    graph: (
+        nodes: {
+            14: Linspace((
+                start: -100.0,
+                stop: 100.0,
+                num: 100,
+            )),
+            12: Constant(-2.6999999999999997),
+            16: PyLoad,
+            23: Plot2D((
+                rect: (
+                    center: (
+                        x: 0.5,
+                        y: 0.5,
+                    ),
+                    width: 1.0,
+                    height: 1.0,
+                ),
+            )),
+            24: PyNode((
+                path: "/home/john/projects/gpi_v2/gpi_iced/nodes/fft.py",
+                ports: (
+                    inputs: {
+                        "a": Complex2d,
+                    },
+                    outputs: {
+                        "out": Complex2d,
+                    },
+                ),
+            )),
+            25: Plot2D((
+                rect: (
+                    center: (
+                        x: 0.5,
+                        y: 0.5,
+                    ),
+                    width: 1.0,
+                    height: 1.0,
+                ),
+            )),
+        },
+        edges: [((
+            node: 16,
+            name: "out",
+            io: Out,
+        ), (
+            node: 23,
+            name: "a",
+            io: In,
+        )), ((
+            node: 16,
+            name: "out",
+            io: Out,
+        ), (
+            node: 24,
+            name: "a",
+            io: In,
+        )), ((
+            node: 24,
+            name: "out",
+            io: Out,
+        ), (
+            node: 25,
+            name: "a",
+            io: In,
+        ))],
+        next_id: 26,
+    ),
+    shapes: (
+        camera: (
+            position: (
+                x: -43.38867,
+                y: 411.92773,
+            ),
+            zoom: 1.0,
+        ),
+        shape_positions: {
+            14: (
+                x: 179.07187,
+                y: 327.11877,
+            ),
+            12: (
+                x: 330.49686,
+                y: 318.47186,
+            ),
+            16: (
+                x: 35.649994,
+                y: 488.80002,
+            ),
+            23: (
+                x: -13.528137,
+                y: 601.45935,
+            ),
+            24: (
+                x: 307.08755,
+                y: 608.34375,
+            ),
+            25: (
+                x: 284.60938,
+                y: 713.3125,
+            ),
+        },
+    ),
+    selected_shape: Some(25),
+    cursor_position: (
+        x: -66.962494,
+        y: 25.13125,
+    ),
+    config: 50.0,
+    debug: false,
+)

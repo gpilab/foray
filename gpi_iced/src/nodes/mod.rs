@@ -55,6 +55,13 @@ pub trait GUINode: derive_more::Debug {
     ) -> Option<Element<'a, Message>> {
         None
     }
+
+    fn templates(&self) -> Vec<Self>
+    where
+        Self: Sized + Clone,
+    {
+        vec![self.clone()]
+    }
 }
 
 pub fn format_node_output<'a>(
@@ -82,21 +89,25 @@ pub(crate) fn available_nodes_view<'a>() -> Element<'a, Message> {
         container(
             //TODO: don't create new nodes on every view. store a list of Node templates in App
             // New nodes are expensive for python nodes which need to read their source
-            column(NodeData::iter().map(|node| {
-                button(
-                    row![
-                        horizontal_rule(0.0),
-                        container(text(node.name())).padding(4.0)
-                    ]
-                    //.spacing(4.0)
-                    .align_y(Center),
-                )
-                .padding(0.)
-                .on_press(Message::AddNode(node))
-                .width(Fill)
-                .style(style::button::list)
-                .into()
-            }))
+            column(
+                NodeData::iter()
+                    .flat_map(|node| node.templates())
+                    .map(|node| {
+                        button(
+                            row![
+                                horizontal_rule(0.0),
+                                container(text(node.name())).padding(4.0)
+                            ]
+                            //.spacing(4.0)
+                            .align_y(Center),
+                        )
+                        .padding(0.)
+                        .on_press(Message::AddNode(node))
+                        .width(Fill)
+                        .style(style::button::list)
+                        .into()
+                    }),
+            )
             .width(150.),
         )
         .style(|t| bordered_box(t).background(Color::TRANSPARENT)),

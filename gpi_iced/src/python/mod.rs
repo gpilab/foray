@@ -16,8 +16,11 @@ pub fn gpipy_compute<'a>(
     py: Python<'a>,
 ) -> Result<OrderMap<String, PyObject>, Box<dyn std::error::Error>> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"));
+    //PERF: cache this in the PyNode
     let node_src = fs::read_to_string(path.join(format!("nodes/{node_type}.py")))?;
-
+    //PERF: test if caching this is a big performance win
+    //This would be more of a pain to cache becaues of the associated python lifetime, but could
+    //potentially be worth it
     let node_module = PyModule::from_code(
         py,
         CString::new(node_src)?.as_c_str(),
@@ -29,11 +32,10 @@ pub fn gpipy_compute<'a>(
     let node_output = match node_module
         .getattr("compute")?
         .call1((inputs.iter().collect::<HashMap<_, _>>(),))
-        //.downcast_into::<PyArrayDyn<f64>>()
     {
         Ok(out) => out,
         Err(err) => {
-            panic!("{:?}", err);
+            panic!("{node_type}: node execution failed {:?}", err);
         }
     };
 
@@ -97,7 +99,7 @@ mod test {
             r#"
 def config():
     class out:
-        inputs = {"a": "Real", "b": "Real2d"}
+        inputs = {"p1": "Real", "p2": "Real2d"}
         outputs = {"out": "Complex"}
     return out
             "#,
@@ -106,8 +108,8 @@ def config():
         assert_eq!(
             PortDef {
                 inputs: [
-                    ("a".to_string(), PortType::Real),
-                    ("b".to_string(), PortType::Real2d)
+                    ("p1".to_string(), PortType::Real),
+                    ("p2".to_string(), PortType::Real2d)
                 ]
                 .into(),
                 outputs: [("out".to_string(), PortType::Complex),].into()

@@ -28,7 +28,7 @@ pub fn main() -> iced::Result {
         .run()
 }
 
-/// ensure that environment variables are correctly set for the python venv
+/// Ensure that environment variables are correctly set for the python venv
 /// located at `nodes/.venv`
 //
 /// The build script `build.rs` is repsonsible for setting these variables
@@ -38,8 +38,12 @@ pub fn main() -> iced::Result {
 fn assert_environment() {
     let venv_dir = env!("CARGO_MANIFEST_DIR").to_string() + "/nodes/.venv";
     let venv_bin = venv_dir.clone() + "/bin";
-    let path = env!("PATH");
-    let venv = env!("VIRTUAL_ENV");
-    assert!(path.contains(&venv_bin));
-    assert_eq!(venv, venv_dir);
+    let python_bin = venv_bin.clone() + "/python";
+
+    let env_path = env!("PATH");
+    assert!(env_path.contains(&venv_bin));
+    let env_venv = env!("VIRTUAL_ENV");
+    assert_eq!(env_venv, venv_dir);
+    let env_python_bin = env!("PYO3_PYTHON");
+    assert_eq!(env_python_bin, python_bin);
 }

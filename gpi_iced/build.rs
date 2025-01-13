@@ -12,7 +12,12 @@ fn main() {
 
     println!(
         "cargo::rustc-env=PATH={}",
-        prepend_path(venv_bin).unwrap().to_str().unwrap()
+        prepend_path(venv_bin.clone()).unwrap().to_str().unwrap()
+    );
+
+    println!(
+        "cargo::rustc-env=PYO3_PYTHON={}",
+        venv_bin.join("python").to_str().unwrap()
     );
 }
 

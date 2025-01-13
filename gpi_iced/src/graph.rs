@@ -94,7 +94,7 @@ where
 
     /// Remove a node and all edges associated with it
     pub fn delete_node(&mut self, id: NodeIndex) {
-        self.nodes.remove(&id);
+        self.nodes.swap_remove(&id);
         self.edges
             .retain(|(from, to)| from.node != id && to.node != id)
     }

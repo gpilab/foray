@@ -5,3 +5,7 @@ version = "0.0.1"
 dependencies = [
     "numpy >= 2.0",
 ]
+
+[tool.pyright]
+venv = ".venv"
+venvPath = "./"

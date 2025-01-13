@@ -8,6 +8,7 @@ use derive_more::derive::Debug;
 use numpy::{PyArrayMethods, ToPyArray};
 use pyo3::{types::PyAnyMethods, FromPyObject, PyObject, Python};
 use serde::{Deserialize, Serialize};
+use strum::VariantNames;
 
 use crate::{
     nodes::{PortData, PortType},
@@ -24,7 +25,7 @@ pub struct PyNode {
 
 impl Default for PyNode {
     fn default() -> Self {
-        Self::new("add_array").unwrap()
+        Self::new("null").unwrap()
     }
 }
 
@@ -38,8 +39,9 @@ impl PortData {
         match self {
             PortData::Integer(array_base) => array_base.to_pyarray(py).into_any().into(),
             PortData::Real(array_base) => array_base.to_pyarray(py).into_any().into(),
-            PortData::Complex(array_base) => todo!(), //array_base.to_pyarray(py).into_any().into(),
             PortData::Real2d(array_base) => array_base.to_pyarray(py).into_any().into(),
+            PortData::Complex(array_base) => array_base.to_pyarray(py).into_any().into(),
+            PortData::Complex2d(array_base) => array_base.to_pyarray(py).into_any().into(),
         }
     }
 }
@@ -71,47 +73,13 @@ impl PyNode {
                 &py_inputs,
                 py,
             )
-            .unwrap(); //["out"];
+            .unwrap();
 
-            let port_data = Self::extract_py_data(&self.ports.outputs["out"], &out["out"], py);
-            //let port_data: PortData = unsafe {
-            //    match self.ports.outputs["out"] {
-            //        PortType::Integer => PortData::Integer(
-            //            out["out"]
-            //                .bind(py)
-            //                .downcast()
-            //                .unwrap()
-            //                .as_array()
-            //                .to_owned(),
-            //        ),
-            //        PortType::Real => PortData::Real(
-            //            out["out"]
-            //                .bind(py)
-            //                .downcast()
-            //                .unwrap()
-            //                .as_array()
-            //                .to_owned(),
-            //        ),
-            //        PortType::Complex => todo!(),
-            //        PortType::Real2d => PortData::Real2d(
-            //            out["out"]
-            //                .bind(py)
-            //                .downcast()
-            //                .unwrap()
-            //                .as_array()
-            //                .to_owned(),
-            //        ),
-            //    }
-            //};
-            //let out = out
-            //    .downcast_bound(py)
-            //    .unwrap()
-            //    .to_dyn()
-            //    .downcast()
-            //    .to_shape((out.len().isqrt(), out.len().isqrt()))
-            //    .expect("correct array shape")
-            //    .to_owned();
-            [("out".to_string(), port_data)].into()
+            self.ports
+                .outputs
+                .iter()
+                .map(|(k, port_type)| (k.clone(), Self::extract_py_data(port_type, &out[k], py)))
+                .collect()
         })
     }
 
@@ -127,10 +95,15 @@ impl PyNode {
                 PortType::Real => {
                     PortData::Real(py_object.bind(py).downcast().unwrap().as_array().to_owned())
                 }
-                PortType::Complex => todo!(),
+                PortType::Complex => {
+                    PortData::Complex(py_object.bind(py).downcast().unwrap().as_array().to_owned())
+                }
                 PortType::Real2d => {
                     PortData::Real2d(py_object.bind(py).downcast().unwrap().as_array().to_owned())
                 }
+                PortType::Complex2d => PortData::Complex2d(
+                    py_object.bind(py).downcast().unwrap().as_array().to_owned(),
+                ),
             }
         }
     }
@@ -147,15 +120,30 @@ impl TryFrom<PyFacingPortDef> for PortDef {
     fn try_from(value: PyFacingPortDef) -> Result<Self, Self::Error> {
         Ok(PortDef {
             inputs: value
+                .clone()
                 .inputs
                 .into_iter()
                 .map(|(key, value)| PortType::from_str(&value).map(|v| (key, v)))
-                .collect::<Result<OrderMap<_, _>, _>>()?,
+                .collect::<Result<OrderMap<_, _>, _>>()
+                .unwrap_or_else(|_| {
+                    panic!(
+                        "Expected port values of {:?}, found {:?}",
+                        PortType::VARIANTS,
+                        value.inputs
+                    )
+                }),
             outputs: value
                 .outputs
                 .into_iter()
                 .map(|(key, value)| PortType::from_str(&value).map(|v| (key, v)))
-                .collect::<Result<OrderMap<_, _>, _>>()?,
+                .collect::<Result<OrderMap<_, _>, _>>()
+                .unwrap_or_else(|_| {
+                    panic!(
+                        "Expected port values of {:?}, found {:?}",
+                        PortType::VARIANTS,
+                        value.inputs
+                    )
+                }),
         })
     }
     type Error = strum::ParseError;

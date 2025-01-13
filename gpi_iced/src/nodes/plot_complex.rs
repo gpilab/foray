@@ -61,11 +61,14 @@ impl Plot2D {
     ) -> Element<'a, Message> {
         let data = if let Some(i) = input_data {
             if let Some(port) = i.get("a") {
-                if let PortData::Real2d(a) = port.borrow().clone() {
-                    a
-                    //(a.to_vec().into_iter().map(|f| f as f32).collect(),)
-                } else {
-                    panic!("unsuported plot types ")
+                match port.borrow().clone() {
+                    PortData::Real2d(a) => a,
+                    PortData::Complex2d(a) => Array2::<f64>::from_shape_vec(
+                        (a.len().isqrt(), a.len().isqrt()),
+                        a.iter().map(|v| v.norm_sqr().sqrt()).collect::<Vec<_>>(),
+                    )
+                    .expect("square matrix"),
+                    _ => panic!("unsuported plot types {:?}", port),
                 }
             } else {
                 Array2::zeros((0, 0))
@@ -181,138 +184,45 @@ impl<Message> canvas::Program<Message> for PlotCanvas {
         bounds: Rectangle,
         _cursor: mouse::Cursor,
     ) -> Vec<canvas::Geometry> {
-        // We prepare a new `Frame`
         let mut frame = canvas::Frame::new(renderer, bounds.size());
 
         let node_width = bounds.width;
         let node_height = bounds.height;
 
         frame.push_transform();
-        ////// center canvas on the origin, y up
+        //// center canvas on the origin, y up
         frame.translate([frame.center().x, frame.center().y].into());
-        //frame.scale_nonuniform([1., -1.]);
 
-        ////// scale for the conifgured height/width
+        //// scale for the conifgured height/width
         frame.scale_nonuniform([
             node_width / self.config.rect.width,
             node_height / self.config.rect.height,
         ]);
-        //
         ////move the center point to the center of our canvas
         frame.translate((-self.config.rect.center).into());
 
-        // The frame is now centered on center, and goes from:
-        // rect.left   -> rect.right
-        // rect.bottom -> rect.top
-
-        //// Grid
-        //{
-        //    let main_grid_stroke = Stroke::default()
-        //        .with_color(theme.palette().primary.scale_alpha(0.3))
-        //        .with_width(1.);
-        //
-        //    let secondary_grid_stroke = Stroke::default()
-        //        .with_color(theme.palette().primary.scale_alpha(0.1))
-        //        .with_width(1.);
-        //    let tertiary_grid_strok = Stroke::default()
-        //        .with_color(theme.palette().primary.scale_alpha(0.01))
-        //        .with_width(1.);
-        //
-        //    grid_path(self.config.rect, 100.)
-        //        .into_iter()
-        //        .for_each(|p| frame.stroke(&p, main_grid_stroke));
-        //
-        //    grid_path(self.config.rect, 10.)
-        //        .into_iter()
-        //        .for_each(|p| frame.stroke(&p, secondary_grid_stroke));
-        //
-        //    grid_path(self.config.rect, 1.)
-        //        .into_iter()
-        //        .for_each(|p| frame.stroke(&p, tertiary_grid_strok));
-        //}
-
-        //let lixne_stroke = Stroke::default()
-        //    .with_color(theme.extended_palette().success.strong.color)
-        //
-        //    .with_width(2.);
         let px_size = 1.0 / self.data.dim().0 as f32;
+        let max = self.data.iter().fold(-f64::INFINITY, |a, &b| a.max(b));
+        let min = self.data.iter().fold(f64::INFINITY, |a, &b| a.min(b));
         self.data
             .rows()
             .into_iter()
             .enumerate()
             .for_each(|(i, row)| {
                 row.iter().enumerate().for_each(|(j, p)| {
+                    let p = ((p - min) / (max - min)) as f32;
+                    let p = if p.is_nan() { 1.0 } else { p };
                     frame.fill(
                         &Path::rectangle(
                             Point::new(px_size * i as f32, px_size * j as f32),
                             (px_size, px_size).into(),
                         ),
-                        iced::Color::new(*p as f32, *p as f32, *p as f32, 1.0),
+                        iced::Color::new(p, p, p, 1.0),
                     )
                 })
             });
-        //.into_iter()
-        //.zip(self.y.clone())
-        //.map_windows(|[from, to]| {
-        //    if from.0.is_finite() && from.1.is_finite() && to.0.is_finite() && to.1.is_finite()
-        //    {
-        //        (
-        //            Path::line(Point::from(*from), Point::from(*to)),
-        //            line_stroke,
-        //        )
-        //    } else if from.0.is_finite() && to.0.is_finite() {
-        //        (
-        //            Path::line(
-        //                Point::from((from.0, self.config.rect.center.y)),
-        //                Point::from((to.0, self.config.rect.center.y)),
-        //            ),
-        //            line_stroke.with_color(theme.palette().danger),
-        //        )
-        //    } else {
-        //        (
-        //            Path::circle(
-        //                Point::from((
-        //                    self.config.rect.right() - 1.,
-        //                    self.config.rect.top() - 1.,
-        //                )),
-        //                0.75,
-        //            ),
-        //            line_stroke.with_color(theme.palette().danger),
-        //        )
-        //    }
-        //})
-        //.for_each(|(path, stroke)| frame.stroke(&path, stroke));
-        //
         frame.pop_transform();
 
         vec![frame.into_geometry()]
     }
 }
-
-//fn grid_path(plot_rect: Rect, tick_size: f32) -> Vec<Path> {
-//    let left = ((plot_rect.left() / tick_size).floor()) * tick_size;
-//    let right = ((plot_rect.right() / tick_size).ceil()) * tick_size;
-//    let bottom = ((plot_rect.bottom() / tick_size).floor()) * tick_size;
-//    let top = ((plot_rect.top() / tick_size).ceil()) * tick_size;
-//
-//    if left.is_nan() || right.is_nan() || top.is_nan() || bottom.is_nan() {
-//        panic!("Encountered nan!{:?}", (plot_rect, tick_size))
-//    }
-//
-//    let h_lines = linspace_delta(top, bottom, tick_size).into_iter().map(|y| {
-//        if y.is_nan() {
-//            panic!("Encountered nan!{:?}", (plot_rect, tick_size))
-//        }
-//        Path::line((left, y).into(), (right, y).into())
-//    });
-//
-//    let v_lines = linspace_delta(right, left, tick_size).into_iter().map(|x| {
-//        if x.is_nan() {
-//            panic!("Encountered nan!{:?}", (plot_rect, tick_size))
-//        }
-//
-//        Path::line((x, bottom).into(), (x, top).into())
-//    });
-//
-//    h_lines.chain(v_lines).collect()
-//}

@@ -7,13 +7,10 @@ use crate::nodes::math_nodes::{binary_operation, unary_operation};
 use crate::nodes::plot::Plot;
 use crate::nodes::plot_complex::Plot2D;
 use crate::nodes::{constant, default_node_size, GUINode, PortData, PortType};
-use crate::python::gpipy_compute;
 use crate::python::py_node::PyNode;
 use crate::OrderMap;
 use iced::widget::text;
 use iced::Font;
-use numpy::{IntoPyArray, ToPyArray};
-use pyo3::{IntoPyObject, Python};
 use serde::{Deserialize, Serialize};
 use strum::{EnumIter, VariantNames};
 
@@ -22,7 +19,6 @@ pub enum NodeData {
     Identity,
     Constant(f64),
     Add,
-    PyAdd,
     Subtract,
     Multiply,
     Divide,
@@ -34,7 +30,6 @@ pub enum NodeData {
     Plot2D(Plot2D),
     Join,
     Reverse,
-    PyLoad,
     PyNode(PyNode),
 }
 
@@ -51,7 +46,6 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
             NodeData::Identity => [("a".to_string(), PortType::Real)].into(),
             NodeData::Constant(_constant_node) => [].into(),
             NodeData::Add => binary_in,
-            NodeData::PyAdd => binary_in,
             NodeData::Subtract => binary_in,
             NodeData::Multiply => binary_in,
             NodeData::Divide => binary_in,
@@ -67,19 +61,16 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
             ]
             .into(),
             NodeData::Plot2D(_) => [("a".to_string(), PortType::Real2d)].into(),
-            NodeData::PyLoad => [].into(),
             NodeData::PyNode(py_node) => py_node.ports.inputs.clone(),
         }
     }
 
     fn outputs(&self) -> OrderMap<String, PortType> {
         let real_out = [("out".to_string(), PortType::Real)].into();
-        let complex2_out = [("out".to_string(), PortType::Real2d)].into();
         match self {
             NodeData::Identity => real_out,
             NodeData::Constant(_constant_node) => real_out,
             NodeData::Add => real_out,
-            NodeData::PyAdd => real_out,
             NodeData::Subtract => real_out,
             NodeData::Multiply => real_out,
             NodeData::Divide => real_out,
@@ -91,7 +82,6 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
             NodeData::Linspace(_) => real_out,
             NodeData::Plot(_) => [].into(),
             NodeData::Plot2D(_) => [].into(),
-            NodeData::PyLoad => complex2_out,
             NodeData::PyNode(py_node) => py_node.ports.outputs.clone(),
         }
     }
@@ -106,27 +96,7 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
             NodeData::Constant(value) => {
                 [("out".to_string(), PortData::Real(vec![*value].into()))].into()
             }
-            NodeData::Add => dbg!(binary_operation(inputs, Box::new(|a, b| a + b))),
-            NodeData::PyAdd => todo!(),
-            //binary_operation(
-            //    inputs,
-            //    Box::new(|a, b| {
-            //        Python::with_gil(|py| {
-            //            let py_a = a.to_pyarray(py).into_pyobject(py).unwrap(); //PyArray1::from_array(py, a);
-            //            let py_b = b.into_pyarray(py).unwrap();
-            //            let out = gpipy_compute(
-            //                "add_array",
-            //                &[("a".to_string(), py_a), ("b".to_string(), py_b)].into(),
-            //                py,
-            //            )
-            //            .unwrap()["out"]
-            //                .to_owned_array();
-            //            out.to_shape(out.len())
-            //                .expect("correct array shape")
-            //                .to_owned()
-            //        })
-            //    }),
-            //),
+            NodeData::Add => binary_operation(inputs, Box::new(|a, b| a + b)),
             NodeData::Subtract => binary_operation(inputs, Box::new(|a, b| a - b)),
             NodeData::Multiply => binary_operation(inputs, Box::new(|a, b| a * b)),
             NodeData::Divide => binary_operation(inputs, Box::new(|a, b| a / b)),
@@ -151,15 +121,6 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
             NodeData::Linspace(linspace_config) => linspace_config.compute(inputs),
             NodeData::Plot(_) => [].into(),
             NodeData::Plot2D(_) => [].into(),
-            NodeData::PyLoad => Python::with_gil(|py| {
-                let out = gpipy_compute("load_py", &[].into(), py).unwrap();
-                let port_data = PyNode::extract_py_data(&PortType::Real2d, &out["out"], py);
-                //let out = out
-                //    .to_shape((out.len().isqrt(), out.len().isqrt()))
-                //    .expect("correct array shape")
-                //    .to_owned();
-                [("out".to_string(), port_data)].into()
-            }),
             NodeData::PyNode(py_node) => py_node.compute(inputs),
         };
         dbg!((self.name(), (Instant::now() - start).as_micros()));
@@ -173,7 +134,6 @@ impl GUINode for NodeData {
             NodeData::Identity => "Identity".to_string(),
             NodeData::Constant(_value) => "Constant".to_string(),
             NodeData::Add => "Add".to_string(),
-            NodeData::PyAdd => "PyAdd".to_string(),
             NodeData::Subtract => "Subtract".to_string(),
             NodeData::Multiply => "Multiply".to_string(),
             NodeData::Divide => "Divide".to_string(),
@@ -185,8 +145,7 @@ impl GUINode for NodeData {
             NodeData::Linspace(_linspace_config) => "Linspace".to_string(),
             NodeData::Plot(_) => "Plot".to_string(),
             NodeData::Plot2D(_) => "Plot 2D".to_string(),
-            NodeData::PyLoad => "PyLoad".to_string(),
-            NodeData::PyNode(py_node) => "PyNode".to_string(),
+            NodeData::PyNode(py_node) => py_node.path.file_stem().unwrap().to_string_lossy().into(),
         }
     }
 
@@ -238,6 +197,23 @@ impl GUINode for NodeData {
             NodeData::Plot(plot) => plot.config_view(id, input_data),
             NodeData::Plot2D(plot) => plot.config_view(id, input_data),
             _ => None,
+        }
+    }
+
+    /// A node can produce any number of "templates" which will be used to populate the
+    /// list of selectable new nodes that can be created.
+    /// Notably, PyNode will produce a dynamic number of nodes,
+    /// depending on what nodes are found in the filesystem at runtime.
+    fn templates(&self) -> Vec<NodeData> {
+        match self {
+            NodeData::PyNode(_) => {
+                let py_nodes = ["add_array", "load_py", "null", "fft"];
+                py_nodes
+                    .into_iter()
+                    .map(|name| NodeData::PyNode(PyNode::new(name).unwrap()))
+                    .collect()
+            }
+            _ => vec![self.clone()],
         }
     }
 }

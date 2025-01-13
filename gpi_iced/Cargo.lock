@@ -1287,7 +1287,6 @@ dependencies = [
  "indexmap",
  "ndarray",
  "numpy",
- "ordermap",
  "pyo3",
  "ron",
  "serde",
@@ -2339,16 +2338,6 @@ checksum = "9aa2b01e1d916879f73a53d01d1d6cee68adbb31d6d9177a8cfce093cced1d50"
 dependencies = [
  "futures-core",
  "pin-project-lite",
-]
-
-[[package]]
-name = "ordermap"
-version = "0.5.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f80a48eb68b6a7da9829b8b0429011708f775af80676a91063d023a66a656106"
-dependencies = [
- "indexmap",
- "serde",
 ]
 
 [[package]]

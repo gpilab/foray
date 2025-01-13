@@ -170,7 +170,7 @@ impl App {
             Message::DeleteNode(id) => {
                 self.stash_state();
                 self.graph.delete_node(id);
-                self.shapes.shape_positions.remove(&id);
+                self.shapes.shape_positions.swap_remove(&id);
                 self.selected_shape = None;
                 //PERF: ideally, we should only execute affected nodes
                 self.graph.execute_network();
@@ -209,6 +209,7 @@ impl App {
                         .push((self.graph.clone(), self.shapes.shape_positions.clone()));
                     self.graph = prev.0;
                     self.shapes.shape_positions = prev.1;
+                    self.graph.execute_network();
                 }
             }
             Message::Redo => {
@@ -217,6 +218,7 @@ impl App {
                         .push((self.graph.clone(), self.shapes.shape_positions.clone()));
                     self.graph = next.0;
                     self.shapes.shape_positions = next.1;
+                    self.graph.execute_network();
                 }
             }
         };
@@ -254,7 +256,6 @@ impl App {
         // just need to carefully handle invalid data between states
         // Also - likely need to re-execute graph after undo/redo, to make sure everything is up to
         // date!
-        //PERF: set a stack limit!
         self.undo_stack
             .push((self.graph.clone(), self.shapes.shape_positions.clone()));
 
