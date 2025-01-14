@@ -1,3 +1,4 @@
+use crate::file_watch::file_watch_subscription;
 use crate::graph::{Graph, PortRef, IO};
 use crate::interface::{side_bar::side_bar, SEPERATOR};
 use crate::math::{Point, Vector};
@@ -77,6 +78,7 @@ pub enum Message {
     ToggleDebug,
     Save,
     Load,
+    ReloadNodes,
 
     //// Focus
     FocusNext,
@@ -179,7 +181,10 @@ impl App {
             }
 
             //// Application
-            Message::Config(v) => self.config = v,
+            Message::Config(v) => {
+                println!("\n\n\n CONFIG!!!!!!!!!!!!!!!!!!!!!\n\n\n");
+                self.config = v
+            }
             Message::ToggleDebug => {
                 self.debug = !self.debug;
             }
@@ -197,6 +202,12 @@ impl App {
             Message::Load => {
                 *self = ron::from_str(&read_to_string("network.ron").expect("Could not read file"))
                     .expect("could not parse file");
+                self.graph.execute_network();
+            }
+            Message::ReloadNodes => {
+                //TODO: update any nodes in the graph if node input types change, nodes are
+                //re-named, etc.
+                self.availble_nodes = available_nodes();
                 self.graph.execute_network();
             }
 
@@ -277,20 +288,23 @@ fn default_theme() -> Theme {
 }
 
 pub fn subscriptions(_state: &App) -> Subscription<Message> {
-    listen_with(|event, _status, _id| match event {
-        iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
-            key: Key::Named(Named::Tab),
-            modifiers,
-            ..
-        }) => {
-            if modifiers.contains(Modifiers::SHIFT) {
-                Some(Message::FocusPrevious)
-            } else {
-                Some(Message::FocusNext)
+    Subscription::batch([
+        file_watch_subscription(),
+        listen_with(|event, _status, _id| match event {
+            iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
+                key: Key::Named(Named::Tab),
+                modifiers,
+                ..
+            }) => {
+                if modifiers.contains(Modifiers::SHIFT) {
+                    Some(Message::FocusPrevious)
+                } else {
+                    Some(Message::FocusNext)
+                }
             }
-        }
-        _ => None,
-    })
+            _ => None,
+        }),
+    ])
 }
 
 impl Default for App {
