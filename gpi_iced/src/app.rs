@@ -2,7 +2,7 @@ use crate::file_watch::file_watch_subscription;
 use crate::graph::{Graph, PortRef, IO};
 use crate::interface::{side_bar::side_bar, SEPERATOR};
 use crate::math::{Point, Vector};
-use crate::node_data::NodeData;
+use crate::node_data::{NodeData, NodeTemplate};
 use crate::nodes::linspace::LinspaceConfig;
 use crate::nodes::plot::Plot;
 use crate::nodes::{available_nodes, PortData, PortType};
@@ -42,7 +42,7 @@ pub struct App {
     pub config: f32,
     pub debug: bool,
     #[serde(skip)]
-    pub availble_nodes: Vec<NodeData>,
+    pub availble_nodes: Vec<NodeTemplate>,
     #[serde(skip, default = "default_theme")]
     pub theme: Theme,
     #[serde(skip)]
@@ -69,8 +69,8 @@ pub enum Message {
 
     //// Node
     OnSelect(Option<ShapeId>),
-    UpdateNodeData(u32, NodeData),
-    AddNode(NodeData),
+    UpdateNodeTemplate(u32, NodeTemplate),
+    AddNode(NodeTemplate),
     DeleteNode(u32),
 
     //// Application
@@ -161,14 +161,14 @@ impl App {
                 }
             }
 
-            Message::UpdateNodeData(id, node) => {
+            Message::UpdateNodeTemplate(id, template) => {
                 self.stash_state();
-                *self.graph.get_mut_node(id) = node;
+                self.graph.get_mut_node(id).template = template;
                 self.graph.exectute_sub_network(id);
             }
-            Message::AddNode(node) => {
+            Message::AddNode(template) => {
                 self.stash_state();
-                let id = self.graph.node(node);
+                let id = self.graph.node(template.into());
                 self.shapes.shape_positions.insert(id, (100., 500.).into());
             }
             Message::DeleteNode(id) => {
@@ -321,13 +321,13 @@ impl Default for App {
                 println!("Failed to load file, loading defaults");
                 let mut g = Graph::<NodeData, PortType, PortData>::new();
 
-                let l1 = g.node(NodeData::Linspace(LinspaceConfig::default()));
-                let c1 = g.node(NodeData::Constant(0.5));
-                let c2 = g.node(NodeData::Constant(-2.));
-                let mult1 = g.node(NodeData::Multiply);
-                let add1 = g.node(NodeData::Add);
-                let plot1 = g.node(NodeData::Plot(Plot::default()));
-                let identity = g.node(NodeData::Identity);
+                let l1 = g.node(NodeTemplate::Linspace(LinspaceConfig::default()).into());
+                let c1 = g.node(NodeTemplate::Constant(0.5).into());
+                let c2 = g.node(NodeTemplate::Constant(-2.).into());
+                let mult1 = g.node(NodeTemplate::Multiply.into());
+                let add1 = g.node(NodeTemplate::Add.into());
+                let plot1 = g.node(NodeTemplate::Plot(Plot::default()).into());
+                let identity = g.node(NodeTemplate::Identity.into());
 
                 g.connect((l1, "out"), (mult1, "a"));
                 g.connect((c1, "out"), (mult1, "b"));

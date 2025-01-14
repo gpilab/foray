@@ -1,6 +1,7 @@
 use super::PortData;
+use crate::node_data::NodeTemplate;
 use crate::OrderMap;
-use crate::{app::Message, math::linspace, node_data::NodeData};
+use crate::{app::Message, math::linspace};
 use iced::{
     widget::{
         column, container, horizontal_rule, horizontal_space, row, text, text_input, TextInput,
@@ -79,9 +80,9 @@ impl LinspaceConfig {
         }
         let start_input = numeric_input(text_input("0", &self.start.to_string()).on_input(
             move |value| {
-                Message::UpdateNodeData(
+                Message::UpdateNodeTemplate(
                     id,
-                    NodeData::Linspace(LinspaceConfig {
+                    NodeTemplate::Linspace(LinspaceConfig {
                         start: value.parse().unwrap_or(0.),
                         ..self.clone()
                     }),
@@ -90,9 +91,9 @@ impl LinspaceConfig {
         ));
         let stop_input = numeric_input(text_input("10", &self.stop.to_string()).on_input(
             move |value| {
-                Message::UpdateNodeData(
+                Message::UpdateNodeTemplate(
                     id,
-                    NodeData::Linspace(LinspaceConfig {
+                    NodeTemplate::Linspace(LinspaceConfig {
                         stop: value.parse().unwrap_or(0.),
                         ..self.clone()
                     }),
@@ -101,9 +102,9 @@ impl LinspaceConfig {
         ));
         let num_input = numeric_input(text_input("100", &self.num.to_string()).on_input(
             move |value| {
-                Message::UpdateNodeData(
+                Message::UpdateNodeTemplate(
                     id,
-                    NodeData::Linspace(LinspaceConfig {
+                    NodeTemplate::Linspace(LinspaceConfig {
                         num: value.parse().unwrap_or(0),
                         ..self.clone()
                     }),

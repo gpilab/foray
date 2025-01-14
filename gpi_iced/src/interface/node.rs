@@ -100,7 +100,7 @@ impl App {
         };
 
         let input_data = self.graph.get_input_data(&id);
-        let (node_size, node_view) = node.view(id, input_data);
+        let (node_size, node_view) = node.template.view(id, input_data);
 
         //// Node
         let node_inner: Element<Message, Theme, Renderer> = container(node_view)

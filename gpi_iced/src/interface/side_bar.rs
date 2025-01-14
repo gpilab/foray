@@ -61,10 +61,13 @@ pub fn side_bar(app: &App) -> Element<Message> {
             text("").into()
         };
         column![
-            container(text(node.name().clone()).size(20.)).center_x(Fill),
+            container(text(node.template.name().clone()).size(20.)).center_x(Fill),
+            horizontal_rule(0),
+            text(node.status.to_string()),
             horizontal_rule(0),
             vertical_space().height(10.),
-            node.config_view(selected_id, input_data)
+            node.template
+                .config_view(selected_id, input_data)
                 .unwrap_or(text("...").into()),
             vertical_space(),
             scrollable(out_port_display),

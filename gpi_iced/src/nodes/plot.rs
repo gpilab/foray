@@ -1,7 +1,7 @@
 use super::{PortData, INNER_NODE_HEIGHT, INNER_NODE_WIDTH, NODE_BORDER_WIDTH};
 use crate::app::Message;
 use crate::math::{linspace_delta, Vector};
-use crate::node_data::NodeData;
+use crate::node_data::NodeTemplate;
 use crate::OrderMap;
 use iced::widget::canvas::{Path, Stroke};
 use iced::widget::{container, horizontal_space, row, text, text_input};
@@ -56,10 +56,10 @@ impl Plot {
     pub fn view<'a>(
         &self,
         _id: u32,
-        input_data: Option<OrderMap<String, &RefCell<PortData>>>,
+        input_data: OrderMap<String, &RefCell<PortData>>,
     ) -> Element<'a, Message> {
-        let (x, y) = if let Some(i) = input_data {
-            if let (Some(x_port), Some(y_port)) = (i.get("x"), i.get("y")) {
+        let (x, y) =
+            if let (Some(x_port), Some(y_port)) = (input_data.get("x"), input_data.get("y")) {
                 if let (PortData::Real(x), PortData::Real(y)) =
                     (x_port.borrow().clone(), y_port.borrow().clone())
                 {
@@ -72,10 +72,7 @@ impl Plot {
                 }
             } else {
                 (vec![], vec![])
-            }
-        } else {
-            (vec![], vec![])
-        };
+            };
         container(
             canvas(PlotCanvas {
                 x,
@@ -92,12 +89,13 @@ impl Plot {
     pub fn config_view<'a>(
         &'a self,
         id: u32,
-        _input_data: Option<OrderMap<String, &RefCell<PortData>>>,
+        _input_data: OrderMap<String, &RefCell<PortData>>,
     ) -> Option<Element<'a, Message>> {
         let center = self.rect.center;
         let width = self.rect.width;
         let height = self.rect.height;
-        let message = move |rect| Message::UpdateNodeData(id, NodeData::Plot(Plot { rect }));
+        let message =
+            move |rect| Message::UpdateNodeTemplate(id, NodeTemplate::Plot(Plot { rect }));
         Some(
             column![
                 row![

@@ -1,4 +1,4 @@
-use crate::{app::Message, node_data::NodeData};
+use crate::{app::Message, node_data::NodeTemplate};
 use iced::{
     widget::{column, container, slider, text},
     Alignment::Center,
@@ -11,7 +11,7 @@ pub fn view<'a>(id: u32, value: f64) -> Element<'a, Message> {
         column![
             text(format!("{value:.1}")),
             slider(0.1..=20., value, move |value| {
-                Message::UpdateNodeData(id, NodeData::Constant(value))
+                Message::UpdateNodeTemplate(id, NodeTemplate::Constant(value))
             })
             .step(0.1)
             .width(Fill),

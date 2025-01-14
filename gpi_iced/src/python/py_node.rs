@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use strum::VariantNames;
 
 use crate::{
+    node_data::NodeError,
     nodes::{PortData, PortType},
     OrderMap,
 };
@@ -60,7 +61,7 @@ impl PyNode {
         &self,
         //populated_inputs: OrderMap<String, PortData>,
         inputs: OrderMap<String, &std::cell::RefCell<PortData>>,
-    ) -> OrderMap<String, PortData> {
+    ) -> Result<OrderMap<String, PortData>, NodeError> {
         // convert inputs to python arrays/objects
 
         Python::with_gil(|py| {
@@ -73,13 +74,14 @@ impl PyNode {
                 &py_inputs,
                 py,
             )
-            .unwrap();
+            .map_err(|_| NodeError)?;
 
-            self.ports
+            Ok(self
+                .ports
                 .outputs
                 .iter()
                 .map(|(k, port_type)| (k.clone(), Self::extract_py_data(port_type, &out[k], py)))
-                .collect()
+                .collect())
         })
     }
 

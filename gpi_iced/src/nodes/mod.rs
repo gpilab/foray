@@ -8,8 +8,9 @@ pub mod port;
 pub use port::PortData;
 pub use port::PortType;
 
+use crate::node_data::NodeTemplate;
 use crate::OrderMap;
-use crate::{app::Message, node_data::NodeData, style};
+use crate::{app::Message, style};
 use iced::{
     widget::{button, column, container, container::bordered_box, horizontal_rule, row, text},
     Alignment::Center,
@@ -43,7 +44,7 @@ pub trait GUINode: derive_more::Debug {
     fn view<'a>(
         &'a self,
         _id: u32,
-        _input_data: Option<OrderMap<String, &RefCell<PortData>>>,
+        _input_data: OrderMap<String, &RefCell<PortData>>,
     ) -> (iced::Size, Element<'a, Message>) {
         (default_node_size(), text("default").into())
     }
@@ -51,7 +52,7 @@ pub trait GUINode: derive_more::Debug {
     fn config_view<'a>(
         &'a self,
         _id: u32,
-        _input_data: Option<OrderMap<String, &RefCell<PortData>>>,
+        _input_data: OrderMap<String, &RefCell<PortData>>,
     ) -> Option<Element<'a, Message>> {
         None
     }
@@ -84,16 +85,18 @@ pub fn format_node_output<'a>(
     .into()
 }
 
-pub(crate) fn available_nodes() -> Vec<NodeData> {
-    NodeData::iter().flat_map(|node| node.templates()).collect()
+pub(crate) fn available_nodes() -> Vec<NodeTemplate> {
+    NodeTemplate::iter()
+        .flat_map(|node| node.templates())
+        .collect()
 }
 
-pub(crate) fn node_list_view<'a>(nodes: &[NodeData]) -> Element<'a, Message> {
+pub(crate) fn node_list_view<'a>(templates: &[NodeTemplate]) -> Element<'a, Message> {
     container(
         container(
             //TODO: don't create new nodes on every view. store a list of Node templates in App
             // New nodes are expensive for python nodes which need to read their source
-            column(nodes.iter().map(|node| {
+            column(templates.iter().map(|node| {
                 button(
                     row![
                         horizontal_rule(0.0),

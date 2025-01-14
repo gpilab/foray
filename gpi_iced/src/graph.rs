@@ -10,10 +10,10 @@ where
 {
     fn inputs(&self) -> OrderMap<String, PortType>;
     fn outputs(&self) -> OrderMap<String, PortType>;
-    fn compute<'a>(
-        &'a self,
-        inputs: OrderMap<String, &'a RefCell<WireData>>,
-    ) -> OrderMap<String, WireData>;
+    fn compute(
+        self,
+        inputs: OrderMap<String, &RefCell<WireData>>,
+    ) -> (OrderMap<String, WireData>, Self);
 }
 
 type PortName = String;
@@ -71,7 +71,7 @@ fn default_wire_data<K, V>() -> HashMap<K, V> {
 }
 impl<NodeData, PortType, WireData> Graph<NodeData, PortType, WireData>
 where
-    NodeData: GraphNode<NodeData, PortType, WireData>,
+    NodeData: GraphNode<NodeData, PortType, WireData> + Clone,
     PortType: Clone,
 {
     pub fn new() -> Self {
@@ -124,7 +124,7 @@ where
             })
             .collect()
     }
-    pub fn get_input_data(&self, nx: &NodeIndex) -> Option<OrderMap<String, &RefCell<WireData>>> {
+    pub fn get_input_data(&self, nx: &NodeIndex) -> OrderMap<String, &RefCell<WireData>> {
         self.get_node(*nx)
             .inputs()
             .keys()
@@ -135,7 +135,8 @@ where
                         .map(|data| (port_name.clone(), data))
                 })
             })
-            .collect()
+            .collect::<Option<OrderMap<_, _>>>()
+            .unwrap_or([].into())
     }
     /// get a list of node indices
     pub fn nodes_ref(&self) -> Vec<NodeIndex> {
@@ -281,31 +282,34 @@ where
         }
     }
 
-    pub fn exectute_sub_network(&mut self, root: NodeIndex) {
+    /// Execute network using topological sort, starting from `start`
+    /// and only processing decendents
+    /// Caller is responsible for handling errors that occur during computation
+    pub fn exectute_sub_network(&mut self, start: NodeIndex) {
         let nodes: Vec<_> = self
             .topological_sort()
             .into_iter()
-            .filter(|&nx| self.is_self_or_dependent(root, nx))
+            .filter(|&nx| self.is_self_or_dependent(start, nx))
             .collect();
         nodes.iter().for_each(|nx| self.compute_node(nx))
     }
 
     /// Execute network using topological sort
+    /// Caller is responsible for handling errors that occur during computation
     pub fn execute_network(&mut self) {
         self.wire_data.clear();
         let mut ordered = self.topological_sort();
         ordered.iter_mut().for_each(|nx| self.compute_node(nx))
     }
 
+    // perform computation by supplying inputs
     fn compute_node(&mut self, nx: &NodeIndex) {
-        let node = self.get_node(*nx);
-        //TODO: Handle errors nicely
+        let node = self.get_mut_node(*nx).clone();
         let inputs = self.get_input_data(nx);
-        if let Some(inputs) = inputs {
-            if inputs.len() == node.inputs().len() {
-                let outputs = node.compute(inputs);
-                self.update_wire_data(*nx, outputs);
-            }
+        if inputs.len() == node.inputs().len() {
+            let (outputs, node) = node.compute(inputs);
+            self.set_node_data(*nx, node);
+            self.update_wire_data(*nx, outputs);
         }
     }
 
@@ -333,7 +337,7 @@ where
 
 impl<NodeData, PortType, WireData> Default for Graph<NodeData, PortType, WireData>
 where
-    NodeData: GraphNode<NodeData, PortType, WireData>,
+    NodeData: GraphNode<NodeData, PortType, WireData> + Clone,
     PortType: Clone + Default,
 {
     fn default() -> Self {
@@ -374,11 +378,14 @@ mod test {
             }
         }
 
-        fn compute(&self, inputs: OrderMap<String, &RefCell<u32>>) -> OrderMap<String, u32> {
-            match self {
-                Node::Identity(_node) => [("out".to_string(), *inputs["in"].borrow())].into(),
-                Node::Constant(node) => [("out".to_string(), node.value)].into(),
-            }
+        fn compute(self, inputs: OrderMap<String, &RefCell<u32>>) -> (OrderMap<String, u32>, Self) {
+            (
+                match &self {
+                    Node::Identity(_node) => [("out".to_string(), *inputs["in"].borrow())].into(),
+                    Node::Constant(node) => [("out".to_string(), node.value)].into(),
+                },
+                self,
+            )
         }
     }
 

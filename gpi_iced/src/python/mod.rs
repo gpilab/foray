@@ -21,6 +21,7 @@ pub fn gpipy_compute<'a>(
     //PERF: test if caching this is a big performance win
     //This would be more of a pain to cache becaues of the associated python lifetime, but could
     //potentially be worth it
+    //Update: It may be possible to package the py type without a lifetime? pyo3 docs
     let node_module = PyModule::from_code(
         py,
         CString::new(node_src)?.as_c_str(),
@@ -29,15 +30,9 @@ pub fn gpipy_compute<'a>(
     )?;
 
     //// COMPUTE
-    let node_output = match node_module
+    let node_output = node_module
         .getattr("compute")?
-        .call1((inputs.iter().collect::<HashMap<_, _>>(),))
-    {
-        Ok(out) => out,
-        Err(err) => {
-            panic!("{node_type}: node execution failed {:?}", err);
-        }
-    };
+        .call1((inputs.iter().collect::<HashMap<_, _>>(),))?;
 
     Ok(OrderMap::from([("out".into(), node_output.into())]))
 }

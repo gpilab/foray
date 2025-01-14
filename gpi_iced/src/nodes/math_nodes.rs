@@ -1,5 +1,5 @@
 use super::PortData;
-use crate::OrderMap;
+use crate::{node_data::NodeError, OrderMap};
 use ndarray::Array1;
 use std::ops::Deref;
 
@@ -8,24 +8,27 @@ pub fn binary_operation(
     //node: NodeData,
     inputs: OrderMap<String, &std::cell::RefCell<PortData>>,
     f: Box<dyn Fn(&Array1<f64>, &Array1<f64>) -> Array1<f64>>,
-) -> OrderMap<String, PortData> {
-    let out = match (inputs["a"].borrow().deref(), inputs["b"].borrow().deref()) {
+) -> Result<OrderMap<String, PortData>, NodeError> {
+    let out = match (
+        inputs.get("a").ok_or(NodeError)?.borrow().deref(),
+        inputs.get("b").ok_or(NodeError)?.borrow().deref(),
+    ) {
         (PortData::Real(a), PortData::Real(b)) => f(a, b),
         _ => panic!("bad inputs!"),
     };
 
-    [("out".into(), PortData::Real(out))].into()
+    Ok([("out".into(), PortData::Real(out))].into())
 }
 #[allow(clippy::type_complexity)]
 pub fn unary_operation(
     //node: NodeData,
     inputs: OrderMap<String, &std::cell::RefCell<PortData>>,
     f: Box<dyn Fn(&Array1<f64>) -> Array1<f64>>,
-) -> OrderMap<String, PortData> {
-    let out = match inputs["a"].borrow().deref() {
+) -> Result<OrderMap<String, PortData>, NodeError> {
+    let out = match inputs.get("a").ok_or(NodeError)?.borrow().deref() {
         PortData::Real(a) => f(a),
         _ => panic!("bad inputs!"),
     };
 
-    [("out".into(), PortData::Real(out))].into()
+    Ok([("out".into(), PortData::Real(out))].into())
 }

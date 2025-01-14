@@ -11,13 +11,6 @@ def config():
 
 
 def compute(input):
-    # a = np.asarray(input["a"])
-    # b = np.asarray(input["b"])
     a = input["a"]
     b = input["b"]
-    # print("add int:")
-    # print(a)
-    # print(b)
-    out = a + b
-    # print(out)
-    return out
+    return a + b

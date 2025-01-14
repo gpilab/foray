@@ -1,7 +1,7 @@
 use super::{PortData, INNER_NODE_WIDTH, NODE_BORDER_WIDTH};
 use crate::app::Message;
 use crate::math::Vector;
-use crate::node_data::NodeData;
+use crate::node_data::NodeTemplate;
 use crate::OrderMap;
 use iced::widget::canvas::Path;
 use iced::widget::{button, container, horizontal_space, row, text, text_input};
@@ -57,21 +57,17 @@ impl Plot2D {
     pub fn view<'a>(
         &self,
         _id: u32,
-        input_data: Option<OrderMap<String, &RefCell<PortData>>>,
+        input_data: OrderMap<String, &RefCell<PortData>>,
     ) -> Element<'a, Message> {
-        let data = if let Some(i) = input_data {
-            if let Some(port) = i.get("a") {
-                match port.borrow().clone() {
-                    PortData::Real2d(a) => a,
-                    PortData::Complex2d(a) => Array2::<f64>::from_shape_vec(
-                        (a.len().isqrt(), a.len().isqrt()),
-                        a.iter().map(|v| v.norm_sqr().sqrt()).collect::<Vec<_>>(),
-                    )
-                    .expect("square matrix"),
-                    _ => panic!("unsuported plot types {:?}", port),
-                }
-            } else {
-                Array2::zeros((0, 0))
+        let data = if let Some(port) = input_data.get("a") {
+            match port.borrow().clone() {
+                PortData::Real2d(a) => a,
+                PortData::Complex2d(a) => Array2::<f64>::from_shape_vec(
+                    (a.len().isqrt(), a.len().isqrt()),
+                    a.iter().map(|v| v.norm_sqr().sqrt()).collect::<Vec<_>>(),
+                )
+                .expect("square matrix"),
+                _ => panic!("unsuported plot types {:?}", port),
             }
         } else {
             Array2::zeros((0, 0))
@@ -91,12 +87,13 @@ impl Plot2D {
     pub fn config_view<'a>(
         &'a self,
         id: u32,
-        _input_data: Option<OrderMap<String, &RefCell<PortData>>>,
+        _input_data: OrderMap<String, &RefCell<PortData>>,
     ) -> Option<Element<'a, Message>> {
         let center = self.rect.center;
         let width = self.rect.width;
         let height = self.rect.height;
-        let message = move |rect| Message::UpdateNodeData(id, NodeData::Plot2D(Self { rect }));
+        let message =
+            move |rect| Message::UpdateNodeTemplate(id, NodeTemplate::Plot2D(Self { rect }));
         let zoom_speed = 0.125;
         Some(
             column![
