@@ -1,6 +1,7 @@
 use crate::app::{App, Message};
 use crate::graph::{GraphNode, PortRef, IO};
 use crate::math::Point;
+use crate::node_data::NodeStatus;
 use crate::nodes::{
     GUINode, INNER_NODE_HEIGHT, INNER_NODE_WIDTH, NODE_BORDER_WIDTH, NODE_RADIUS, PORT_RADIUS,
 };
@@ -22,15 +23,21 @@ impl App {
             style.border.radius = border::radius(100.);
             style
         }
-        let node_style = move |t: &Theme| {
-            let outline_color = match is_selected {
-                true => t.extended_palette().primary.strong.color,
-                false => t.extended_palette().secondary.strong.color,
+        let node_style = move |status: &NodeStatus, t: &Theme| {
+            let color = match status {
+                NodeStatus::Idle => match is_selected {
+                    true => t.extended_palette().primary.strong.color,
+                    false => t.extended_palette().secondary.strong.color,
+                },
+                NodeStatus::Error(_node_error) => match is_selected {
+                    true => t.extended_palette().danger.base.color,
+                    false => t.extended_palette().danger.weak.color,
+                },
             };
             container::transparent(t)
                 .border(
                     border::rounded(NODE_RADIUS)
-                        .color(outline_color)
+                        .color(color)
                         .width(NODE_BORDER_WIDTH),
                 )
                 .background(self.theme.palette().background)
@@ -104,7 +111,7 @@ impl App {
 
         //// Node
         let node_inner: Element<Message, Theme, Renderer> = container(node_view)
-            .style(node_style)
+            .style(move |theme| node_style(&node.status, theme))
             .center_x(node_size.width)
             .center_y(node_size.height)
             .into();
