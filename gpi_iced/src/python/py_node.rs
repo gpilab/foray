@@ -10,23 +10,24 @@ use pyo3::{types::PyAnyMethods, FromPyObject, PyObject, Python};
 use serde::{Deserialize, Serialize};
 use strum::VariantNames;
 
-use crate::{
-    node_data::NodeError,
-    nodes::{PortData, PortType},
-    OrderMap,
+use crate::nodes::{
+    port::{PortData, PortType},
+    status::NodeError,
 };
+use crate::OrderMap;
 
 use super::{gpipy_compute, gpipy_config};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PyNode {
+    pub name: String,
     pub path: PathBuf,
-    pub ports: PortDef,
+    pub ports: Result<PortDef, NodeError>,
 }
 
 impl Default for PyNode {
     fn default() -> Self {
-        Self::new("null").unwrap()
+        Self::new("null")
     }
 }
 
@@ -48,13 +49,8 @@ impl PortData {
 }
 
 impl PyNode {
-    pub fn new(name: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(name: &str) -> Self {
         gpipy_config(name)
-        //Self {
-        //    path: Self::py_node_path(name),
-        //    //TODO: initialize using gpipy_config
-        //    ports: gpipy_config(node_name)
-        //}
     }
 
     pub fn compute(
@@ -74,10 +70,12 @@ impl PyNode {
                 &py_inputs,
                 py,
             )
-            .map_err(|_| NodeError)?;
+            .map_err(|err| NodeError::Runtime(err.to_string()))?;
 
             Ok(self
                 .ports
+                .as_ref()
+                .unwrap()
                 .outputs
                 .iter()
                 .map(|(k, port_type)| (k.clone(), Self::extract_py_data(port_type, &out[k], py)))

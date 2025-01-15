@@ -1,20 +1,30 @@
-use std::error;
 use std::time::{Duration, Instant};
+
+pub mod constant;
+pub mod linspace;
+pub mod math_nodes;
+pub mod plot;
+pub mod plot_complex;
+pub mod port;
+pub mod status;
 
 use crate::app::Message;
 use crate::graph::GraphNode;
+use crate::gui_node::GUINode;
+use crate::interface::node::default_node_size;
 use crate::nodes::linspace::LinspaceConfig;
 use crate::nodes::math_nodes::{binary_operation, unary_operation};
 use crate::nodes::plot::Plot;
 use crate::nodes::plot_complex::Plot2D;
-use crate::nodes::{constant, default_node_size, GUINode, PortData, PortType};
 use crate::python::py_node::PyNode;
 use crate::OrderMap;
-use derive_more::derive::Display;
 use iced::widget::text;
 use iced::Font;
+use log::trace;
+use port::{PortData, PortType};
 use serde::{Deserialize, Serialize};
-use strum::{EnumIter, VariantNames};
+use status::{NodeError, NodeStatus};
+use strum::{EnumIter, IntoEnumIterator, VariantNames};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeData {
@@ -23,13 +33,6 @@ pub struct NodeData {
     pub status: NodeStatus,
     #[serde(skip)]
     pub run_time: Option<Duration>,
-}
-
-#[derive(Clone, Debug, Default, Display)]
-pub enum NodeStatus {
-    #[default]
-    Idle,
-    Error(NodeError),
 }
 
 #[derive(Clone, Debug, EnumIter, VariantNames, Serialize, Deserialize)]
@@ -50,6 +53,7 @@ pub enum NodeTemplate {
     Reverse,
     PyNode(PyNode),
 }
+
 impl From<NodeData> for NodeTemplate {
     fn from(value: NodeData) -> Self {
         value.template
@@ -64,10 +68,6 @@ impl From<NodeTemplate> for NodeData {
         }
     }
 }
-#[derive(Debug, Display, Clone)]
-pub struct NodeError;
-
-impl error::Error for NodeError {}
 
 impl NodeData {
     fn fallible_compute(
@@ -77,7 +77,11 @@ impl NodeData {
         Ok(match &self.template {
             NodeTemplate::Identity => [(
                 "out".to_string(),
-                inputs.get("a").ok_or(NodeError)?.borrow().clone(),
+                inputs
+                    .get("a")
+                    .ok_or(NodeError::Input("input 'a' not found".to_string()))?
+                    .borrow()
+                    .clone(),
             )]
             .into(),
             NodeTemplate::Constant(value) => {
@@ -111,6 +115,32 @@ impl NodeData {
             NodeTemplate::PyNode(py_node) => py_node.compute(inputs)?,
         })
     }
+
+    pub fn available_nodes() -> Vec<NodeData> {
+        let nodes = NodeTemplate::iter()
+            .flat_map(|template| template.template_variants())
+            .collect();
+        trace!("loading available nodes:\n{:?}", nodes);
+        nodes
+    }
+}
+impl NodeTemplate {
+    /// A node can produce any number of "templates" which will be used to populate the
+    /// list of selectable new nodes that can be created.
+    /// Notably, PyNode will produce a dynamic number of nodes,
+    /// depending on what nodes are found in the filesystem at runtime.
+    pub fn template_variants(&self) -> Vec<NodeData> {
+        match &self {
+            NodeTemplate::PyNode(_) => {
+                let py_nodes = ["add_array", "load_py", "null", "fft"];
+                py_nodes
+                    .into_iter()
+                    .map(|name| NodeTemplate::PyNode(PyNode::new(name)).into())
+                    .collect()
+            }
+            _ => vec![self.clone().into()],
+        }
+    }
 }
 
 impl GraphNode<NodeData, PortType, PortData> for NodeData {
@@ -141,7 +171,7 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
             ]
             .into(),
             NodeTemplate::Plot2D(_) => [("a".to_string(), PortType::Real2d)].into(),
-            NodeTemplate::PyNode(py_node) => py_node.ports.inputs.clone(),
+            NodeTemplate::PyNode(py_node) => py_node.ports.clone().unwrap_or_default().inputs,
         }
     }
 
@@ -162,7 +192,7 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
             NodeTemplate::Linspace(_) => real_out,
             NodeTemplate::Plot(_) => [].into(),
             NodeTemplate::Plot2D(_) => [].into(),
-            NodeTemplate::PyNode(py_node) => py_node.ports.outputs.clone(),
+            NodeTemplate::PyNode(py_node) => py_node.ports.clone().unwrap_or_default().outputs,
         }
     }
 
@@ -270,23 +300,6 @@ impl GUINode for NodeTemplate {
             NodeTemplate::Plot(plot) => plot.config_view(id, input_data),
             NodeTemplate::Plot2D(plot) => plot.config_view(id, input_data),
             _ => None,
-        }
-    }
-
-    /// A node can produce any number of "templates" which will be used to populate the
-    /// list of selectable new nodes that can be created.
-    /// Notably, PyNode will produce a dynamic number of nodes,
-    /// depending on what nodes are found in the filesystem at runtime.
-    fn templates(&self) -> Vec<NodeTemplate> {
-        match &self {
-            NodeTemplate::PyNode(_) => {
-                let py_nodes = ["add_array", "load_py", "null", "fft"];
-                py_nodes
-                    .into_iter()
-                    .map(|name| NodeTemplate::PyNode(PyNode::new(name).unwrap()))
-                    .collect()
-            }
-            _ => vec![self.clone()],
         }
     }
 }

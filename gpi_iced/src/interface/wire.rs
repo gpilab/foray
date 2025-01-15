@@ -68,10 +68,10 @@ impl App {
     }
 }
 
+use super::node::{INNER_NODE_HEIGHT, INNER_NODE_WIDTH, NODE_RADIUS, PORT_RADIUS};
 use crate::{
     app,
     graph::{PortRef, IO},
-    nodes::{INNER_NODE_HEIGHT, INNER_NODE_WIDTH, NODE_RADIUS, PORT_RADIUS},
 };
 use iced::{Theme, Vector};
 

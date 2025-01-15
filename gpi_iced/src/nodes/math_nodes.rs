@@ -1,5 +1,5 @@
 use super::PortData;
-use crate::{node_data::NodeError, OrderMap};
+use crate::{nodes::NodeError, OrderMap};
 use ndarray::Array1;
 use std::ops::Deref;
 
@@ -10,8 +10,16 @@ pub fn binary_operation(
     f: Box<dyn Fn(&Array1<f64>, &Array1<f64>) -> Array1<f64>>,
 ) -> Result<OrderMap<String, PortData>, NodeError> {
     let out = match (
-        inputs.get("a").ok_or(NodeError)?.borrow().deref(),
-        inputs.get("b").ok_or(NodeError)?.borrow().deref(),
+        inputs
+            .get("a")
+            .ok_or(NodeError::input_error("a"))?
+            .borrow()
+            .deref(),
+        inputs
+            .get("b")
+            .ok_or(NodeError::input_error("b"))?
+            .borrow()
+            .deref(),
     ) {
         (PortData::Real(a), PortData::Real(b)) => f(a, b),
         _ => panic!("bad inputs!"),
@@ -25,7 +33,12 @@ pub fn unary_operation(
     inputs: OrderMap<String, &std::cell::RefCell<PortData>>,
     f: Box<dyn Fn(&Array1<f64>) -> Array1<f64>>,
 ) -> Result<OrderMap<String, PortData>, NodeError> {
-    let out = match inputs.get("a").ok_or(NodeError)?.borrow().deref() {
+    let out = match inputs
+        .get("a")
+        .ok_or(NodeError::input_error("a"))?
+        .borrow()
+        .deref()
+    {
         PortData::Real(a) => f(a),
         _ => panic!("bad inputs!"),
     };

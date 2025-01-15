@@ -7,6 +7,8 @@ pub fn main() -> iced::Result {
     #[cfg(target_arch = "wasm32")]
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
+    env_logger::init();
+
     pyo3::prepare_freethreaded_python();
 
     application("gpi_v2", App::update, App::view)
@@ -21,10 +23,10 @@ pub fn main() -> iced::Result {
         .window_size((1000., 800.))
         .decorations(true)
         .scale_factor(|_| 1.25)
-        .font(include_bytes!("../data/Cantarell-VF.otf").as_slice()) // "Canterell"
         .font(include_bytes!("../data/DejaVuMathTeXGyre.ttf").as_slice()) // "DejaVu Math TeX Gyre"
         .font(include_bytes!("../data/CaskaydiaCoveNerdFont.ttf").as_slice())
-        .default_font(Font::with_name("CaskaydiaCoveNerdFont"))
+        .font(include_bytes!("../data/CaskaydiaCove.ttf").as_slice())
+        .default_font(Font::with_name("CaskaydiaCove"))
         .run()
 }
 

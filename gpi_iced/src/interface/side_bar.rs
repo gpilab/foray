@@ -1,6 +1,7 @@
 use crate::app::{App, Message};
+use crate::gui_node::GUINode;
+use crate::interface::node::{format_node_output, node_list_view};
 use crate::interface::{char_icon_button, debug_format, SEPERATOR};
-use crate::nodes::{self, format_node_output, GUINode};
 use iced::*;
 use widget::{column, *};
 
@@ -63,7 +64,7 @@ pub fn side_bar(app: &App) -> Element<Message> {
         column![
             container(text(node.template.name().clone()).size(20.)).center_x(Fill),
             horizontal_rule(0),
-            text(node.status.to_string()),
+            column![node.status.icon(), node.status.text_element().size(12.),],
             horizontal_rule(0),
             vertical_space().height(10.),
             node.template
@@ -78,7 +79,7 @@ pub fn side_bar(app: &App) -> Element<Message> {
         .padding([10., 5.])
         .into()
     } else {
-        let node_list = nodes::node_list_view(&app.availble_nodes);
+        let node_list = node_list_view(&app.availble_nodes);
         column![
             container(text("Add Node").size(20.)).center_x(Fill),
             horizontal_rule(0),

@@ -26,7 +26,7 @@ fn file_watcher() -> impl Stream<Item = Message> {
                         .into_iter()
                         .map(|debounce_event| debounce_event.event)
                         .filter(|e| {
-                            e.kind.is_modify()
+                            (e.kind.is_modify() || e.kind.is_create())
                                 && e.paths.iter().any(|p| {
                                     p.extension() == Some(OsStr::new("py"))
                                         && !p

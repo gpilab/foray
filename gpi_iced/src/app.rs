@@ -2,10 +2,12 @@ use crate::file_watch::file_watch_subscription;
 use crate::graph::{Graph, PortRef, IO};
 use crate::interface::{side_bar::side_bar, SEPERATOR};
 use crate::math::{Point, Vector};
-use crate::node_data::{NodeData, NodeTemplate};
 use crate::nodes::linspace::LinspaceConfig;
 use crate::nodes::plot::Plot;
-use crate::nodes::{available_nodes, PortData, PortType};
+use crate::nodes::port::PortData;
+use crate::nodes::port::PortType;
+use crate::nodes::{NodeData, NodeTemplate};
+use crate::python::py_node::PyNode;
 use crate::widget::shapes::ShapeId;
 use crate::widget::workspace::{self, workspace};
 use crate::OrderMap;
@@ -16,6 +18,7 @@ use iced::keyboard::{Key, Modifiers};
 use iced::widget::*;
 use iced::Length::Fill;
 use iced::{Subscription, Task};
+use log::warn;
 use serde::{Deserialize, Serialize};
 use std::fs::read_to_string;
 
@@ -42,7 +45,7 @@ pub struct App {
     pub config: f32,
     pub debug: bool,
     #[serde(skip)]
-    pub availble_nodes: Vec<NodeTemplate>,
+    pub availble_nodes: Vec<NodeData>,
     #[serde(skip, default = "default_theme")]
     pub theme: Theme,
     #[serde(skip)]
@@ -205,12 +208,8 @@ impl App {
                 self.graph.execute_network();
             }
             Message::ReloadNodes => {
-                //TODO: update any nodes in the graph if node input types change, nodes are
-                //re-named, etc.
-                self.availble_nodes = available_nodes();
-                self.graph.execute_network();
+                self.reload_nodes();
             }
-
             //// Focus
             Message::FocusNext => return focus_next(),
             Message::FocusPrevious => return focus_previous(),
@@ -277,6 +276,61 @@ impl App {
 
         self.redo_stack.clear();
     }
+
+    fn reload_nodes(&mut self) {
+        //update any existing nodes in the graph that could change based on file changes
+        self.graph.nodes_ref().iter().for_each(|nx| {
+            let node = self.graph.get_node(*nx);
+            if let NodeTemplate::PyNode(old_py_node) = &node.template {
+                // get old version's ports
+                let old_ports = old_py_node.clone().ports.unwrap_or_default();
+                let old_in_ports = old_ports.inputs;
+                let old_out_ports = old_ports.outputs;
+
+                // get new node version, reading from disk
+                let new_py_node = PyNode::new(&old_py_node.name);
+                let new_ports = new_py_node.clone().ports.unwrap_or_default();
+
+                let new_in_ports = new_ports.inputs;
+                let new_out_ports = new_ports.outputs;
+
+                // find any nodes that previously existed, but now do not
+                let invalid_in = old_in_ports
+                    .into_iter()
+                    .filter(|(old_name, old_type)| new_in_ports.get(old_name) != Some(old_type))
+                    .map(|(old_name, _)| PortRef {
+                        node: *nx,
+                        name: old_name,
+                        io: IO::In,
+                    });
+                let invalid_out = old_out_ports
+                    .into_iter()
+                    .filter(|(old_name, old_type)| new_out_ports.get(old_name) != Some(old_type))
+                    .map(|(old_name, _)| PortRef {
+                        node: *nx,
+                        name: old_name,
+                        io: IO::Out,
+                    });
+
+                // remove invalid edges from graph
+                invalid_in.chain(invalid_out).for_each(|p| {
+                    warn!(
+                        "removing port {:?} from node {:?}",
+                        p.name, new_py_node.name
+                    );
+                    self.graph.remove_edge(&p);
+                });
+
+                // update the node with most recent changes
+                self.graph
+                    .set_node_data(*nx, NodeTemplate::PyNode(new_py_node).into());
+            }
+        });
+        //update list of available nodes
+        self.availble_nodes = NodeData::available_nodes();
+        //recompute all nodes
+        self.graph.execute_network();
+    }
 }
 
 pub fn theme(_state: &App) -> Theme {
@@ -313,8 +367,8 @@ impl Default for App {
         match read_to_string("network.ron").map(|s| ron::from_str::<App>(&s)) {
             Ok(Ok(app)) => {
                 let mut app = app;
-                app.availble_nodes = available_nodes();
-                app.graph.execute_network();
+                app.availble_nodes = NodeData::available_nodes();
+                app.reload_nodes();
                 app
             }
             _ => {
@@ -356,7 +410,7 @@ impl Default for App {
                     cursor_position: Default::default(),
                     action: Default::default(),
 
-                    availble_nodes: dbg!(available_nodes()),
+                    availble_nodes: NodeData::available_nodes(),
                     shapes: workspace::State::new(shapes.into()),
                     graph: g,
                     undo_stack: vec![],

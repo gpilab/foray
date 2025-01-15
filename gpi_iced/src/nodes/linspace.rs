@@ -1,5 +1,5 @@
 use super::PortData;
-use crate::node_data::NodeTemplate;
+use crate::nodes::NodeTemplate;
 use crate::OrderMap;
 use crate::{app::Message, math::linspace};
 use iced::{

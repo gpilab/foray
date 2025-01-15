@@ -30,7 +30,6 @@ pub fn linspace(start: f32, stop: f32, num: i32) -> Vec<f32> {
     if start.is_nan() || stop.is_nan() {
         panic!("Encountered nan!{:?}", (start, stop, num))
     }
-    //dbg!((start, stop, num));
     (0..num)
         .map(|i| (i as f32 / (num - 1).max(1) as f32))
         .map(|c| start * (1. - c) + c * stop)

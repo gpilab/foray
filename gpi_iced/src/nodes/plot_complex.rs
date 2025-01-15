@@ -1,7 +1,8 @@
-use super::{PortData, INNER_NODE_WIDTH, NODE_BORDER_WIDTH};
+use super::PortData;
 use crate::app::Message;
+use crate::interface::node::{INNER_NODE_WIDTH, NODE_BORDER_WIDTH};
 use crate::math::Vector;
-use crate::node_data::NodeTemplate;
+use crate::nodes::NodeTemplate;
 use crate::OrderMap;
 use iced::widget::canvas::Path;
 use iced::widget::{button, container, horizontal_space, row, text, text_input};

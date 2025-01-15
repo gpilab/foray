@@ -1,4 +1,4 @@
-use crate::{app::Message, node_data::NodeTemplate};
+use crate::{app::Message, nodes::NodeTemplate};
 use iced::{
     widget::{column, container, slider, text},
     Alignment::Center,
