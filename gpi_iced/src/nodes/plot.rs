@@ -168,17 +168,23 @@ impl<Message> canvas::Program<Message> for PlotCanvas {
 
         let node_width = bounds.width;
         let node_height = bounds.height;
+        let aspect = node_width / node_height;
 
         frame.push_transform();
+        //TODO: figure out how ot rephrase this in math, so I can actually
+        //predict/undestand how to switch between plot space and screen space
         //// center canvas on the origin, y up
         frame.translate([frame.center().x, frame.center().y].into());
         frame.scale_nonuniform([1., -1.]);
 
-        // scale for the conifgured height/width
-        frame.scale_nonuniform([
+        frame.push_transform();
+
+        let scale = Vector::new(
             node_width / self.config.rect.width,
             node_height / self.config.rect.height,
-        ]);
+        );
+        // scale for the conifgured height/width
+        frame.scale_nonuniform(scale);
 
         //move the center point to the center of our canvas
         frame.translate((-self.config.rect.center).into());
@@ -189,29 +195,31 @@ impl<Message> canvas::Program<Message> for PlotCanvas {
 
         //// Grid
         {
-            let color = theme.extended_palette().secondary.base.color;
+            let color = theme.extended_palette().secondary.strong.color;
             let main_grid_stroke = Stroke::default()
-                .with_color(color.scale_alpha(0.3))
-                .with_width(1.);
+                .with_width(0.8)
+                .with_color(color.scale_alpha(0.5));
 
-            let secondary_grid_stroke = Stroke::default()
-                .with_color(color.scale_alpha(0.1))
-                .with_width(1.);
-            let tertiary_grid_strok = Stroke::default()
-                .with_color(color.scale_alpha(0.01))
-                .with_width(1.);
+            let secondary_grid_stroke = main_grid_stroke.with_width(0.4);
 
-            grid_path(self.config.rect, 100.)
+            let tertiary_grid_strok = secondary_grid_stroke;
+
+            let max_length = (self.config.rect.width + self.config.rect.center.x.abs())
+                .max(self.config.rect.height + self.config.rect.center.y.abs());
+
+            grid_path(self.config.rect, max_length, aspect, max_length)
                 .into_iter()
                 .for_each(|p| frame.stroke(&p, main_grid_stroke));
 
-            grid_path(self.config.rect, 10.)
-                .into_iter()
-                .for_each(|p| frame.stroke(&p, secondary_grid_stroke));
+            {
+                grid_path(self.config.rect, 0.05, aspect, 10.)
+                    .into_iter()
+                    .for_each(|p| frame.stroke(&p, secondary_grid_stroke));
 
-            grid_path(self.config.rect, 1.)
-                .into_iter()
-                .for_each(|p| frame.stroke(&p, tertiary_grid_strok));
+                grid_path(self.config.rect, 0.025, aspect, 1.)
+                    .into_iter()
+                    .for_each(|p| frame.stroke(&p, tertiary_grid_strok));
+            }
         }
 
         let line_stroke = Stroke::default()
@@ -257,30 +265,49 @@ impl<Message> canvas::Program<Message> for PlotCanvas {
     }
 }
 
-fn grid_path(plot_rect: Rect, tick_size: f32) -> Vec<Path> {
-    let left = ((plot_rect.left() / tick_size).floor()) * tick_size;
-    let right = ((plot_rect.right() / tick_size).ceil()) * tick_size;
-    let bottom = ((plot_rect.bottom() / tick_size).floor()) * tick_size;
-    let top = ((plot_rect.top() / tick_size).ceil()) * tick_size;
+fn grid_path(
+    plot_rect: Rect,
+    tick_length_node_space: f32,
+    aspect: f32,
+    tick_spacing: f32,
+) -> Vec<Path> {
+    let left = ((plot_rect.left() / tick_spacing).floor()) * tick_spacing;
+    let right = ((plot_rect.right() / tick_spacing).ceil()) * tick_spacing;
+    let bottom = ((plot_rect.bottom() / tick_spacing).floor()) * tick_spacing;
+    let top = ((plot_rect.top() / tick_spacing).ceil()) * tick_spacing;
+    let cx = 0.0f32.clamp(left, right);
+    let cy = 0.0f32.clamp(bottom, top);
+    let x_tick_length = tick_length_node_space * plot_rect.height * aspect;
+    let y_tick_length = tick_length_node_space * plot_rect.width;
 
     if left.is_nan() || right.is_nan() || top.is_nan() || bottom.is_nan() {
-        panic!("Encountered nan!{:?}", (plot_rect, tick_size))
+        panic!("Encountered nan!{:?}", (plot_rect, tick_spacing))
     }
 
-    let h_lines = linspace_delta(top, bottom, tick_size).into_iter().map(|y| {
-        if y.is_nan() {
-            panic!("Encountered nan!{:?}", (plot_rect, tick_size))
-        }
-        Path::line((left, y).into(), (right, y).into())
-    });
+    let h_lines = linspace_delta(top, bottom, tick_spacing)
+        .into_iter()
+        .map(|y| {
+            if y.is_nan() {
+                panic!("Encountered nan!{:?}", (plot_rect, tick_spacing))
+            }
+            Path::line(
+                (cx - (y_tick_length / 2.), y).into(),
+                (cx + (y_tick_length / 2.), y).into(),
+            )
+        });
 
-    let v_lines = linspace_delta(right, left, tick_size).into_iter().map(|x| {
-        if x.is_nan() {
-            panic!("Encountered nan!{:?}", (plot_rect, tick_size))
-        }
+    let v_lines = linspace_delta(right, left, tick_spacing)
+        .into_iter()
+        .map(|x| {
+            if x.is_nan() {
+                panic!("Encountered nan!{:?}", (plot_rect, tick_spacing))
+            }
 
-        Path::line((x, bottom).into(), (x, top).into())
-    });
+            Path::line(
+                (x, cy - (x_tick_length / 2.)).into(),
+                (x, cy + (x_tick_length / 2.)).into(),
+            )
+        });
 
     h_lines.chain(v_lines).collect()
 }
