@@ -13,13 +13,13 @@ pub fn main() -> iced::Result {
 
     application("gpi_v2", App::update, App::view)
         .subscription(subscriptions)
-        .antialiasing(true)
         .theme(theme)
         .window(iced::window::Settings {
             min_size: Some((400., 300.).into()),
             //icon: Some(icon::from_rgba(vec![0u8; (32 * 32) * 4], 32, 32).unwrap()),
             ..Default::default()
         })
+        .antialiasing(true)
         .window_size((1000., 800.))
         .decorations(true)
         .scale_factor(|_| 1.25)

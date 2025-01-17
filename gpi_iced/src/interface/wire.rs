@@ -20,19 +20,27 @@ impl App {
         //// Handle currently active wire
         // TODO: test nodes with multiple out ports
         let active_wire = match &self.action {
-            Action::CreatingInputWire(input, Some(tentative_output)) => {
-                Some((port_position(input), port_position(tentative_output)))
-            }
-            Action::CreatingInputWire(input, None) => Some((
-                port_position(input),
-                self.cursor_position + self.shapes.camera.position,
+            Action::CreatingInputWire(input, Some(tentative_output)) => Some((
+                (port_position(input), port_position(tentative_output)),
+                active_wire_stroke(&self.app_theme, true),
             )),
-            Action::CreatingOutputWire(output, Some(input)) => {
-                Some((port_position(input), port_position(output)))
-            }
+            Action::CreatingInputWire(input, None) => Some((
+                (
+                    port_position(input),
+                    self.cursor_position + self.shapes.camera.position,
+                ),
+                active_wire_stroke(&self.app_theme, false),
+            )),
+            Action::CreatingOutputWire(output, Some(input)) => Some((
+                (port_position(input), port_position(output)),
+                active_wire_stroke(&self.app_theme, true),
+            )),
             Action::CreatingOutputWire(output, None) => Some((
-                self.cursor_position + self.shapes.camera.position,
-                port_position(output),
+                (
+                    self.cursor_position + self.shapes.camera.position,
+                    port_position(output),
+                ),
+                active_wire_stroke(&self.app_theme, false),
             )),
             _ => None,
         };
@@ -42,13 +50,13 @@ impl App {
         incoming_wires
             .iter()
             .map(|(from, to)| {
-                let color = wire_status(from, to, &self.action, &self.app_theme);
-                ((port_position(to), port_position(from)), color)
+                let stroke = wire_status(from, to, &self.action, &self.app_theme);
+                ((port_position(to), port_position(from)), stroke)
             })
             //// include the active wire
-            .chain(once(active_wire.map(|w| (w, active_wire_color(&self.app_theme)))).flatten())
+            .chain(once(active_wire).flatten())
             //// build the wire curves
-            .map(|((from, to), color)| {
+            .map(|((from, to), stroke)| {
                 (
                     Path::new(|builder| {
                         builder.move_to(from.into());
@@ -59,10 +67,7 @@ impl App {
                             to.into(),
                         );
                     }),
-                    Stroke::default()
-                        .with_width(3.0)
-                        .with_color(color)
-                        .with_line_cap(canvas::LineCap::Round),
+                    stroke,
                 )
             })
             .collect()
@@ -91,20 +96,20 @@ pub fn find_port_offset(port_ref: &PortRef, port_index: usize) -> Vector {
 /// Determine the status of a given *non-active* wire, and provide the corresponding color
 /// The current action determines how existing wires should be displayed, to provide
 /// context about how the current action will affect other wires
-pub fn wire_status(
+pub fn wire_status<'a>(
     output: &PortRef,
     input: &PortRef,
     current_action: &app::Action,
-    theme: &AppTheme,
-) -> iced::Color {
+    theme: &'a AppTheme,
+) -> Stroke<'a> {
     assert!(output.io == IO::Out);
     assert!(input.io == IO::In);
 
     //let p = theme.extended_palette();
 
-    let default_color = theme.secondary.base_color;
-    let maybe_delete = theme.danger.weak_color();
-    let will_delete = theme.danger.base_color;
+    let default_stroke = default_wire_stroke(theme);
+    let maybe_delete = default_stroke.with_color(theme.danger.weak_color().into());
+    let will_delete = with_dashed_stroke(maybe_delete);
 
     match current_action {
         app::Action::CreatingInputWire(active_input, active_output) => {
@@ -118,25 +123,46 @@ pub fn wire_status(
                     maybe_delete
                 }
             } else {
-                default_color
+                default_stroke
             }
         }
-        app::Action::CreatingOutputWire(_, None) => default_color,
+        app::Action::CreatingOutputWire(_, None) => default_stroke,
         app::Action::CreatingOutputWire(_, Some(active_input)) => {
             //// if a new wire is created at an input, any existing wires will be deleted
             if active_input == input {
                 will_delete
             } else {
-                default_color
+                default_stroke
             }
         }
-        app::Action::Idle => default_color,
-        _ => default_color,
+        app::Action::Idle => default_stroke,
+        _ => default_stroke,
     }
-    .into()
 }
 
 /// active wire color
-pub fn active_wire_color(t: &AppTheme) -> iced::Color {
-    t.secondary.strong_color().into()
+pub fn active_wire_stroke(t: &AppTheme, is_tentative_connection: bool) -> Stroke {
+    let stroke = default_wire_stroke(t).with_color(t.secondary.strong_color().into());
+    if !is_tentative_connection {
+        with_dashed_stroke(stroke)
+    } else {
+        stroke
+    }
+}
+
+fn with_dashed_stroke(stroke: Stroke) -> Stroke {
+    Stroke {
+        line_dash: canvas::LineDash {
+            segments: &[10.0],
+            offset: 0,
+        },
+        ..stroke
+    }
+}
+
+pub fn default_wire_stroke(theme: &AppTheme) -> Stroke {
+    Stroke::default()
+        .with_width(3.0)
+        .with_color(theme.secondary.base_color.into())
+        .with_line_cap(canvas::LineCap::Round)
 }
