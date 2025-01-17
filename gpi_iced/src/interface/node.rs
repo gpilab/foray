@@ -4,16 +4,16 @@ use crate::app::{App, Message};
 use crate::graph::{GraphNode, PortRef, IO};
 use crate::gui_node::GUINode;
 use crate::math::Point;
+use crate::nodes::port::PortType;
 use crate::nodes::NodeData;
 use crate::nodes::{port::PortData, status::NodeStatus};
 use crate::widget::custom_button;
 use crate::widget::node_container::NodeContainer;
 use crate::widget::pin::Pin;
 use crate::{style, OrderMap};
-use container::bordered_box;
 use iced::Alignment::Center;
 use iced::Length::Fill;
-use iced::{border, widget::*, Color, Element};
+use iced::{border, color, widget::*, Color, Element};
 
 pub const INNER_NODE_WIDTH: f32 = 120.;
 pub const INNER_NODE_HEIGHT: f32 = 60.;
@@ -35,11 +35,25 @@ impl App {
             None => false,
         };
 
-        fn port_style(t: &Theme, s: custom_button::Status) -> custom_button::Style {
-            let mut style = custom_button::primary(t, s);
-            style.border.radius = border::radius(100.);
-            style
-        }
+        let port_style =
+            move |port_type: &PortType, s: &custom_button::Status| -> custom_button::Style {
+                let color_pair = match port_type {
+                    //TODO: put these colors into AppTheme
+                    PortType::Integer => (color!(209, 77, 65), color!(175, 48, 41)), //red
+                    PortType::Real => (
+                        self.app_theme.primary.weak_color().into(),
+                        self.app_theme.primary.base_color.into(),
+                    ),
+                    //(color!(139, 126, 200), color!(94, 64, 157)),  //purple
+                    PortType::Real2d => (color!(67, 133, 190), color!(32, 94, 166)), //blue
+                    PortType::Complex => (color!(135, 154, 57), color!(102, 128, 11)), //green
+                    PortType::Complex2d => (color!(58, 169, 159), color!(36, 131, 123)), //cyan
+                };
+
+                let mut style = custom_button::custom(*s, color_pair.1, color_pair.0);
+                style.border.radius = border::radius(100.);
+                style
+            };
         let node_style = move |status: &NodeStatus, t: &Theme| {
             let color = match status {
                 NodeStatus::Idle => match is_selected {
@@ -57,7 +71,7 @@ impl App {
                         .color(color)
                         .width(NODE_BORDER_WIDTH),
                 )
-                .background(self.theme.palette().background)
+                .background(iced::Color::from(self.app_theme.background.base_color))
         };
 
         //TODO: clean up this function, use something similar to wires.rs
@@ -69,7 +83,7 @@ impl App {
 
         let port_buttons = {
             let in_port_buttons = inputs
-                .iter()
+                .into_iter()
                 .enumerate()
                 .map(|(i, port)| (Point::new(port_x(i), -PORT_RADIUS), port))
                 .map(|(point, port)| {
@@ -84,7 +98,7 @@ impl App {
                                 .on_press(Message::PortPress(in_port.clone()))
                                 .on_right_press(Message::PortDelete(in_port.clone()))
                                 .on_release_self(Message::PortRelease)
-                                .style(port_style)
+                                .style(move |_t, s| port_style(&port.1, &s))
                                 .width(PORT_RADIUS * 2.)
                                 .height(PORT_RADIUS * 2.),
                         )
@@ -95,7 +109,7 @@ impl App {
                     .into()
                 });
             let out_port_buttons = outputs
-                .iter()
+                .into_iter()
                 .enumerate()
                 .map(|(i, port)| (Point::new(port_x(i), INNER_NODE_HEIGHT - PORT_RADIUS), port))
                 .map(|(point, port)| {
@@ -104,13 +118,14 @@ impl App {
                         name: port.0.clone(),
                         io: IO::Out,
                     };
+
                     Pin::new(
                         mouse_area(
                             custom_button::Button::new(vertical_space())
                                 .on_press(Message::PortPress(out_port.clone()))
                                 .on_right_press(Message::PortDelete(out_port.clone()))
                                 .on_release_self(Message::PortRelease)
-                                .style(port_style)
+                                .style(move |_t, s| port_style(&port.1, &s))
                                 .width(PORT_RADIUS * 2.)
                                 .height(PORT_RADIUS * 2.),
                         )
@@ -169,29 +184,24 @@ pub fn format_node_output<'a>(
 }
 
 pub(crate) fn node_list_view<'a>(templates: &[NodeData]) -> Element<'a, Message> {
-    container(
-        container(
-            //TODO: don't create new nodes on every view. store a list of Node templates in App
-            // New nodes are expensive for python nodes which need to read their source
-            column(templates.iter().map(|node| {
-                button(
-                    row![
-                        horizontal_rule(0.0),
-                        container(text(node.template.name())).padding(4.0)
-                    ]
-                    //.spacing(4.0)
-                    .align_y(Center),
-                )
-                .padding(0.)
-                .on_press(Message::AddNode(node.clone().into()))
-                .width(Fill)
-                .style(style::button::list)
-                .into()
-            }))
-            .width(150.),
-        )
-        .style(|t| bordered_box(t).background(Color::TRANSPARENT)),
-    )
+    container(container(
+        column(templates.iter().map(|node| {
+            button(
+                row![
+                    horizontal_rule(0.0),
+                    container(text(node.template.name())).padding(4.0),
+                    horizontal_space()
+                ]
+                .align_y(Center),
+            )
+            .padding(0.)
+            .on_press(Message::AddNode(node.clone().into()))
+            .width(Fill)
+            .style(style::button::list)
+            .into()
+        }))
+        .width(Fill),
+    ))
     .center_x(Fill)
     .into()
 }

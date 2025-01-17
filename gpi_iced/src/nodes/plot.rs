@@ -189,15 +189,16 @@ impl<Message> canvas::Program<Message> for PlotCanvas {
 
         //// Grid
         {
+            let color = theme.extended_palette().secondary.base.color;
             let main_grid_stroke = Stroke::default()
-                .with_color(theme.palette().primary.scale_alpha(0.3))
+                .with_color(color.scale_alpha(0.3))
                 .with_width(1.);
 
             let secondary_grid_stroke = Stroke::default()
-                .with_color(theme.palette().primary.scale_alpha(0.1))
+                .with_color(color.scale_alpha(0.1))
                 .with_width(1.);
             let tertiary_grid_strok = Stroke::default()
-                .with_color(theme.palette().primary.scale_alpha(0.01))
+                .with_color(color.scale_alpha(0.01))
                 .with_width(1.);
 
             grid_path(self.config.rect, 100.)

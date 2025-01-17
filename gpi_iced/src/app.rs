@@ -1,5 +1,6 @@
 use crate::file_watch::file_watch_subscription;
 use crate::graph::{Graph, PortRef, IO};
+use crate::interface::theme_config::{AppThemeMessage, GuiColorMessage};
 use crate::interface::{side_bar::side_bar, SEPERATOR};
 use crate::math::{Point, Vector};
 use crate::nodes::linspace::LinspaceConfig;
@@ -8,6 +9,7 @@ use crate::nodes::port::PortData;
 use crate::nodes::port::PortType;
 use crate::nodes::{NodeData, NodeTemplate};
 use crate::python::py_node::PyNode;
+use crate::style::theme::AppTheme;
 use crate::widget::shapes::ShapeId;
 use crate::widget::workspace::{self, workspace};
 use crate::OrderMap;
@@ -15,7 +17,7 @@ use iced::advanced::graphics::core::Element;
 use iced::event::listen_with;
 use iced::keyboard::key::Named;
 use iced::keyboard::{Key, Modifiers};
-use iced::widget::*;
+use iced::widget::{column, *};
 use iced::Length::Fill;
 use iced::{Subscription, Task};
 use log::warn;
@@ -44,10 +46,9 @@ pub struct App {
     pub cursor_position: Point,
     pub config: f32,
     pub debug: bool,
+    pub app_theme: AppTheme,
     #[serde(skip)]
     pub availble_nodes: Vec<NodeData>,
-    #[serde(skip, default = "default_theme")]
-    pub theme: Theme,
     #[serde(skip)]
     pub action: Action,
     #[serde(skip)]
@@ -78,6 +79,7 @@ pub enum Message {
 
     //// Application
     Config(f32),
+    ThemeValueChange(AppThemeMessage, GuiColorMessage),
     ToggleDebug,
     Save,
     Load,
@@ -188,6 +190,7 @@ impl App {
                 println!("\n\n\n CONFIG!!!!!!!!!!!!!!!!!!!!!\n\n\n");
                 self.config = v
             }
+            Message::ThemeValueChange(tm, tv) => self.app_theme.update(tm, tv),
             Message::ToggleDebug => {
                 self.debug = !self.debug;
             }
@@ -239,24 +242,28 @@ impl App {
 
     /// App View
     pub fn view(&self) -> Element<Message, Theme, Renderer> {
-        row![
-            side_bar(self),
-            vertical_rule(SEPERATOR),
-            container(
-                workspace(
-                    &self.shapes,
-                    //// Node view
-                    |id| self.node_content(id),
-                    //// Wires paths
-                    |wire_end_node, points| self.wire_curve(wire_end_node, points),
+        column![
+            row![
+                side_bar(self),
+                vertical_rule(SEPERATOR),
+                container(
+                    workspace(
+                        &self.shapes,
+                        //// Node view
+                        |id| self.node_content(id),
+                        //// Wires paths
+                        |wire_end_node, points| self.wire_curve(wire_end_node, points),
+                    )
+                    .on_shape_drag(Message::OnDrag)
+                    .on_cursor_move(Message::OnMove)
+                    .on_press(Message::OnSelect)
+                    .pan(Message::Pan)
                 )
-                .on_shape_drag(Message::OnDrag)
-                .on_cursor_move(Message::OnMove)
-                .on_press(Message::OnSelect)
-                .pan(Message::Pan)
-            )
-            .height(Fill)
-            .width(Fill)
+                .height(Fill)
+                .width(Fill)
+            ],
+            horizontal_rule(SEPERATOR),
+            self.app_theme.view()
         ]
         .into()
     }
@@ -333,12 +340,8 @@ impl App {
     }
 }
 
-pub fn theme(_state: &App) -> Theme {
-    default_theme()
-}
-
-fn default_theme() -> Theme {
-    Theme::Ferra
+pub fn theme(state: &App) -> Theme {
+    state.app_theme.clone().into()
 }
 
 pub fn subscriptions(_state: &App) -> Subscription<Message> {
@@ -403,13 +406,13 @@ impl Default for App {
 
                 Self {
                     debug: false,
-                    theme: Theme::Ferra,
                     config: 50.,
 
                     selected_shape: None,
                     cursor_position: Default::default(),
                     action: Default::default(),
 
+                    app_theme: Default::default(),
                     availble_nodes: NodeData::available_nodes(),
                     shapes: workspace::State::new(shapes.into()),
                     graph: g,

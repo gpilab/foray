@@ -2,6 +2,7 @@ use std::iter::once;
 
 use crate::app::{Action, App};
 use crate::math::Point;
+use crate::style::theme::AppTheme;
 use crate::OrderMap;
 use canvas::{Path, Stroke};
 use iced::widget::*;
@@ -41,11 +42,11 @@ impl App {
         incoming_wires
             .iter()
             .map(|(from, to)| {
-                let color = wire_status(from, to, &self.action, &self.theme);
+                let color = wire_status(from, to, &self.action, &self.app_theme);
                 ((port_position(to), port_position(from)), color)
             })
             //// include the active wire
-            .chain(once(active_wire.map(|w| (w, active_wire_color(&self.theme)))).flatten())
+            .chain(once(active_wire.map(|w| (w, active_wire_color(&self.app_theme)))).flatten())
             //// build the wire curves
             .map(|((from, to), color)| {
                 (
@@ -73,7 +74,7 @@ use crate::{
     app,
     graph::{PortRef, IO},
 };
-use iced::{Theme, Vector};
+use iced::Vector;
 
 /// Determine where a port should be positioned relative to the origin of the node
 pub fn find_port_offset(port_ref: &PortRef, port_index: usize) -> Vector {
@@ -94,16 +95,16 @@ pub fn wire_status(
     output: &PortRef,
     input: &PortRef,
     current_action: &app::Action,
-    theme: &Theme,
+    theme: &AppTheme,
 ) -> iced::Color {
     assert!(output.io == IO::Out);
     assert!(input.io == IO::In);
 
-    let p = theme.extended_palette();
+    //let p = theme.extended_palette();
 
-    let default_color = p.secondary.base.color;
-    let maybe_delete = p.danger.weak.color;
-    let will_delete = p.danger.base.color;
+    let default_color = theme.secondary.base_color;
+    let maybe_delete = theme.danger.weak_color();
+    let will_delete = theme.danger.base_color;
 
     match current_action {
         app::Action::CreatingInputWire(active_input, active_output) => {
@@ -132,9 +133,10 @@ pub fn wire_status(
         app::Action::Idle => default_color,
         _ => default_color,
     }
+    .into()
 }
 
 /// active wire color
-pub fn active_wire_color(t: &Theme) -> iced::Color {
-    t.extended_palette().secondary.strong.color
+pub fn active_wire_color(t: &AppTheme) -> iced::Color {
+    t.secondary.strong_color().into()
 }

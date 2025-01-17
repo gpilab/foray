@@ -8,7 +8,7 @@ use widget::{column, *};
 /// Create the sidebar view
 pub fn side_bar(app: &App) -> Element<Message> {
     fn button_style(t: &Theme, s: button::Status) -> button::Style {
-        let mut style = button::secondary(t, s);
+        let mut style = button::primary(t, s);
         style.border.radius = border::radius(0.);
         style
     }
@@ -65,7 +65,6 @@ pub fn side_bar(app: &App) -> Element<Message> {
             container(text(node.template.name().clone()).size(20.)).center_x(Fill),
             horizontal_rule(0),
             column![node.status.icon(), node.status.text_element().size(12.),],
-            horizontal_rule(0),
             vertical_space().height(10.),
             node.template
                 .config_view(selected_id, input_data)
@@ -84,7 +83,7 @@ pub fn side_bar(app: &App) -> Element<Message> {
             container(text("Add Node").size(20.)).center_x(Fill),
             horizontal_rule(0),
             vertical_space().height(10.),
-            scrollable(node_list)
+            row![vertical_rule(SEPERATOR), scrollable(node_list)],
         ]
         .spacing(5.)
         .padding([10., 5.])

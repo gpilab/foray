@@ -7,6 +7,7 @@ use crate::{app::Message, SYMBOL_FONT};
 
 pub mod node;
 pub mod side_bar;
+pub mod theme_config;
 pub mod wire;
 
 pub const SEPERATOR: f32 = 1.0;

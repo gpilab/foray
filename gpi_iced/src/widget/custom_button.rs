@@ -531,6 +531,22 @@ impl Catalog for Theme {
 }
 
 /// A primary button; denoting a main action.
+pub fn custom(status: Status, base_color: Color, hover_color: Color) -> Style {
+    let base = Style {
+        background: Some(Background::Color(base_color)),
+        border: border::rounded(2),
+        ..Style::default()
+    };
+    match status {
+        Status::Active | Status::Pressed => base,
+        Status::Hovered => Style {
+            background: Some(Background::Color(hover_color)),
+            ..base
+        },
+        Status::Disabled => disabled(base),
+    }
+}
+/// A primary button; denoting a main action.
 pub fn primary(theme: &Theme, status: Status) -> Style {
     let palette = theme.extended_palette();
     let base = styled(palette.primary.strong);
