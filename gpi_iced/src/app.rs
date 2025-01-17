@@ -45,8 +45,11 @@ pub struct App {
     pub selected_shape: Option<ShapeId>,
     pub cursor_position: Point,
     pub config: f32,
-    pub debug: bool,
     pub app_theme: AppTheme,
+    #[serde(skip)]
+    pub debug: bool,
+    #[serde(skip)]
+    pub show_palette_ui: bool,
     #[serde(skip)]
     pub availble_nodes: Vec<NodeData>,
     #[serde(skip)]
@@ -81,6 +84,7 @@ pub enum Message {
     Config(f32),
     ThemeValueChange(AppThemeMessage, GuiColorMessage),
     ToggleDebug,
+    TogglePaletteUI,
     Save,
     Load,
     ReloadNodes,
@@ -194,6 +198,9 @@ impl App {
             Message::ToggleDebug => {
                 self.debug = !self.debug;
             }
+            Message::TogglePaletteUI => {
+                self.show_palette_ui = !self.show_palette_ui;
+            }
             Message::Save => {
                 std::fs::write(
                     "network.ron",
@@ -208,7 +215,7 @@ impl App {
             Message::Load => {
                 *self = ron::from_str(&read_to_string("network.ron").expect("Could not read file"))
                     .expect("could not parse file");
-                self.graph.execute_network();
+                self.reload_nodes();
             }
             Message::ReloadNodes => {
                 self.reload_nodes();
@@ -242,7 +249,7 @@ impl App {
 
     /// App View
     pub fn view(&self) -> Element<Message, Theme, Renderer> {
-        column![
+        let content: Element<Message, Theme, Renderer> = column![
             row![
                 side_bar(self),
                 vertical_rule(SEPERATOR),
@@ -262,10 +269,17 @@ impl App {
                 .height(Fill)
                 .width(Fill)
             ],
-            horizontal_rule(SEPERATOR),
-            self.app_theme.view()
+            match self.show_palette_ui {
+                true => column![horizontal_rule(SEPERATOR), self.app_theme.view()],
+                false => column![],
+            }
         ]
-        .into()
+        .into();
+        if self.debug {
+            content.explain(iced::Color::from_rgba(0.7, 0.7, 0.8, 0.2))
+        } else {
+            content
+        }
     }
 
     /// stash current app state, and reset the redo stack
@@ -406,6 +420,7 @@ impl Default for App {
 
                 Self {
                     debug: false,
+                    show_palette_ui: false,
                     config: 50.,
 
                     selected_shape: None,

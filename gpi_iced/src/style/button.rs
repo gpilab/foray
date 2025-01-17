@@ -74,6 +74,42 @@ pub fn text(theme: &Theme, status: Status) -> Style {
     }
 }
 
+pub fn primary_icon(theme: &Theme, status: Status) -> Style {
+    let palette = theme.extended_palette();
+
+    let base = Style {
+        text_color: palette.primary.strong.color,
+        ..Style::default()
+    };
+
+    match status {
+        Status::Active | Status::Pressed => base,
+        Status::Hovered => Style {
+            text_color: palette.primary.base.color,
+            ..base
+        },
+        Status::Disabled => disabled(base),
+    }
+}
+
+pub fn secondary_icon(theme: &Theme, status: Status) -> Style {
+    let palette = theme.extended_palette();
+
+    let base = Style {
+        text_color: palette.secondary.strong.color,
+        ..Style::default()
+    };
+
+    match status {
+        Status::Active | Status::Pressed => base,
+        Status::Hovered => Style {
+            text_color: palette.secondary.base.color,
+            ..base
+        },
+        Status::Disabled => disabled(base),
+    }
+}
+
 fn styled(pair: palette::Pair) -> Style {
     Style {
         background: Some(Background::Color(pair.color)),
