@@ -132,10 +132,10 @@ impl NodeTemplate {
     pub fn template_variants(&self) -> Vec<NodeData> {
         match &self {
             NodeTemplate::PyNode(_) => {
-                let py_nodes = ["add_array", "load_py", "null", "fft"];
+                let py_nodes = load_node_names();
                 py_nodes
                     .into_iter()
-                    .map(|name| NodeTemplate::PyNode(PyNode::new(name)).into())
+                    .map(|name| NodeTemplate::PyNode(PyNode::new(&name)).into())
                     .collect()
             }
             _ => vec![self.clone().into()],
@@ -302,4 +302,17 @@ impl GUINode for NodeTemplate {
             _ => None,
         }
     }
+}
+
+fn load_node_names() -> Vec<String> {
+    use glob::glob;
+    glob("[!.]*/*.py")
+        .expect("valid glob")
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            entry
+                .file_stem()
+                .map(|stem| stem.to_string_lossy().to_string())
+        })
+        .collect()
 }

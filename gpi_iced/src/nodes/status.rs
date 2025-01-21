@@ -32,6 +32,8 @@ impl NodeStatus {
 #[derive(Debug, Display, Clone, Serialize, Deserialize, Default)]
 pub enum NodeError {
     Input(String),
+    Output(String),
+    Config(String),
     Syntax(String),
     FileSys(String),
     Runtime(String),

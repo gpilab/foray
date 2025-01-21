@@ -54,16 +54,21 @@ pub fn gpipy_config(node_name: &str) -> PyNode {
     let node_src = match fs::read_to_string(&path).map_err(|e| NodeError::FileSys(e.to_string())) {
         Ok(src) => src,
         Err(_) => {
-            return PyNode {
+            let py_node = PyNode {
                 name: node_name.to_string(),
                 path,
-                ports: Err(NodeError::FileSys("could find src file".into())),
-            }
+                ports: Err(NodeError::FileSys("could not find src file".into())),
+            };
+            log::error!("Failed to load node {node_name} {py_node:?}");
+            return py_node;
         }
     };
 
-    let ports =
-        gpipy_read_config(node_name, &node_src).map_err(|e| NodeError::Runtime(e.to_string()));
+    let ports = gpipy_read_config(node_name, &node_src);
+
+    if ports.is_err() {
+        log::error!("Error reading port configuration {ports:?}")
+    }
 
     PyNode {
         name: node_name.to_string(),
@@ -72,31 +77,41 @@ pub fn gpipy_config(node_name: &str) -> PyNode {
     }
 }
 
-pub fn gpipy_read_config(
-    node_type: &str,
-    node_src: &str,
-) -> Result<PortDef, Box<dyn std::error::Error>> {
+pub fn gpipy_read_config(node_type: &str, node_src: &str) -> Result<PortDef, NodeError> {
     Python::with_gil(|py| {
         trace!("reading node '{node_type}' config with src:\n{node_src}");
+
+        //TODO Clean up error handling
         let node_module = PyModule::from_code(
             py,
-            CString::new(node_src)?.as_c_str(),
-            c_str!("gpi_node.py"),
-            c_str!("gpi_node"),
-        )?;
+            CString::new(node_src)
+                .map_err(|e| {
+                    NodeError::Syntax(format!("Error in node '{node_type}' source text {e}"))
+                })?
+                .as_c_str(),
+            CString::new(format!("{node_type}.py"))
+                .map_err(|e| NodeError::Syntax(format!("Error with node name {node_type}{e}")))?
+                .as_c_str(),
+            CString::new(node_type)
+                .map_err(|e| NodeError::Syntax(format!("Error with node name {node_type}{e}")))?
+                .as_c_str(),
+        )
+        .map_err(|e| NodeError::Syntax(format!("Error in node '{node_type}' source text {e}")))?;
 
-        //reload_node(node_type);
         //// get config
-        Ok(match node_module.getattr("config") {
-            Ok(compute_fn) => match compute_fn.call0() {
-                Ok(out_py) => match out_py.extract::<PyFacingPortDef>() {
-                    Ok(out_value) => out_value.try_into()?,
-                    Err(e) => panic!("Failed to interperet  {node_type}'s `config`: {e}, {out_py}"),
-                },
-                Err(e) => panic!("Failed to run `config` in {node_type}: {e}"),
+        match node_module
+            .getattr("config")
+            .map_err(|_e| {
+                NodeError::Config(format!("Error getting node '{node_type}' configuration"))
+            })?
+            .call0()
+        {
+            Ok(out_py) => match out_py.extract::<PyFacingPortDef>() {
+                Ok(out_value) => out_value.try_into(),
+                Err(e) => panic!("Failed to interperet  {node_type}'s `config`: {e}, {out_py}"),
             },
             Err(e) => panic!("Failed to run `config` in {node_type}: {e}"),
-        })
+        }
     })
 }
 

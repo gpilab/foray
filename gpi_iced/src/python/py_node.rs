@@ -72,39 +72,49 @@ impl PyNode {
             )
             .map_err(|err| NodeError::Runtime(err.to_string()))?;
 
-            Ok(self
-                .ports
+            self.ports
                 .as_ref()
                 .unwrap()
                 .outputs
                 .iter()
-                .map(|(k, port_type)| (k.clone(), Self::extract_py_data(port_type, &out[k], py)))
-                .collect())
+                .map(|(k, port_type)| {
+                    Self::extract_py_data(port_type, &out[k], py).map(|p| (k.clone(), p))
+                })
+                .collect()
         })
     }
 
     pub fn py_node_path(node_name: &str) -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("nodes/{node_name}.py"))
     }
-    pub fn extract_py_data(port_type: &PortType, py_object: &PyObject, py: Python) -> PortData {
+    pub fn extract_py_data(
+        port_type: &PortType,
+        py_object: &PyObject,
+        py: Python,
+    ) -> Result<PortData, NodeError> {
         unsafe {
-            match port_type {
+            Ok(match port_type {
                 PortType::Integer => {
-                    PortData::Integer(py_object.bind(py).downcast().unwrap().as_array().to_owned())
+                    PortData::Integer(py_object.bind(py).downcast()
+                        .map_err(|_e|NodeError::Output(format!("Received unexpected output from node. expected {port_type:?}, found {py_object:?}")))?.as_array().to_owned())
                 }
                 PortType::Real => {
-                    PortData::Real(py_object.bind(py).downcast().unwrap().as_array().to_owned())
+                    PortData::Real(py_object.bind(py).downcast()
+                        .map_err(|_e|NodeError::Output(format!("Received unexpected output from node. expected {port_type:?}, found {py_object:?}")))?.as_array().to_owned())
                 }
                 PortType::Complex => {
-                    PortData::Complex(py_object.bind(py).downcast().unwrap().as_array().to_owned())
+                    PortData::Complex(py_object.bind(py).downcast()
+                        .map_err(|_e|NodeError::Output(format!("Received unexpected output from node. expected {port_type:?}, found {py_object:?}")))?.as_array().to_owned())
                 }
                 PortType::Real2d => {
-                    PortData::Real2d(py_object.bind(py).downcast().unwrap().as_array().to_owned())
+                    PortData::Real2d(py_object.bind(py).downcast()
+                        .map_err(|_e|NodeError::Output(format!("Received unexpected output from node. expected {port_type:?}, found {py_object:?}")))?.as_array().to_owned())
                 }
                 PortType::Complex2d => PortData::Complex2d(
-                    py_object.bind(py).downcast().unwrap().as_array().to_owned(),
+                    py_object.bind(py).downcast()
+                        .map_err(|_e|NodeError::Output(format!("Received unexpected output from node. expected {port_type:?}, found {py_object:?}")))?.as_array().to_owned()
                 ),
-            }
+            })
         }
     }
 }
@@ -133,6 +143,7 @@ impl TryFrom<PyFacingPortDef> for PortDef {
                     )
                 }),
             outputs: value
+                .clone()
                 .outputs
                 .into_iter()
                 .map(|(key, value)| PortType::from_str(&value).map(|v| (key, v)))
@@ -141,10 +152,10 @@ impl TryFrom<PyFacingPortDef> for PortDef {
                     panic!(
                         "Expected port values of {:?}, found {:?}",
                         PortType::VARIANTS,
-                        value.inputs
+                        value.outputs
                     )
                 }),
         })
     }
-    type Error = strum::ParseError;
+    type Error = NodeError;
 }

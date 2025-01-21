@@ -12,7 +12,19 @@ fn main() {
 
     println!(
         "cargo::rustc-env=PATH={}",
-        prepend_path(venv_bin.clone()).unwrap().to_str().unwrap()
+        prepend_env("PATH", venv_bin.clone())
+            .unwrap()
+            .to_str()
+            .unwrap()
+    );
+    // Need to add `site packages` venv dir in PYTHONPATH for macos
+    // open pyo3 issue https://github.com/PyO3/pyo3/issues/1741
+    println!(
+        "cargo::rustc-env=PYTHONPATH={}",
+        prepend_env("PYTHONPATH", venv_path.join("lib/python3.13/site-packages"))
+            .unwrap()
+            .to_str()
+            .unwrap()
     );
 
     println!(
@@ -21,9 +33,9 @@ fn main() {
     );
 }
 
-fn prepend_path<P: AsRef<Path>>(p: P) -> Result<OsString, env::JoinPathsError> {
+fn prepend_env<P: AsRef<Path>>(env: &str, p: P) -> Result<OsString, env::JoinPathsError> {
     let new_path = p.as_ref();
-    if let Some(path) = env::var_os("PATH") {
+    if let Some(path) = env::var_os(env) {
         let old = env::split_paths(&path);
         Ok(env::join_paths(iter::once(new_path.to_owned()).chain(old))?)
     } else {
