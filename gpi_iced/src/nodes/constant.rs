@@ -6,12 +6,14 @@ use iced::{
     Length::Fill,
 };
 
+use super::RustNode;
+
 pub fn view<'a>(id: u32, value: f64) -> Element<'a, Message> {
     container(
         column![
             text(format!("{value:.1}")),
             slider(0.1..=20., value, move |value| {
-                Message::UpdateNodeTemplate(id, NodeTemplate::Constant(value))
+                Message::UpdateNodeTemplate(id, NodeTemplate::RustNode(RustNode::Constant(value)))
             })
             .step(0.1)
             .width(Fill),

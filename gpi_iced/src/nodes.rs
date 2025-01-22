@@ -36,7 +36,7 @@ pub struct NodeData {
 }
 
 #[derive(Clone, Debug, EnumIter, VariantNames, Serialize, Deserialize)]
-pub enum NodeTemplate {
+pub enum RustNode {
     Identity,
     Constant(f64),
     Add,
@@ -51,6 +51,11 @@ pub enum NodeTemplate {
     Plot2D(Plot2D),
     Join,
     Reverse,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum NodeTemplate {
+    RustNode(RustNode),
     PyNode(PyNode),
 }
 
@@ -71,75 +76,80 @@ impl From<NodeTemplate> for NodeData {
 
 impl NodeData {
     fn fallible_compute(
-        &self,
+        &mut self,
         inputs: OrderMap<String, &std::cell::RefCell<PortData>>,
     ) -> Result<OrderMap<String, PortData>, NodeError> {
-        Ok(match &self.template {
-            NodeTemplate::Identity => [(
-                "out".to_string(),
-                inputs
-                    .get("a")
-                    .ok_or(NodeError::Input("input 'a' not found".to_string()))?
-                    .borrow()
-                    .clone(),
-            )]
-            .into(),
-            NodeTemplate::Constant(value) => {
-                [("out".to_string(), PortData::Real(vec![*value].into()))].into()
-            }
-            NodeTemplate::Add => binary_operation(inputs, Box::new(|a, b| a + b))?,
-            NodeTemplate::Subtract => binary_operation(inputs, Box::new(|a, b| a - b))?,
-            NodeTemplate::Multiply => binary_operation(inputs, Box::new(|a, b| a * b))?,
-            NodeTemplate::Divide => binary_operation(inputs, Box::new(|a, b| a / b))?,
-            NodeTemplate::Join => binary_operation(
-                inputs,
-                Box::new(|a, b| a.iter().chain(b).copied().collect()),
-            )?,
-            NodeTemplate::Reverse => {
-                unary_operation(inputs, Box::new(|a| a.iter().rev().copied().collect()))?
-            }
-            NodeTemplate::Cos => unary_operation(inputs, Box::new(|a| a.cos()))?,
-            NodeTemplate::Sin => unary_operation(inputs, Box::new(|a| a.sin()))?,
-            NodeTemplate::Sinc => unary_operation(
-                inputs,
-                Box::new(|a| {
-                    a.map(|x| match x {
-                        0. => 1.,
-                        _ => x.sin() / x,
-                    })
-                }),
-            )?,
-            NodeTemplate::Linspace(linspace_config) => linspace_config.compute(inputs),
-            NodeTemplate::Plot(_) => [].into(),
-            NodeTemplate::Plot2D(_) => [].into(),
+        Ok(match &mut self.template {
+            NodeTemplate::RustNode(rust_node) => match rust_node {
+                RustNode::Identity => [(
+                    "out".to_string(),
+                    inputs
+                        .get("a")
+                        .ok_or(NodeError::Input("input 'a' not found".to_string()))?
+                        .borrow()
+                        .clone(),
+                )]
+                .into(),
+                RustNode::Constant(value) => {
+                    [("out".to_string(), PortData::Real(vec![*value].into()))].into()
+                }
+                RustNode::Add => binary_operation(inputs, Box::new(|a, b| a + b))?,
+                RustNode::Subtract => binary_operation(inputs, Box::new(|a, b| a - b))?,
+                RustNode::Multiply => binary_operation(inputs, Box::new(|a, b| a * b))?,
+                RustNode::Divide => binary_operation(inputs, Box::new(|a, b| a / b))?,
+                RustNode::Join => binary_operation(
+                    inputs,
+                    Box::new(|a, b| a.iter().chain(b).copied().collect()),
+                )?,
+                RustNode::Reverse => {
+                    unary_operation(inputs, Box::new(|a| a.iter().rev().copied().collect()))?
+                }
+                RustNode::Cos => unary_operation(inputs, Box::new(|a| a.cos()))?,
+                RustNode::Sin => unary_operation(inputs, Box::new(|a| a.sin()))?,
+                RustNode::Sinc => unary_operation(
+                    inputs,
+                    Box::new(|a| {
+                        a.map(|x| match x {
+                            0. => 1.,
+                            _ => x.sin() / x,
+                        })
+                    }),
+                )?,
+                RustNode::Linspace(linspace_config) => linspace_config.compute(inputs),
+                RustNode::Plot(_) => [].into(),
+                RustNode::Plot2D(plot_2d) => plot_2d.input_changed(inputs),
+            },
+
             NodeTemplate::PyNode(py_node) => py_node.compute(inputs)?,
         })
     }
 
     pub fn available_nodes() -> Vec<NodeData> {
-        let nodes = NodeTemplate::iter()
-            .flat_map(|template| template.template_variants())
+        let nodes = RustNode::iter()
+            .map(|template| template.template_variants())
+            .chain(PyNode::template_variants())
             .collect();
+
         trace!("loading available nodes:\n{:?}", nodes);
         nodes
     }
 }
-impl NodeTemplate {
+impl RustNode {
     /// A node can produce any number of "templates" which will be used to populate the
     /// list of selectable new nodes that can be created.
     /// Notably, PyNode will produce a dynamic number of nodes,
     /// depending on what nodes are found in the filesystem at runtime.
-    pub fn template_variants(&self) -> Vec<NodeData> {
-        match &self {
-            NodeTemplate::PyNode(_) => {
-                let py_nodes = load_node_names();
-                py_nodes
-                    .into_iter()
-                    .map(|name| NodeTemplate::PyNode(PyNode::new(&name)).into())
-                    .collect()
-            }
-            _ => vec![self.clone().into()],
-        }
+    pub fn template_variants(&self) -> NodeData {
+        NodeTemplate::RustNode(self.clone()).into()
+    }
+}
+impl PyNode {
+    pub fn template_variants() -> Vec<NodeData> {
+        let py_nodes = load_node_names();
+        py_nodes
+            .into_iter()
+            .map(|name| NodeTemplate::PyNode(PyNode::new(&name)).into())
+            .collect()
     }
 }
 
@@ -153,24 +163,26 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
         let unary_in = [("a".to_string(), PortType::Real)].into();
 
         match &self.template {
-            NodeTemplate::Identity => [("a".to_string(), PortType::Real)].into(),
-            NodeTemplate::Constant(_constant_node) => [].into(),
-            NodeTemplate::Add => binary_in,
-            NodeTemplate::Subtract => binary_in,
-            NodeTemplate::Multiply => binary_in,
-            NodeTemplate::Divide => binary_in,
-            NodeTemplate::Join => binary_in,
-            NodeTemplate::Reverse => unary_in,
-            NodeTemplate::Cos => unary_in,
-            NodeTemplate::Sin => unary_in,
-            NodeTemplate::Sinc => unary_in,
-            NodeTemplate::Linspace(_) => [].into(),
-            NodeTemplate::Plot(_) => [
-                ("x".to_string(), PortType::Real),
-                ("y".to_string(), PortType::Real),
-            ]
-            .into(),
-            NodeTemplate::Plot2D(_) => [("a".to_string(), PortType::Real2d)].into(),
+            NodeTemplate::RustNode(rn) => match rn {
+                RustNode::Identity => [("a".to_string(), PortType::Real)].into(),
+                RustNode::Constant(_constant_node) => [].into(),
+                RustNode::Add => binary_in,
+                RustNode::Subtract => binary_in,
+                RustNode::Multiply => binary_in,
+                RustNode::Divide => binary_in,
+                RustNode::Join => binary_in,
+                RustNode::Reverse => unary_in,
+                RustNode::Cos => unary_in,
+                RustNode::Sin => unary_in,
+                RustNode::Sinc => unary_in,
+                RustNode::Linspace(_) => [].into(),
+                RustNode::Plot(_) => [
+                    ("x".to_string(), PortType::Real),
+                    ("y".to_string(), PortType::Real),
+                ]
+                .into(),
+                RustNode::Plot2D(_) => [("a".to_string(), PortType::Real2d)].into(),
+            },
             NodeTemplate::PyNode(py_node) => py_node.ports.clone().unwrap_or_default().inputs,
         }
     }
@@ -178,26 +190,28 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
     fn outputs(&self) -> OrderMap<String, PortType> {
         let real_out = [("out".to_string(), PortType::Real)].into();
         match &self.template {
-            NodeTemplate::Identity => real_out,
-            NodeTemplate::Constant(_constant_node) => real_out,
-            NodeTemplate::Add => real_out,
-            NodeTemplate::Subtract => real_out,
-            NodeTemplate::Multiply => real_out,
-            NodeTemplate::Divide => real_out,
-            NodeTemplate::Join => real_out,
-            NodeTemplate::Reverse => real_out,
-            NodeTemplate::Cos => real_out,
-            NodeTemplate::Sin => real_out,
-            NodeTemplate::Sinc => real_out,
-            NodeTemplate::Linspace(_) => real_out,
-            NodeTemplate::Plot(_) => [].into(),
-            NodeTemplate::Plot2D(_) => [].into(),
+            NodeTemplate::RustNode(rn) => match rn {
+                RustNode::Identity => real_out,
+                RustNode::Constant(_constant_node) => real_out,
+                RustNode::Add => real_out,
+                RustNode::Subtract => real_out,
+                RustNode::Multiply => real_out,
+                RustNode::Divide => real_out,
+                RustNode::Join => real_out,
+                RustNode::Reverse => real_out,
+                RustNode::Cos => real_out,
+                RustNode::Sin => real_out,
+                RustNode::Sinc => real_out,
+                RustNode::Linspace(_) => real_out,
+                RustNode::Plot(_) => [].into(),
+                RustNode::Plot2D(_) => [].into(),
+            },
             NodeTemplate::PyNode(py_node) => py_node.ports.clone().unwrap_or_default().outputs,
         }
     }
 
     fn compute(
-        self,
+        mut self,
         inputs: OrderMap<String, &std::cell::RefCell<PortData>>,
     ) -> (OrderMap<String, PortData>, Self) {
         let start = Instant::now();
@@ -232,20 +246,22 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
 impl GUINode for NodeTemplate {
     fn name(&self) -> String {
         match &self {
-            NodeTemplate::Identity => "Identity".to_string(),
-            NodeTemplate::Constant(_value) => "Constant".to_string(),
-            NodeTemplate::Add => "Add".to_string(),
-            NodeTemplate::Subtract => "Subtract".to_string(),
-            NodeTemplate::Multiply => "Multiply".to_string(),
-            NodeTemplate::Divide => "Divide".to_string(),
-            NodeTemplate::Join => "Join".to_string(),
-            NodeTemplate::Reverse => "Reverse".to_string(),
-            NodeTemplate::Cos => "cos".to_string(),
-            NodeTemplate::Sin => "sin".to_string(),
-            NodeTemplate::Sinc => "sinc".to_string(),
-            NodeTemplate::Linspace(_linspace_config) => "Linspace".to_string(),
-            NodeTemplate::Plot(_) => "Plot".to_string(),
-            NodeTemplate::Plot2D(_) => "Plot 2D".to_string(),
+            NodeTemplate::RustNode(rn) => match rn {
+                RustNode::Identity => "Identity".to_string(),
+                RustNode::Constant(_value) => "Constant".to_string(),
+                RustNode::Add => "Add".to_string(),
+                RustNode::Subtract => "Subtract".to_string(),
+                RustNode::Multiply => "Multiply".to_string(),
+                RustNode::Divide => "Divide".to_string(),
+                RustNode::Join => "Join".to_string(),
+                RustNode::Reverse => "Reverse".to_string(),
+                RustNode::Cos => "cos".to_string(),
+                RustNode::Sin => "sin".to_string(),
+                RustNode::Sinc => "sinc".to_string(),
+                RustNode::Linspace(_linspace_config) => "Linspace".to_string(),
+                RustNode::Plot(_) => "Plot".to_string(),
+                RustNode::Plot2D(_) => "Plot 2D".to_string(),
+            },
             NodeTemplate::PyNode(py_node) => {
                 py_node.path.file_stem().unwrap().to_string_lossy().into()
             }
@@ -273,21 +289,25 @@ impl GUINode for NodeTemplate {
         };
 
         match self {
-            NodeTemplate::Constant(value) => (dft, constant::view(id, *value)),
-            NodeTemplate::Linspace(linspace_config) => (dft, linspace_config.view(id)),
-            NodeTemplate::Plot(plot) => (dft * 2., plot.view(id, input_data)),
-            NodeTemplate::Plot2D(plot) => (
-                (dft.width * 2., dft.width * 2.).into(),
-                plot.view(id, input_data),
-            ),
-            NodeTemplate::Add => (dft, operation("+")),
-            NodeTemplate::Subtract => (dft, operation("−")),
-            NodeTemplate::Multiply => (dft, operation("×")),
-            NodeTemplate::Divide => (dft, operation("÷")),
-            NodeTemplate::Cos => (dft, trig("cos(α)")),
-            NodeTemplate::Sin => (dft, trig("sin(α)")),
-            NodeTemplate::Sinc => (dft, trig("sinc(α)")),
-            _ => (dft, text(self.name()).into()),
+            NodeTemplate::RustNode(rn) => match rn {
+                RustNode::Constant(value) => (dft, constant::view(id, *value)),
+                RustNode::Linspace(linspace_config) => (dft, linspace_config.view(id)),
+                RustNode::Plot(plot) => (dft * 2., plot.view(id, input_data)),
+                RustNode::Plot2D(plot) => (
+                    (dft.width * 2., dft.width * 2.).into(),
+                    plot.view(id, input_data),
+                ),
+                RustNode::Add => (dft, operation("+")),
+                RustNode::Subtract => (dft, operation("−")),
+                RustNode::Multiply => (dft, operation("×")),
+                RustNode::Divide => (dft, operation("÷")),
+                RustNode::Cos => (dft, trig("cos(α)")),
+                RustNode::Sin => (dft, trig("sin(α)")),
+                RustNode::Sinc => (dft, trig("sinc(α)")),
+
+                _ => (dft, text(self.name()).into()),
+            },
+            NodeTemplate::PyNode(_) => (dft, text(self.name()).into()),
         }
     }
 
@@ -297,8 +317,11 @@ impl GUINode for NodeTemplate {
         input_data: OrderMap<String, &std::cell::RefCell<PortData>>,
     ) -> Option<iced::Element<'a, Message>> {
         match &self {
-            NodeTemplate::Plot(plot) => plot.config_view(id, input_data),
-            NodeTemplate::Plot2D(plot) => plot.config_view(id, input_data),
+            NodeTemplate::RustNode(rn) => match rn {
+                RustNode::Plot(plot) => plot.config_view(id, input_data),
+                RustNode::Plot2D(plot) => plot.config_view(id, input_data),
+                _ => None,
+            },
             _ => None,
         }
     }
@@ -306,7 +329,8 @@ impl GUINode for NodeTemplate {
 
 fn load_node_names() -> Vec<String> {
     use glob::glob;
-    glob("[!.]*/*.py")
+
+    glob(&(env!("CARGO_MANIFEST_DIR").to_string() + "/nodes/*.py"))
         .expect("valid glob")
         .filter_map(Result::ok)
         .filter_map(|entry| {

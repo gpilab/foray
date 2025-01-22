@@ -8,6 +8,7 @@ edition = "2021"
 iced = { version = "0.13.1", features = [
 	"debug",
 	"lazy",
+	"image",
 	"advanced",
 	"canvas",
 	"async-std",

@@ -1,5 +1,5 @@
 use super::PortData;
-use crate::nodes::NodeTemplate;
+use crate::nodes::{NodeTemplate, RustNode};
 use crate::OrderMap;
 use crate::{app::Message, math::linspace};
 use iced::{
@@ -82,10 +82,10 @@ impl LinspaceConfig {
             move |value| {
                 Message::UpdateNodeTemplate(
                     id,
-                    NodeTemplate::Linspace(LinspaceConfig {
+                    NodeTemplate::RustNode(RustNode::Linspace(LinspaceConfig {
                         start: value.parse().unwrap_or(0.),
                         ..self.clone()
-                    }),
+                    })),
                 )
             },
         ));
@@ -93,10 +93,10 @@ impl LinspaceConfig {
             move |value| {
                 Message::UpdateNodeTemplate(
                     id,
-                    NodeTemplate::Linspace(LinspaceConfig {
+                    NodeTemplate::RustNode(RustNode::Linspace(LinspaceConfig {
                         stop: value.parse().unwrap_or(0.),
                         ..self.clone()
-                    }),
+                    })),
                 )
             },
         ));
@@ -104,10 +104,10 @@ impl LinspaceConfig {
             move |value| {
                 Message::UpdateNodeTemplate(
                     id,
-                    NodeTemplate::Linspace(LinspaceConfig {
+                    NodeTemplate::RustNode(RustNode::Linspace(LinspaceConfig {
                         num: value.parse().unwrap_or(0),
                         ..self.clone()
-                    }),
+                    })),
                 )
             },
         ));

@@ -16,4 +16,4 @@ def compute(input):
     # just take blue channel for simplicity
     np_img = np.array(img)[:, :, 0] / 255.0
 
-    return np_img.transpose()
+    return np_img

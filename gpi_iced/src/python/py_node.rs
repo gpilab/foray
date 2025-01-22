@@ -25,12 +25,6 @@ pub struct PyNode {
     pub ports: Result<PortDef, NodeError>,
 }
 
-impl Default for PyNode {
-    fn default() -> Self {
-        Self::new("null")
-    }
-}
-
 #[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq)]
 pub struct PortDef {
     pub inputs: OrderMap<String, PortType>,

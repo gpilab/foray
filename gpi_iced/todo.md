@@ -1,91 +1,72 @@
-
 # Window
 ## System Level
-- [*] undo/redo
+- [x] undo/redo
 
-- [-] save to file
-  - [-] load from file
+- [x] save to file
+  - [x] load from file
 
-- [-] hot reload nodes
-  - [-] visually notify node reloads
-  - [-] notify of node errors
+- [x] hot reload nodes
+  - [x] notify of node errors
     - [*] Actionable Error Messages. Not cryptic! Ideally point directly to what needs to change.
+    -  [ ]
 ## External Input
-- [-] Nodes that load data from file
+- [x] Nodes that load data from file
+  - [ ] run from gpi "headless" from cli
   - [*] Load data from cli arguments (How others will use your network. Shouldn't have to edit the network to point to new files)
 
-# Canvas
+# UI
  - [x] pan
-   - [-] kinetic pan
- - [-] zoom
-## Data generation
+   - [ ] kinetic pan
+ - [ ] zoom
+ - [ ] hotkeys
+ - [ ] copy/paste
+ - [ ] toggle auto reload
+ - [ ] visually notify node reloads
+
 
 ## Data manipulation
 - [x] execution
   - [*] async execution
-  - [!] parallel execution
-  - [-] pause execution
+  - [*] parallel execution
+  - [ ] pause execution
 
-- [-] load available nodes
-- [-] display available nodes
-- [-] create nodes
+- [x] load available nodes
+- [x] display available nodes
+- [x] create nodes
 
 - [x] render nodes
 
 - [x] select single node
-  - [-] select multiple nodes
+  - [ ] select multiple nodes
 
-- [-] render node types differently
+- [x] render node types differently
 
 - [x] wires
   - [x] create wires via click and drag
   - [x] indicate wires that will be deleted when a new wire replaces an old wire  
-- [-] multiple inputs/outputs
-  - [-] render input/output types differently
+- [x] multiple inputs/outputs
+  - [x] render input/output types differently
+  - [x] semantic color for data type 
+  - [ ]  and semantic shape for array shape/dimension
 
-- [-] restrict node connections to only valid ports
-  - [-] nd arrays of data on wires
+- [ ] restrict node connections to only valid ports
+  - [?] and convert arrays of data on wires
 
-- [-] display editable node config
+- [x] display editable node config
   - [*] Specify config UI from python
 
 
 ## On Canvas Ad-Hoc Visualization 
-- [-] efficient image display/manipulation
+- [x] efficient image display
+- [ ] image display manipulation
+  - [ ] floor window level contrast
+  - [ ] complex phase vis
+
+# C interface
+- [ ] compilation process
+
 
 # Primary Visualization/Output
 - [?] compose widgets from multiple nodes together
 
 
-# Active Item Notes
-## Network Execution
-1. load network
-2. topo sort. 
-3. execute top nodes
-4. trigger children
-
-
-## Node status
-- `inert`
-  - missing required inputs connections/config
-- `unprocessed`
-  - has connections, but parent output isn't populated yet
-  - could be run, but hasn't yet
-- `processing(start_time)`
-  - Executor is currently running
-- `complete(exec_time)`
-  - has output
-
-## Node exectution
-1. Nodes start at a status of `inert`
-2. If Node is `unprocessed`, continue executing
-  - if not, visually highlight what parts are missing
-  - in cli mode print a warning/error?
-3. Get Inputs (assert that inputs exist and are valid)
-4. (Async?) Submit inputs and config to Executor (python)
-  a. Start timer
-  b. Update node state to `processing`
-  c. handle errors
-5. receive output
-  a. stop timer
-  b. update node status to `complete`

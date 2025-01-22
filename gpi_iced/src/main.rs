@@ -1,5 +1,6 @@
 use gpi_iced::app::{subscriptions, theme, App};
 use iced::{application, Font};
+use pyo3::{types::PyAnyMethods, PyResult, Python};
 
 pub fn main() -> iced::Result {
     assert_environment();
@@ -11,12 +12,22 @@ pub fn main() -> iced::Result {
 
     pyo3::prepare_freethreaded_python();
 
+    // set python so that it closes the program when
+    // SIGINT (ctrl-c) is received
+    let _ = Python::with_gil(|py| -> PyResult<()> {
+        let signal = py.import("signal")?;
+        signal
+            .getattr("signal")?
+            .call1((signal.getattr("SIGINT")?, signal.getattr("SIG_DFL")?))?;
+        Ok(())
+    });
+
     application("gpi_v2", App::update, App::view)
         .subscription(subscriptions)
         .theme(theme)
         .window(iced::window::Settings {
             min_size: Some((400., 300.).into()),
-            //icon: Some(icon::from_rgba(vec![0u8; (32 * 32) * 4], 32, 32).unwrap()),
+            //icon: Some(iced::window::icon::from_rgba(vec![0u8; (32 * 32) * 4], 32, 32).unwrap()),
             ..Default::default()
         })
         .antialiasing(true)

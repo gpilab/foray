@@ -3,8 +3,6 @@ use crate::graph::{Graph, PortRef, IO};
 use crate::interface::theme_config::{AppThemeMessage, GuiColorMessage};
 use crate::interface::{side_bar::side_bar, SEPERATOR};
 use crate::math::{Point, Vector};
-use crate::nodes::linspace::LinspaceConfig;
-use crate::nodes::plot::Plot;
 use crate::nodes::port::PortData;
 use crate::nodes::port::PortType;
 use crate::nodes::{NodeData, NodeTemplate};
@@ -390,33 +388,9 @@ impl Default for App {
             }
             _ => {
                 println!("Failed to load file, loading defaults");
-                let mut g = Graph::<NodeData, PortType, PortData>::new();
+                let g = Graph::<NodeData, PortType, PortData>::new();
 
-                let l1 = g.node(NodeTemplate::Linspace(LinspaceConfig::default()).into());
-                let c1 = g.node(NodeTemplate::Constant(0.5).into());
-                let c2 = g.node(NodeTemplate::Constant(-2.).into());
-                let mult1 = g.node(NodeTemplate::Multiply.into());
-                let add1 = g.node(NodeTemplate::Add.into());
-                let plot1 = g.node(NodeTemplate::Plot(Plot::default()).into());
-                let identity = g.node(NodeTemplate::Identity.into());
-
-                g.connect((l1, "out"), (mult1, "a"));
-                g.connect((c1, "out"), (mult1, "b"));
-                g.connect((mult1, "out"), (add1, "a"));
-                g.connect((c2, "out"), (add1, "b"));
-                g.connect((l1, "out"), (plot1, "x"));
-                g.connect((add1, "out"), (plot1, "y"));
-                g.execute_network();
-
-                let shapes = [
-                    (l1, Point::new(100., 100.)),
-                    (c1, Point::new(250., 80.)),
-                    (c2, Point::new(400., 100.)),
-                    (mult1, Point::new(200., 200.)),
-                    (add1, Point::new(300., 300.)),
-                    (plot1, Point::new(200., 400.)),
-                    (identity, Point::new(100., 300.)),
-                ];
+                let shapes = [];
 
                 Self {
                     debug: false,
