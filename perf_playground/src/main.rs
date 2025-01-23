@@ -1,8 +1,12 @@
 use std::time::{self, Duration};
 
-use perf_playground::{test_fft, test_ndarray::run};
+use perf_playground::{
+    scheduler::{injector, schedule},
+    test_fft,
+    test_ndarray::run,
+};
 fn main() {
-    copy_bench();
+    injector()
 }
 
 fn fft_bench() {

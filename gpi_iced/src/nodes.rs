@@ -1,5 +1,7 @@
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+pub mod async_compute;
 pub mod constant;
 pub mod linspace;
 pub mod math_nodes;
@@ -77,7 +79,7 @@ impl From<NodeTemplate> for NodeData {
 impl NodeData {
     fn fallible_compute(
         &mut self,
-        inputs: OrderMap<String, &std::cell::RefCell<PortData>>,
+        inputs: OrderMap<String, &Mutex<PortData>>,
     ) -> Result<OrderMap<String, PortData>, NodeError> {
         Ok(match &mut self.template {
             NodeTemplate::RustNode(rust_node) => match rust_node {
@@ -86,7 +88,8 @@ impl NodeData {
                     inputs
                         .get("a")
                         .ok_or(NodeError::Input("input 'a' not found".to_string()))?
-                        .borrow()
+                        .lock()
+                        .unwrap()
                         .clone(),
                 )]
                 .into(),
@@ -212,7 +215,7 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
 
     fn compute(
         mut self,
-        inputs: OrderMap<String, &std::cell::RefCell<PortData>>,
+        inputs: OrderMap<String, &Mutex<PortData>>,
     ) -> (OrderMap<String, PortData>, Self) {
         let start = Instant::now();
 
@@ -271,7 +274,7 @@ impl GUINode for NodeTemplate {
     fn view<'a>(
         &'a self,
         id: u32,
-        input_data: OrderMap<String, &std::cell::RefCell<PortData>>,
+        input_data: OrderMap<String, &Mutex<PortData>>,
     ) -> (iced::Size, iced::Element<'a, Message>) {
         let dft = default_node_size();
 
@@ -314,7 +317,7 @@ impl GUINode for NodeTemplate {
     fn config_view<'a>(
         &'a self,
         id: u32,
-        input_data: OrderMap<String, &std::cell::RefCell<PortData>>,
+        input_data: OrderMap<String, &Mutex<PortData>>,
     ) -> Option<iced::Element<'a, Message>> {
         match &self {
             NodeTemplate::RustNode(rn) => match rn {

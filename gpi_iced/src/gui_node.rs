@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::sync::Mutex;
 
 use iced::{widget::text, Element};
 
@@ -17,7 +17,7 @@ pub trait GUINode: derive_more::Debug {
     fn view<'a>(
         &'a self,
         _id: u32,
-        _input_data: OrderMap<String, &RefCell<PortData>>,
+        _input_data: OrderMap<String, &Mutex<PortData>>,
     ) -> (iced::Size, Element<'a, Message>) {
         (default_node_size(), text("default").into())
     }
@@ -25,7 +25,7 @@ pub trait GUINode: derive_more::Debug {
     fn config_view<'a>(
         &'a self,
         _id: u32,
-        _input_data: OrderMap<String, &RefCell<PortData>>,
+        _input_data: OrderMap<String, &Mutex<PortData>>,
     ) -> Option<Element<'a, Message>> {
         None
     }

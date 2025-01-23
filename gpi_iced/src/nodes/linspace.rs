@@ -11,7 +11,7 @@ use iced::{
     Length::{Fill, Shrink},
 };
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
+use std::sync::Mutex;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LinspaceConfig {
@@ -37,7 +37,7 @@ impl LinspaceConfig {
 
     pub fn compute(
         &self,
-        _inputs: OrderMap<String, &RefCell<PortData>>,
+        _inputs: OrderMap<String, &Mutex<PortData>>,
     ) -> OrderMap<String, PortData> {
         //node after potential modifications
         let LinspaceConfig { start, stop, num } = self;

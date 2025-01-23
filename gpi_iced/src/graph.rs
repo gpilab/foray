@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap};
+use std::{collections::HashMap, sync::Mutex};
 
 use serde::{Deserialize, Serialize};
 
@@ -12,7 +12,7 @@ where
     fn outputs(&self) -> OrderMap<String, PortType>;
     fn compute(
         self,
-        inputs: OrderMap<String, &RefCell<WireData>>,
+        inputs: OrderMap<String, &Mutex<WireData>>,
     ) -> (OrderMap<String, WireData>, Self);
 }
 
@@ -44,7 +44,7 @@ where
     nodes: crate::OrderMap<NodeIndex, NodeData>,
     edges: Vec<Edge>,
     #[serde(skip, default = "default_wire_data")]
-    wire_data: HashMap<(NodeIndex, PortName), RefCell<WireData>>,
+    wire_data: HashMap<(NodeIndex, PortName), Mutex<WireData>>,
     next_id: NodeIndex,
     #[serde(skip)]
     phantom: std::marker::PhantomData<PortType>,
@@ -111,7 +111,7 @@ where
     pub fn get_mut_node(&mut self, nx: NodeIndex) -> &mut NodeData {
         self.nodes.get_mut(&nx).unwrap()
     }
-    pub fn get_output_data(&self, nx: NodeIndex) -> OrderMap<String, Option<&RefCell<WireData>>> {
+    pub fn get_output_data(&self, nx: NodeIndex) -> OrderMap<String, Option<&Mutex<WireData>>> {
         self.get_node(nx)
             .outputs()
             .clone()
@@ -124,7 +124,7 @@ where
             })
             .collect()
     }
-    pub fn get_input_data(&self, nx: &NodeIndex) -> OrderMap<String, &RefCell<WireData>> {
+    pub fn get_input_data(&self, nx: &NodeIndex) -> OrderMap<String, &Mutex<WireData>> {
         self.get_node(*nx)
             .inputs()
             .keys()
@@ -158,7 +158,7 @@ where
         }
     }
 
-    pub fn get_wire_data(&self, nx: &NodeIndex, port_name: &str) -> Option<&RefCell<WireData>> {
+    pub fn get_wire_data(&self, nx: &NodeIndex, port_name: &str) -> Option<&Mutex<WireData>> {
         self.wire_data.get(&(*nx, port_name.into()))
     }
 
@@ -301,9 +301,28 @@ where
         let mut ordered = self.topological_sort();
         ordered.iter_mut().for_each(|nx| self.compute_node(nx))
     }
+    /// async compute
+    pub async fn execute_network_async(&mut self) {
+        self.wire_data.clear();
+        let mut ordered = self.topological_sort();
+        ordered.iter_mut().for_each(|nx| self.compute_node(nx))
+    }
 
     // perform computation by supplying inputs
-    fn compute_node(&mut self, nx: &NodeIndex) {
+    pub async fn clone_compute(
+        &self,
+        nx: NodeIndex,
+    ) -> Option<(OrderMap<String, WireData>, NodeData)> {
+        let node = self.get_node(nx).clone();
+        let inputs = self.get_input_data(&nx);
+        if inputs.len() == node.inputs().len() {
+            Some(node.compute(inputs))
+        } else {
+            None
+        }
+    }
+    // perform computation by supplying inputs
+    pub fn compute_node(&mut self, nx: &NodeIndex) {
         let node = self.get_mut_node(*nx).clone();
         let inputs = self.get_input_data(nx);
         if inputs.len() == node.inputs().len() {
@@ -333,6 +352,27 @@ where
     fn next_connected_edge(nx: &NodeIndex, edges: &[Edge]) -> Option<usize> {
         edges.iter().position(|(from, _to)| from.node == *nx)
     }
+
+    //pub(crate) fn get_compute(
+    //    &self,
+    //    nx: u32,
+    //) -> Option<
+    //    impl Fn(
+    //        indexmap::IndexMap<String, &Mutex<WireData>>,
+    //    ) -> (indexmap::IndexMap<String, WireData>, NodeData),
+    //> {
+    //    let node = self.get_node(nx).clone();
+    //    let inputs = self.get_input_data(&nx);
+    //    //let inputs = inputs.into_iter().map(|(a, b)| (a, (*b).()));
+    //    if inputs.len() == node.inputs().len() {
+    //        Some(move |inputs| {
+    //            let (new_node, output) = node.clone().compute(inputs);
+    //            (new_node, output)
+    //        })
+    //    } else {
+    //        None
+    //    }
+    //}
 }
 
 impl<NodeData, PortType, WireData> Default for Graph<NodeData, PortType, WireData>
@@ -378,10 +418,12 @@ mod test {
             }
         }
 
-        fn compute(self, inputs: OrderMap<String, &RefCell<u32>>) -> (OrderMap<String, u32>, Self) {
+        fn compute(self, inputs: OrderMap<String, &Mutex<u32>>) -> (OrderMap<String, u32>, Self) {
             (
                 match &self {
-                    Node::Identity(_node) => [("out".to_string(), *inputs["in"].borrow())].into(),
+                    Node::Identity(_node) => {
+                        [("out".to_string(), *inputs["in"].lock().unwrap())].into()
+                    }
                     Node::Constant(node) => [("out".to_string(), node.value)].into(),
                 },
                 self,
@@ -431,10 +473,10 @@ mod test {
         //Propogate values
         g.execute_network();
 
-        assert_eq!(g.get_wire_data(&n1, "out"), Some(RefCell::new(7)).as_ref());
-        assert_eq!(g.get_wire_data(&n2, "out"), Some(RefCell::new(7)).as_ref());
-        assert_eq!(g.get_wire_data(&n3, "out"), Some(RefCell::new(7)).as_ref());
-        assert_eq!(g.get_wire_data(&n_unconnected, "out"), None);
+        assert_eq!(*g.get_wire_data(&n1, "out").unwrap().lock().unwrap(), 7);
+        assert_eq!(*g.get_wire_data(&n2, "out").unwrap().lock().unwrap(), 7);
+        assert_eq!(*g.get_wire_data(&n3, "out").unwrap().lock().unwrap(), 7);
+        assert!(g.get_wire_data(&n_unconnected, "out").is_none());
     }
 }
 //#[test]

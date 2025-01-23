@@ -21,6 +21,7 @@ use iced::{Subscription, Task};
 use log::warn;
 use serde::{Deserialize, Serialize};
 use std::fs::read_to_string;
+use std::sync::Mutex;
 
 #[derive(Default, Clone)]
 pub enum Action {
@@ -35,6 +36,7 @@ type UndoStash = Vec<(
     Graph<NodeData, PortType, PortData>,
     OrderMap<ShapeId, Point>,
 )>;
+pub type PortDataContainer = Mutex<PortData>;
 
 #[derive(Serialize, Deserialize)]
 pub struct App {
@@ -77,6 +79,7 @@ pub enum Message {
     UpdateNodeTemplate(u32, NodeTemplate),
     AddNode(NodeTemplate),
     DeleteNode(u32),
+    ComputeComplete(Option<(OrderMap<String, PortData>, NodeData)>),
 
     //// Application
     Config(f32),
@@ -165,6 +168,12 @@ impl App {
                 self.selected_shape = maybe_id;
                 if let Some(shape_id) = maybe_id {
                     self.graph.exectute_sub_network(shape_id);
+                    //TODO: async graph execute
+                    ////let graph = self.graph.clone();
+                    //if let Some(compute) = self.graph.get_compute(shape_id) {
+                    //    return Task::perform(compute, Message::ComputeComplete);
+                    //}
+                    //return Task::perform(self.graph.execute_network_async(), Message::Config(10.));
                 }
             }
 
@@ -241,6 +250,7 @@ impl App {
                     self.graph.execute_network();
                 }
             }
+            Message::ComputeComplete(_) => todo!(),
         };
         Task::none()
     }

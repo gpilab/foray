@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
     str::FromStr,
+    sync::Mutex,
 };
 
 use derive_more::derive::Debug;
@@ -10,11 +11,14 @@ use pyo3::{types::PyAnyMethods, FromPyObject, PyObject, Python};
 use serde::{Deserialize, Serialize};
 use strum::VariantNames;
 
-use crate::nodes::{
-    port::{PortData, PortType},
-    status::NodeError,
-};
 use crate::OrderMap;
+use crate::{
+    app::PortDataContainer,
+    nodes::{
+        port::{PortData, PortType},
+        status::NodeError,
+    },
+};
 
 use super::{gpipy_compute, gpipy_config};
 
@@ -49,15 +53,13 @@ impl PyNode {
 
     pub fn compute(
         &self,
-        //populated_inputs: OrderMap<String, PortData>,
-        inputs: OrderMap<String, &std::cell::RefCell<PortData>>,
+        inputs: OrderMap<String, &PortDataContainer>,
     ) -> Result<OrderMap<String, PortData>, NodeError> {
         // convert inputs to python arrays/objects
-
         Python::with_gil(|py| {
             let py_inputs = inputs
                 .into_iter()
-                .map(|(k, v)| (k.clone(), v.borrow().to_py(py)))
+                .map(|(k, v)| (k.clone(), v.lock().unwrap().to_py(py)))
                 .collect();
             let out = gpipy_compute(
                 self.path.file_stem().unwrap().to_str().unwrap(),

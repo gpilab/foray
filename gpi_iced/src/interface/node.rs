@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::sync::Mutex;
 
 use crate::app::{App, Message};
 use crate::graph::{GraphNode, PortRef, IO};
@@ -164,13 +164,13 @@ impl App {
 }
 
 pub fn format_node_output<'a>(
-    data: &OrderMap<String, Option<&RefCell<PortData>>>,
+    data: &OrderMap<String, Option<&Mutex<PortData>>>,
 ) -> Element<'a, Message> {
     //TODO: clean this up by iterating straight to text elements?
     let node_output = data.into_iter().map(|(port_name, d)| {
         (
             port_name.to_string(),
-            d.map(|d| format!("{}", d.borrow()))
+            d.map(|d| format!("{}", d.lock().unwrap()))
                 .unwrap_or("n/a".to_string()),
         )
     });

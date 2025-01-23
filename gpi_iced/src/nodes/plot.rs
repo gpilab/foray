@@ -14,7 +14,7 @@ use iced::{
 };
 use iced::{Rectangle, Renderer, Theme};
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
+use std::sync::Mutex;
 
 // Rectanlge specified by center position, width and height
 // y is up
@@ -57,13 +57,14 @@ impl Plot {
     pub fn view<'a>(
         &self,
         _id: u32,
-        input_data: OrderMap<String, &RefCell<PortData>>,
+        input_data: OrderMap<String, &Mutex<PortData>>,
     ) -> Element<'a, Message> {
         let (x, y) =
             if let (Some(x_port), Some(y_port)) = (input_data.get("x"), input_data.get("y")) {
-                if let (PortData::Real(x), PortData::Real(y)) =
-                    (x_port.borrow().clone(), y_port.borrow().clone())
-                {
+                if let (PortData::Real(x), PortData::Real(y)) = (
+                    x_port.lock().unwrap().clone(),
+                    y_port.lock().unwrap().clone(),
+                ) {
                     (
                         x.to_vec().into_iter().map(|f| f as f32).collect(),
                         y.to_vec().into_iter().map(|f| f as f32).collect(),
@@ -90,7 +91,7 @@ impl Plot {
     pub fn config_view<'a>(
         &'a self,
         id: u32,
-        _input_data: OrderMap<String, &RefCell<PortData>>,
+        _input_data: OrderMap<String, &Mutex<PortData>>,
     ) -> Option<Element<'a, Message>> {
         let center = self.rect.center;
         let width = self.rect.width;

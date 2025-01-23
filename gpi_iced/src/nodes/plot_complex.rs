@@ -11,6 +11,7 @@ use iced::{widget::column, Element};
 use ndarray::Array2;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
+use std::sync::Mutex;
 
 // Rectanlge specified by center position, width and height
 // y is up
@@ -55,7 +56,7 @@ impl Plot2D {
     pub fn view<'a>(
         &self,
         _id: u32,
-        _input_data: OrderMap<String, &RefCell<PortData>>,
+        _input_data: OrderMap<String, &Mutex<PortData>>,
     ) -> Element<'a, Message> {
         match &self.image_handle {
             Some(handle) => container(
@@ -73,7 +74,7 @@ impl Plot2D {
     pub fn config_view<'a>(
         &'a self,
         id: u32,
-        _input_data: OrderMap<String, &RefCell<PortData>>,
+        _input_data: OrderMap<String, &Mutex<PortData>>,
     ) -> Option<Element<'a, Message>> {
         let center = self.rect.center;
         let width = self.rect.width;
@@ -157,10 +158,10 @@ impl Plot2D {
 
     pub(crate) fn input_changed(
         &mut self,
-        input_data: OrderMap<String, &RefCell<PortData>>,
+        input_data: OrderMap<String, &Mutex<PortData>>,
     ) -> indexmap::IndexMap<String, PortData> {
         let data = if let Some(port) = input_data.get("a") {
-            match port.borrow().clone() {
+            match port.lock().unwrap().clone() {
                 PortData::Real2d(a) => a,
                 PortData::Complex2d(a) => Array2::<f64>::from_shape_vec(
                     (a.len().isqrt(), a.len().isqrt()),
