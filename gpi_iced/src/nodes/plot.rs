@@ -1,5 +1,5 @@
 use super::{PortData, RustNode};
-use crate::app::Message;
+use crate::app::{Message, PortDataContainer};
 use crate::interface::node::{INNER_NODE_HEIGHT, INNER_NODE_WIDTH, NODE_BORDER_WIDTH};
 use crate::math::{linspace_delta, Vector};
 use crate::nodes::NodeTemplate;
@@ -14,7 +14,6 @@ use iced::{
 };
 use iced::{Rectangle, Renderer, Theme};
 use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
 
 // Rectanlge specified by center position, width and height
 // y is up
@@ -57,7 +56,7 @@ impl Plot {
     pub fn view<'a>(
         &self,
         _id: u32,
-        input_data: OrderMap<String, &Mutex<PortData>>,
+        input_data: OrderMap<String, &PortDataContainer>,
     ) -> Element<'a, Message> {
         let (x, y) =
             if let (Some(x_port), Some(y_port)) = (input_data.get("x"), input_data.get("y")) {
@@ -91,7 +90,7 @@ impl Plot {
     pub fn config_view<'a>(
         &'a self,
         id: u32,
-        _input_data: OrderMap<String, &Mutex<PortData>>,
+        _input_data: OrderMap<String, &PortDataContainer>,
     ) -> Option<Element<'a, Message>> {
         let center = self.rect.center;
         let width = self.rect.width;

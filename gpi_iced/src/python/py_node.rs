@@ -2,7 +2,6 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
     str::FromStr,
-    sync::Mutex,
 };
 
 use derive_more::derive::Debug;
@@ -53,7 +52,7 @@ impl PyNode {
 
     pub fn compute(
         &self,
-        inputs: OrderMap<String, &PortDataContainer>,
+        inputs: OrderMap<String, PortDataContainer>,
     ) -> Result<OrderMap<String, PortData>, NodeError> {
         // convert inputs to python arrays/objects
         Python::with_gil(|py| {

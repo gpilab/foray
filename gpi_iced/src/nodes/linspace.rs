@@ -1,4 +1,5 @@
 use super::PortData;
+use crate::app::PortDataContainer;
 use crate::nodes::{NodeTemplate, RustNode};
 use crate::OrderMap;
 use crate::{app::Message, math::linspace};
@@ -11,7 +12,6 @@ use iced::{
     Length::{Fill, Shrink},
 };
 use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LinspaceConfig {
@@ -37,7 +37,7 @@ impl LinspaceConfig {
 
     pub fn compute(
         &self,
-        _inputs: OrderMap<String, &Mutex<PortData>>,
+        _inputs: OrderMap<String, PortDataContainer>,
     ) -> OrderMap<String, PortData> {
         //node after potential modifications
         let LinspaceConfig { start, stop, num } = self;

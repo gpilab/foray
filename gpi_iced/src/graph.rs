@@ -1,8 +1,13 @@
-use std::{collections::HashMap, sync::Mutex};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use serde::{Deserialize, Serialize};
 
-use crate::OrderMap;
+use crate::{nodes::status::NodeError, OrderMap};
+
+type WireDataContainer<T> = Arc<Mutex<T>>;
 
 pub trait GraphNode<NodeData, PortType, WireData>
 where
@@ -12,8 +17,8 @@ where
     fn outputs(&self) -> OrderMap<String, PortType>;
     fn compute(
         self,
-        inputs: OrderMap<String, &Mutex<WireData>>,
-    ) -> (OrderMap<String, WireData>, Self);
+        inputs: OrderMap<String, WireDataContainer<WireData>>,
+    ) -> Result<OrderMap<String, WireData>, NodeError>;
 }
 
 type PortName = String;
@@ -44,7 +49,7 @@ where
     nodes: crate::OrderMap<NodeIndex, NodeData>,
     edges: Vec<Edge>,
     #[serde(skip, default = "default_wire_data")]
-    wire_data: HashMap<(NodeIndex, PortName), Mutex<WireData>>,
+    wire_data: HashMap<(NodeIndex, PortName), WireDataContainer<WireData>>,
     next_id: NodeIndex,
     #[serde(skip)]
     phantom: std::marker::PhantomData<PortType>,
@@ -111,7 +116,10 @@ where
     pub fn get_mut_node(&mut self, nx: NodeIndex) -> &mut NodeData {
         self.nodes.get_mut(&nx).unwrap()
     }
-    pub fn get_output_data(&self, nx: NodeIndex) -> OrderMap<String, Option<&Mutex<WireData>>> {
+    pub fn get_output_data(
+        &self,
+        nx: NodeIndex,
+    ) -> OrderMap<String, Option<&WireDataContainer<WireData>>> {
         self.get_node(nx)
             .outputs()
             .clone()
@@ -124,7 +132,7 @@ where
             })
             .collect()
     }
-    pub fn get_input_data(&self, nx: &NodeIndex) -> OrderMap<String, &Mutex<WireData>> {
+    pub fn get_input_data(&self, nx: &NodeIndex) -> OrderMap<String, &WireDataContainer<WireData>> {
         self.get_node(*nx)
             .inputs()
             .keys()
@@ -154,11 +162,16 @@ where
 
     pub fn update_wire_data(&mut self, nx: NodeIndex, outputs: OrderMap<PortName, WireData>) {
         for (port_name, wire_data) in outputs.into_iter() {
-            self.wire_data.insert((nx, port_name), wire_data.into());
+            self.wire_data
+                .insert((nx, port_name), Arc::new(wire_data.into()));
         }
     }
 
-    pub fn get_wire_data(&self, nx: &NodeIndex, port_name: &str) -> Option<&Mutex<WireData>> {
+    pub fn get_wire_data(
+        &self,
+        nx: &NodeIndex,
+        port_name: &str,
+    ) -> Option<&WireDataContainer<WireData>> {
         self.wire_data.get(&(*nx, port_name.into()))
     }
 
@@ -282,55 +295,57 @@ where
         }
     }
 
-    /// Execute network using topological sort, starting from `start`
-    /// and only processing decendents
-    /// Caller is responsible for handling errors that occur during computation
-    pub fn exectute_sub_network(&mut self, start: NodeIndex) {
-        let nodes: Vec<_> = self
-            .topological_sort()
-            .into_iter()
-            .filter(|&nx| self.is_self_or_dependent(start, nx))
-            .collect();
-        nodes.iter().for_each(|nx| self.compute_node(nx))
-    }
-
-    /// Execute network using topological sort
-    /// Caller is responsible for handling errors that occur during computation
-    pub fn execute_network(&mut self) {
-        self.wire_data.clear();
-        let mut ordered = self.topological_sort();
-        ordered.iter_mut().for_each(|nx| self.compute_node(nx))
-    }
+    ///// Execute network using topological sort, starting from `start`
+    ///// and only processing decendents
+    ///// Caller is responsible for handling errors that occur during computation
+    //pub fn exectute_sub_network(&mut self, start: NodeIndex) {
+    //    let nodes: Vec<_> = self
+    //        .topological_sort()
+    //        .into_iter()
+    //        .filter(|&nx| self.is_self_or_dependent(start, nx))
+    //        .collect();
+    //    nodes.iter().for_each(|nx| self.compute_node(nx))
+    //}
+    //
+    ///// Execute network using topological sort
+    ///// Caller is responsible for handling errors that occur during computation
+    //pub fn execute_network(&mut self) {
+    //    self.wire_data.clear();
+    //    let mut ordered = self.topological_sort();
+    //    ordered.iter_mut().for_each(|nx| self.compute_node(nx))
+    //}
     /// async compute
-    pub async fn execute_network_async(&mut self) {
-        self.wire_data.clear();
-        let mut ordered = self.topological_sort();
-        ordered.iter_mut().for_each(|nx| self.compute_node(nx))
-    }
+    //pub async fn execute_network_async(&mut self) {
+    //    self.wire_data.clear();
+    //    let mut ordered = self.topological_sort();
+    //    ordered.iter_mut().for_each(|nx| self.compute_node(nx))
+    //}
 
     // perform computation by supplying inputs
-    pub async fn clone_compute(
-        &self,
-        nx: NodeIndex,
-    ) -> Option<(OrderMap<String, WireData>, NodeData)> {
-        let node = self.get_node(nx).clone();
-        let inputs = self.get_input_data(&nx);
-        if inputs.len() == node.inputs().len() {
-            Some(node.compute(inputs))
-        } else {
-            None
-        }
-    }
+    //pub async fn clone_compute(
+    //    &self,
+    //    nx: NodeIndex,
+    //) -> Option<(OrderMap<String, WireData>, NodeData)> {
+    //    let node = self.get_node(nx).clone();
+    //    let inputs = self.get_input_data(&nx);
+    //    if inputs.len() == node.inputs().len() {
+    //        Some(node.compute(inputs.into_iter().map(|(k, v)| (k, v.clone())).collect()))
+    //    } else {
+    //        None
+    //    }
+    //}
+    //
     // perform computation by supplying inputs
-    pub fn compute_node(&mut self, nx: &NodeIndex) {
-        let node = self.get_mut_node(*nx).clone();
-        let inputs = self.get_input_data(nx);
-        if inputs.len() == node.inputs().len() {
-            let (outputs, node) = node.compute(inputs);
-            self.set_node_data(*nx, node);
-            self.update_wire_data(*nx, outputs);
-        }
-    }
+    //pub fn compute_node(&mut self, nx: &NodeIndex) {
+    //    let node = self.get_mut_node(*nx).clone();
+    //    let inputs = self.get_input_data(nx);
+    //    if inputs.len() == node.inputs().len() {
+    //        let (outputs, node) =
+    //            node.compute(inputs.into_iter().map(|(k, v)| (k, v.clone())).collect());
+    //        self.set_node_data(*nx, node);
+    //        self.update_wire_data(*nx, outputs);
+    //    }
+    //}
 
     fn is_self_or_dependent(&self, root: NodeIndex, to_check: NodeIndex) -> bool {
         if root == to_check {
@@ -356,23 +371,38 @@ where
     //pub(crate) fn get_compute(
     //    &self,
     //    nx: u32,
-    //) -> Option<
-    //    impl Fn(
-    //        indexmap::IndexMap<String, &Mutex<WireData>>,
-    //    ) -> (indexmap::IndexMap<String, WireData>, NodeData),
-    //> {
+    //) -> Option<impl AsyncFn() -> > {
     //    let node = self.get_node(nx).clone();
     //    let inputs = self.get_input_data(&nx);
-    //    //let inputs = inputs.into_iter().map(|(a, b)| (a, (*b).()));
+    //    let inputs: OrderMap<String, Arc<Mutex<WireData>>> =
+    //        inputs.into_iter().map(|(a, b)| (a, b.clone())).collect();
     //    if inputs.len() == node.inputs().len() {
-    //        Some(move |inputs| {
-    //            let (new_node, output) = node.clone().compute(inputs);
+    //        Some(async move || {
+    //            let (new_node, output) = node.compute(inputs);
     //            (new_node, output)
     //        })
     //    } else {
     //        None
     //    }
     //}
+    pub fn get_compute(
+        &self,
+        nx: NodeIndex,
+    ) -> (NodeData, OrderMap<String, WireDataContainer<WireData>>) {
+        let node = self.get_node(nx);
+        let inputs = self.get_input_data(&nx);
+        (
+            node.clone(),
+            inputs.into_iter().map(|(k, v)| (k, v.clone())).collect(),
+        )
+    }
+    pub async fn async_compute(
+        nx: NodeIndex,
+        node: NodeData,
+        inputs: indexmap::IndexMap<String, Arc<Mutex<WireData>>>,
+    ) -> (u32, Result<indexmap::IndexMap<String, WireData>, NodeError>) {
+        (nx, node.compute(inputs))
+    }
 }
 
 impl<NodeData, PortType, WireData> Default for Graph<NodeData, PortType, WireData>
@@ -418,16 +448,16 @@ mod test {
             }
         }
 
-        fn compute(self, inputs: OrderMap<String, &Mutex<u32>>) -> (OrderMap<String, u32>, Self) {
-            (
-                match &self {
-                    Node::Identity(_node) => {
-                        [("out".to_string(), *inputs["in"].lock().unwrap())].into()
-                    }
-                    Node::Constant(node) => [("out".to_string(), node.value)].into(),
-                },
-                self,
-            )
+        fn compute(
+            self,
+            inputs: OrderMap<String, WireDataContainer<u32>>,
+        ) -> Result<OrderMap<String, u32>, NodeError> {
+            Ok(match &self {
+                Node::Identity(_node) => {
+                    [("out".to_string(), *inputs["in"].lock().unwrap())].into()
+                }
+                Node::Constant(node) => [("out".to_string(), node.value)].into(),
+            })
         }
     }
 
@@ -471,7 +501,11 @@ mod test {
         g.connect((n3, "out"), (n4, "in"));
 
         //Propogate values
-        g.execute_network();
+        for nx in g.topological_sort() {
+            let (node, inputs) = g.get_compute(nx);
+            let output = node.compute(inputs).unwrap();
+            g.update_wire_data(nx, output);
+        }
 
         assert_eq!(*g.get_wire_data(&n1, "out").unwrap().lock().unwrap(), 7);
         assert_eq!(*g.get_wire_data(&n2, "out").unwrap().lock().unwrap(), 7);

@@ -1,12 +1,10 @@
-use std::sync::Mutex;
-
-use crate::app::{App, Message};
+use crate::app::{App, Message, PortDataContainer};
 use crate::graph::{GraphNode, PortRef, IO};
 use crate::gui_node::GUINode;
 use crate::math::Point;
 use crate::nodes::port::PortType;
+use crate::nodes::status::NodeStatus;
 use crate::nodes::NodeData;
-use crate::nodes::{port::PortData, status::NodeStatus};
 use crate::widget::custom_button;
 use crate::widget::node_container::NodeContainer;
 use crate::widget::pin::Pin;
@@ -59,6 +57,10 @@ impl App {
                 NodeStatus::Idle => match is_selected {
                     true => t.extended_palette().primary.strong.color,
                     false => t.extended_palette().secondary.strong.color,
+                },
+                NodeStatus::Running => match is_selected {
+                    true => t.extended_palette().primary.weak.color,
+                    false => t.extended_palette().secondary.weak.color,
                 },
                 NodeStatus::Error(_node_error) => match is_selected {
                     true => t.extended_palette().danger.base.color,
@@ -164,7 +166,7 @@ impl App {
 }
 
 pub fn format_node_output<'a>(
-    data: &OrderMap<String, Option<&Mutex<PortData>>>,
+    data: &OrderMap<String, Option<&PortDataContainer>>,
 ) -> Element<'a, Message> {
     //TODO: clean this up by iterating straight to text elements?
     let node_output = data.into_iter().map(|(port_name, d)| {

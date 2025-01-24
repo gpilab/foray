@@ -5,10 +5,11 @@ use std::error;
 
 use crate::SYMBOL_FONT;
 
-#[derive(Clone, Debug, Default, Display)]
+#[derive(Clone, Debug, Default, Display, PartialEq, Eq)]
 pub enum NodeStatus {
     #[default]
     Idle,
+    Running,
     Error(NodeError),
 }
 
@@ -16,6 +17,7 @@ impl NodeStatus {
     pub fn icon(&self) -> Text {
         match self {
             NodeStatus::Idle => text(""),
+            NodeStatus::Running => text(""),
             NodeStatus::Error(_) => text("").style(text::danger).font(SYMBOL_FONT),
         }
     }
@@ -23,13 +25,14 @@ impl NodeStatus {
     pub fn text_element(&self) -> Text {
         match self {
             NodeStatus::Idle => text(""),
+            NodeStatus::Running => text("running"),
             NodeStatus::Error(err) => text(err.to_string()).style(text::danger),
         }
     }
 }
 
 //TODO: Cleanup errors and make them more discrete where possible
-#[derive(Debug, Display, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Display, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub enum NodeError {
     Input(String),
     Output(String),

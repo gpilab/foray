@@ -1,8 +1,10 @@
-use std::sync::Mutex;
-
 use iced::{widget::text, Element};
 
-use crate::{app::Message, interface::node::default_node_size, nodes::port::PortData, OrderMap};
+use crate::{
+    app::{Message, PortDataContainer},
+    interface::node::default_node_size,
+    OrderMap,
+};
 
 pub trait GUINode: derive_more::Debug {
     //TODO make this more understandable. clearer distinction between graph and gui?
@@ -17,7 +19,7 @@ pub trait GUINode: derive_more::Debug {
     fn view<'a>(
         &'a self,
         _id: u32,
-        _input_data: OrderMap<String, &Mutex<PortData>>,
+        _input_data: OrderMap<String, &PortDataContainer>,
     ) -> (iced::Size, Element<'a, Message>) {
         (default_node_size(), text("default").into())
     }
@@ -25,7 +27,7 @@ pub trait GUINode: derive_more::Debug {
     fn config_view<'a>(
         &'a self,
         _id: u32,
-        _input_data: OrderMap<String, &Mutex<PortData>>,
+        _input_data: OrderMap<String, &PortDataContainer>,
     ) -> Option<Element<'a, Message>> {
         None
     }

@@ -5,12 +5,14 @@ use crate::interface::{side_bar::side_bar, SEPERATOR};
 use crate::math::{Point, Vector};
 use crate::nodes::port::PortData;
 use crate::nodes::port::PortType;
+use crate::nodes::status::{NodeError, NodeStatus};
 use crate::nodes::{NodeData, NodeTemplate};
 use crate::python::py_node::PyNode;
 use crate::style::theme::AppTheme;
 use crate::widget::shapes::ShapeId;
 use crate::widget::workspace::{self, workspace};
 use crate::OrderMap;
+
 use iced::advanced::graphics::core::Element;
 use iced::event::listen_with;
 use iced::keyboard::key::Named;
@@ -18,10 +20,11 @@ use iced::keyboard::{Key, Modifiers};
 use iced::widget::{column, *};
 use iced::Length::Fill;
 use iced::{Subscription, Task};
-use log::warn;
+use log::{trace, warn};
 use serde::{Deserialize, Serialize};
 use std::fs::read_to_string;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 #[derive(Default, Clone)]
 pub enum Action {
@@ -36,7 +39,8 @@ type UndoStash = Vec<(
     Graph<NodeData, PortType, PortData>,
     OrderMap<ShapeId, Point>,
 )>;
-pub type PortDataContainer = Mutex<PortData>;
+
+pub type PortDataContainer = Arc<Mutex<PortData>>;
 
 #[derive(Serialize, Deserialize)]
 pub struct App {
@@ -79,7 +83,8 @@ pub enum Message {
     UpdateNodeTemplate(u32, NodeTemplate),
     AddNode(NodeTemplate),
     DeleteNode(u32),
-    ComputeComplete(Option<(OrderMap<String, PortData>, NodeData)>),
+    QueueCompute(u32),
+    ComputeComplete(u32, Instant, Result<OrderMap<String, PortData>, NodeError>),
 
     //// Application
     Config(f32),
@@ -151,7 +156,7 @@ impl App {
                         self.stash_state();
                         self.graph.remove_edge(input);
                         self.graph.add_edge_from_ref(output, input);
-                        self.graph.exectute_sub_network(output.node);
+                        //self.graph.exectute_sub_network(output.node);
                     }
                     _ => {}
                 }
@@ -166,21 +171,15 @@ impl App {
             //// Node
             Message::OnSelect(maybe_id) => {
                 self.selected_shape = maybe_id;
-                if let Some(shape_id) = maybe_id {
-                    self.graph.exectute_sub_network(shape_id);
-                    //TODO: async graph execute
-                    ////let graph = self.graph.clone();
-                    //if let Some(compute) = self.graph.get_compute(shape_id) {
-                    //    return Task::perform(compute, Message::ComputeComplete);
-                    //}
-                    //return Task::perform(self.graph.execute_network_async(), Message::Config(10.));
+                if let Some(nx) = maybe_id {
+                    return Task::done(Message::QueueCompute(nx));
                 }
             }
 
             Message::UpdateNodeTemplate(id, template) => {
                 self.stash_state();
                 self.graph.get_mut_node(id).template = template;
-                self.graph.exectute_sub_network(id);
+                //self.graph.exectute_sub_network(id);
             }
             Message::AddNode(template) => {
                 self.stash_state();
@@ -193,7 +192,7 @@ impl App {
                 self.shapes.shape_positions.swap_remove(&id);
                 self.selected_shape = None;
                 //PERF: ideally, we should only execute affected nodes
-                self.graph.execute_network();
+                //self.graph.execute_network();
             }
 
             //// Application
@@ -238,7 +237,7 @@ impl App {
                         .push((self.graph.clone(), self.shapes.shape_positions.clone()));
                     self.graph = prev.0;
                     self.shapes.shape_positions = prev.1;
-                    self.graph.execute_network();
+                    //self.graph.execute_network();
                 }
             }
             Message::Redo => {
@@ -247,10 +246,53 @@ impl App {
                         .push((self.graph.clone(), self.shapes.shape_positions.clone()));
                     self.graph = next.0;
                     self.shapes.shape_positions = next.1;
-                    self.graph.execute_network();
+                    //self.graph.execute_network();
                 }
             }
-            Message::ComputeComplete(_) => todo!(),
+            Message::QueueCompute(nx) => {
+                {
+                    let node = self.graph.get_mut_node(nx);
+                    node.status = NodeStatus::Running;
+                    trace!("queing compute: node {nx}\n{node:?}");
+                }
+                let node = self.graph.get_node(nx);
+                let inputs = self.graph.get_input_data(&nx);
+                let inputs = inputs.into_iter().map(|(k, v)| (k, v.clone())).collect();
+                let start_inst = Instant::now();
+                return Task::perform(
+                    Graph::async_compute(nx, node.clone(), inputs),
+                    move |(nx, res)| Message::ComputeComplete(nx, start_inst, res),
+                );
+            }
+            Message::ComputeComplete(nx, start_inst, result) => {
+                let node = self.graph.get_mut_node(nx);
+                assert_eq!(node.status, NodeStatus::Running);
+
+                match result {
+                    Ok(output) => {
+                        node.status = NodeStatus::Idle;
+                        node.run_time = Some(Instant::now() - start_inst);
+                        trace!("compute complete: node {nx}\n{node:?}");
+
+                        self.graph.update_wire_data(nx, output);
+                        // attempt to compute children
+                        return dbg!(self.graph.outgoing_edges(&nx)).into_iter().fold(
+                            Task::none(),
+                            |acc, port_ref| {
+                                acc.then(move |_| Task::done(Message::QueueCompute(port_ref.node)))
+                            },
+                        );
+                        //.map(|port_ref| )
+                    }
+                    Err(node_error) => {
+                        log::error!("{}", node_error);
+                        node.status = NodeStatus::Error(node_error);
+                        node.run_time = None;
+                        self.graph.update_wire_data(nx, [].into());
+                        return Task::none();
+                    }
+                };
+            }
         };
         Task::none()
     }
@@ -358,7 +400,7 @@ impl App {
         //update list of available nodes
         self.availble_nodes = NodeData::available_nodes();
         //recompute all nodes
-        self.graph.execute_network();
+        //self.graph.execute_network();
     }
 }
 

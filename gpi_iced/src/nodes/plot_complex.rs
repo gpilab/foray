@@ -1,5 +1,5 @@
 use super::{PortData, RustNode};
-use crate::app::Message;
+use crate::app::{Message, PortDataContainer};
 use crate::interface::node::{INNER_NODE_WIDTH, NODE_BORDER_WIDTH};
 use crate::math::Vector;
 use crate::nodes::NodeTemplate;
@@ -10,8 +10,6 @@ use iced::Alignment::Center;
 use iced::{widget::column, Element};
 use ndarray::Array2;
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
-use std::sync::Mutex;
 
 // Rectanlge specified by center position, width and height
 // y is up
@@ -56,7 +54,7 @@ impl Plot2D {
     pub fn view<'a>(
         &self,
         _id: u32,
-        _input_data: OrderMap<String, &Mutex<PortData>>,
+        _input_data: OrderMap<String, &PortDataContainer>,
     ) -> Element<'a, Message> {
         match &self.image_handle {
             Some(handle) => container(
@@ -74,7 +72,7 @@ impl Plot2D {
     pub fn config_view<'a>(
         &'a self,
         id: u32,
-        _input_data: OrderMap<String, &Mutex<PortData>>,
+        _input_data: OrderMap<String, &PortDataContainer>,
     ) -> Option<Element<'a, Message>> {
         let center = self.rect.center;
         let width = self.rect.width;
@@ -158,7 +156,7 @@ impl Plot2D {
 
     pub(crate) fn input_changed(
         &mut self,
-        input_data: OrderMap<String, &Mutex<PortData>>,
+        input_data: OrderMap<String, PortDataContainer>,
     ) -> indexmap::IndexMap<String, PortData> {
         let data = if let Some(port) = input_data.get("a") {
             match port.lock().unwrap().clone() {

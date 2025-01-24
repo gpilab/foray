@@ -1,4 +1,3 @@
-use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 pub mod async_compute;
@@ -10,7 +9,7 @@ pub mod plot_complex;
 pub mod port;
 pub mod status;
 
-use crate::app::Message;
+use crate::app::{Message, PortDataContainer};
 use crate::graph::GraphNode;
 use crate::gui_node::GUINode;
 use crate::interface::node::default_node_size;
@@ -79,7 +78,7 @@ impl From<NodeTemplate> for NodeData {
 impl NodeData {
     fn fallible_compute(
         &mut self,
-        inputs: OrderMap<String, &Mutex<PortData>>,
+        inputs: OrderMap<String, PortDataContainer>,
     ) -> Result<OrderMap<String, PortData>, NodeError> {
         Ok(match &mut self.template {
             NodeTemplate::RustNode(rust_node) => match rust_node {
@@ -215,34 +214,10 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
 
     fn compute(
         mut self,
-        inputs: OrderMap<String, &Mutex<PortData>>,
-    ) -> (OrderMap<String, PortData>, Self) {
-        let start = Instant::now();
-
-        // execute compute and handle errors
-        let (output, node) = match self.fallible_compute(inputs) {
-            Ok(output) => (
-                output,
-                NodeData {
-                    status: NodeStatus::Idle,
-                    run_time: Some(Instant::now() - start),
-                    template: self.template,
-                },
-            ),
-            Err(node_error) => {
-                log::error!("{}", node_error);
-                (
-                    [].into(),
-                    NodeData {
-                        status: NodeStatus::Error(node_error),
-                        run_time: None,
-                        template: self.template,
-                    },
-                )
-            }
-        };
-
-        (output, node)
+        inputs: OrderMap<String, PortDataContainer>,
+    ) -> Result<OrderMap<String, PortData>, NodeError> {
+        trace!("executing compute:\n{self:?}");
+        self.fallible_compute(inputs)
     }
 }
 
@@ -274,7 +249,7 @@ impl GUINode for NodeTemplate {
     fn view<'a>(
         &'a self,
         id: u32,
-        input_data: OrderMap<String, &Mutex<PortData>>,
+        input_data: OrderMap<String, &PortDataContainer>,
     ) -> (iced::Size, iced::Element<'a, Message>) {
         let dft = default_node_size();
 
@@ -317,7 +292,7 @@ impl GUINode for NodeTemplate {
     fn config_view<'a>(
         &'a self,
         id: u32,
-        input_data: OrderMap<String, &Mutex<PortData>>,
+        input_data: OrderMap<String, &PortDataContainer>,
     ) -> Option<iced::Element<'a, Message>> {
         match &self {
             NodeTemplate::RustNode(rn) => match rn {
