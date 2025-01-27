@@ -3,6 +3,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use itertools::Itertools;
+use log::debug;
 use serde::{Deserialize, Serialize};
 
 use crate::{nodes::status::NodeError, OrderMap};
@@ -25,13 +27,13 @@ type PortName = String;
 
 type NodeIndex = u32;
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum IO {
     In,
     Out,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct PortRef {
     pub node: u32,
     pub name: PortName,
@@ -45,6 +47,7 @@ pub struct Graph<NodeData, PortType, WireData>
 where
     NodeData: GraphNode<NodeData, PortType, WireData>,
     PortType: Clone,
+    WireData: std::fmt::Debug,
 {
     nodes: crate::OrderMap<NodeIndex, NodeData>,
     edges: Vec<Edge>,
@@ -59,6 +62,7 @@ impl<NodeData: Clone, PortType: Clone, WireData> Clone for Graph<NodeData, PortT
 where
     NodeData: GraphNode<NodeData, PortType, WireData>,
     PortType: Clone,
+    WireData: std::fmt::Debug,
 {
     fn clone(&self) -> Self {
         Self {
@@ -78,6 +82,7 @@ impl<NodeData, PortType, WireData> Graph<NodeData, PortType, WireData>
 where
     NodeData: GraphNode<NodeData, PortType, WireData> + Clone,
     PortType: Clone,
+    WireData: std::fmt::Debug,
 {
     pub fn new() -> Self {
         Self {
@@ -132,9 +137,30 @@ where
             })
             .collect()
     }
-    pub fn get_input_data(&self, nx: &NodeIndex) -> OrderMap<String, &WireDataContainer<WireData>> {
+    pub fn get_input_data(&self, nx: &NodeIndex) -> OrderMap<String, WireDataContainer<WireData>> {
         self.get_node(*nx)
             .inputs()
+            .keys()
+            .filter_map(|port_name| {
+                self.get_parent(nx, port_name.clone()).map(|out_port| {
+                    self.wire_data
+                        .get(&(out_port.node, out_port.name))
+                        .map(|data| (port_name.clone(), data.clone()))
+                })
+            })
+            .collect::<Option<OrderMap<_, _>>>()
+            .unwrap_or([].into())
+    }
+    pub fn get_input_data_mapped(
+        &self,
+        nx: &NodeIndex,
+    ) -> (
+        OrderMap<String, String>,
+        OrderMap<String, WireDataContainer<WireData>>,
+    ) {
+        let inputs = self.get_node(*nx).inputs();
+
+        let data_with_duplicates = inputs
             .keys()
             .filter_map(|port_name| {
                 self.get_parent(nx, port_name.clone()).map(|out_port| {
@@ -144,7 +170,33 @@ where
                 })
             })
             .collect::<Option<OrderMap<_, _>>>()
-            .unwrap_or([].into())
+            .unwrap_or([].into());
+
+        let port_matches: OrderMap<String, String> = data_with_duplicates
+            .iter()
+            .combinations(2)
+            .filter(|v| v[0].0 != v[1].0)
+            .flat_map(|v| {
+                let (a_key, a_value) = v[0];
+                let (b_key, b_value) = v[1];
+                if Arc::ptr_eq(a_value, b_value) {
+                    println!("{} points to the same Arc as {}", a_key, b_key);
+                    vec![
+                        (a_key.clone(), a_key.clone()),
+                        (b_key.clone(), a_key.clone()),
+                    ]
+                } else {
+                    vec![(a_key.clone(), a_key.clone())]
+                }
+            })
+            .collect();
+        debug!("{port_matches:?}");
+        let data = port_matches
+            .keys()
+            .map(|k| (k.clone(), Arc::clone(data_with_duplicates[k])))
+            .collect();
+
+        (port_matches, data)
     }
     /// get a list of node indices
     pub fn nodes_ref(&self) -> Vec<NodeIndex> {
@@ -314,7 +366,9 @@ where
     //    let mut ordered = self.topological_sort();
     //    ordered.iter_mut().for_each(|nx| self.compute_node(nx))
     //}
-    /// async compute
+
+    // async compute
+
     //pub async fn execute_network_async(&mut self) {
     //    self.wire_data.clear();
     //    let mut ordered = self.topological_sort();
@@ -347,15 +401,15 @@ where
     //    }
     //}
 
-    fn is_self_or_dependent(&self, root: NodeIndex, to_check: NodeIndex) -> bool {
-        if root == to_check {
-            true
-        } else {
-            self.incoming_edges(&to_check)
-                .into_iter()
-                .any(|(from, _to)| self.is_self_or_dependent(root, from.node))
-        }
-    }
+    //fn is_self_or_dependent(&self, root: NodeIndex, to_check: NodeIndex) -> bool {
+    //    if root == to_check {
+    //        true
+    //    } else {
+    //        self.incoming_edges(&to_check)
+    //            .into_iter()
+    //            .any(|(from, _to)| self.is_self_or_dependent(root, from.node))
+    //    }
+    //}
 
     /// Determine if a node has any incoming connections
     fn has_incoming(nx: &NodeIndex, edges: &[Edge]) -> bool {
@@ -390,18 +444,33 @@ where
         nx: NodeIndex,
     ) -> (NodeData, OrderMap<String, WireDataContainer<WireData>>) {
         let node = self.get_node(nx);
-        let inputs = self.get_input_data(&nx);
-        (
-            node.clone(),
-            inputs.into_iter().map(|(k, v)| (k, v.clone())).collect(),
-        )
+        let wire_data = self.get_input_data(&nx);
+        (node.clone(), wire_data)
+    }
+    pub fn compute_node(
+        nx: NodeIndex,
+        node: NodeData,
+        input_guarded: OrderMap<String, WireDataContainer<WireData>>,
+    ) -> (u32, Result<indexmap::IndexMap<String, WireData>, NodeError>) {
+        let output = { node.compute(input_guarded) };
+
+        (nx, output)
     }
     pub async fn async_compute(
         nx: NodeIndex,
         node: NodeData,
-        inputs: indexmap::IndexMap<String, Arc<Mutex<WireData>>>,
+        input_guarded: OrderMap<String, Arc<Mutex<WireData>>>,
     ) -> (u32, Result<indexmap::IndexMap<String, WireData>, NodeError>) {
-        (nx, node.compute(inputs))
+        Self::compute_node(nx, node, input_guarded)
+    }
+
+    /// get all nodes that have no parents
+    pub fn get_roots(&self) -> Vec<NodeIndex> {
+        self.nodes
+            .keys()
+            .filter(|nx| self.incoming_edges(nx).is_empty())
+            .copied()
+            .collect()
     }
 }
 
@@ -409,6 +478,7 @@ impl<NodeData, PortType, WireData> Default for Graph<NodeData, PortType, WireDat
 where
     NodeData: GraphNode<NodeData, PortType, WireData> + Clone,
     PortType: Clone + Default,
+    WireData: std::fmt::Debug,
 {
     fn default() -> Self {
         Self::new()
@@ -502,9 +572,9 @@ mod test {
 
         //Propogate values
         for nx in g.topological_sort() {
-            let (node, inputs) = g.get_compute(nx);
-            let output = node.compute(inputs).unwrap();
-            g.update_wire_data(nx, output);
+            let (node, input_guarded) = g.get_compute(nx);
+            let (_, output) = Graph::compute_node(nx, node, input_guarded);
+            g.update_wire_data(nx, output.unwrap());
         }
 
         assert_eq!(*g.get_wire_data(&n1, "out").unwrap().lock().unwrap(), 7);

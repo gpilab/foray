@@ -12,7 +12,7 @@ use strum::VariantNames;
 
 use crate::OrderMap;
 use crate::{
-    app::PortDataContainer,
+    app::PortDataReference,
     nodes::{
         port::{PortData, PortType},
         status::NodeError,
@@ -52,13 +52,13 @@ impl PyNode {
 
     pub fn compute(
         &self,
-        inputs: OrderMap<String, PortDataContainer>,
+        inputs: OrderMap<String, PortDataReference>,
     ) -> Result<OrderMap<String, PortData>, NodeError> {
         // convert inputs to python arrays/objects
         Python::with_gil(|py| {
             let py_inputs = inputs
                 .into_iter()
-                .map(|(k, v)| (k.clone(), v.lock().unwrap().to_py(py)))
+                .map(|(k, v)| (k.clone(), v.to_py(py)))
                 .collect();
             let out = gpipy_compute(
                 self.path.file_stem().unwrap().to_str().unwrap(),

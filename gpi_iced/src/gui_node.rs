@@ -16,19 +16,19 @@ pub trait GUINode: derive_more::Debug {
 
     fn name(&self) -> String;
 
-    fn view<'a>(
-        &'a self,
+    fn view(
+        &self,
         _id: u32,
-        _input_data: OrderMap<String, &PortDataContainer>,
-    ) -> (iced::Size, Element<'a, Message>) {
+        _input_data: OrderMap<String, PortDataContainer>,
+    ) -> (iced::Size, Element<Message>) {
         (default_node_size(), text("default").into())
     }
 
-    fn config_view<'a>(
-        &'a self,
+    fn config_view(
+        &self,
         _id: u32,
-        _input_data: OrderMap<String, &PortDataContainer>,
-    ) -> Option<Element<'a, Message>> {
+        _input_data: OrderMap<String, PortDataContainer>,
+    ) -> Option<Element<'_, Message>> {
         None
     }
 }

@@ -1,4 +1,5 @@
-use std::time::{Duration, Instant};
+use std::sync::{Arc, MutexGuard};
+use std::time::Duration;
 
 pub mod async_compute;
 pub mod constant;
@@ -9,7 +10,7 @@ pub mod plot_complex;
 pub mod port;
 pub mod status;
 
-use crate::app::{Message, PortDataContainer};
+use crate::app::{Message, PortDataContainer, PortDataReference};
 use crate::graph::GraphNode;
 use crate::gui_node::GUINode;
 use crate::interface::node::default_node_size;
@@ -21,6 +22,7 @@ use crate::python::py_node::PyNode;
 use crate::OrderMap;
 use iced::widget::text;
 use iced::Font;
+use itertools::Itertools;
 use log::trace;
 use port::{PortData, PortType};
 use serde::{Deserialize, Serialize};
@@ -78,18 +80,16 @@ impl From<NodeTemplate> for NodeData {
 impl NodeData {
     fn fallible_compute(
         &mut self,
-        inputs: OrderMap<String, PortDataContainer>,
+        inputs: OrderMap<String, PortDataReference>,
     ) -> Result<OrderMap<String, PortData>, NodeError> {
         Ok(match &mut self.template {
             NodeTemplate::RustNode(rust_node) => match rust_node {
                 RustNode::Identity => [(
                     "out".to_string(),
-                    inputs
+                    (**inputs
                         .get("a")
-                        .ok_or(NodeError::Input("input 'a' not found".to_string()))?
-                        .lock()
-                        .unwrap()
-                        .clone(),
+                        .ok_or(NodeError::Input("input 'a' not found".to_string()))?)
+                    .clone(),
                 )]
                 .into(),
                 RustNode::Constant(value) => {
@@ -216,8 +216,48 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
         mut self,
         inputs: OrderMap<String, PortDataContainer>,
     ) -> Result<OrderMap<String, PortData>, NodeError> {
-        trace!("executing compute:\n{self:?}");
-        self.fallible_compute(inputs)
+        //unpack mutex
+        let port_matches: OrderMap<String, String> = if inputs.len() == 1 {
+            let key = inputs.keys().next().unwrap();
+            [(key.clone(), key.clone())].into()
+        } else {
+            inputs
+                .iter()
+                .combinations(2)
+                .filter(|v| v[0].0 != v[1].0)
+                .flat_map(|v| {
+                    let (a_key, a_value) = v[0];
+                    let (b_key, b_value) = v[1];
+                    if Arc::ptr_eq(a_value, b_value) {
+                        println!("{} points to the same Arc as {}", a_key, b_key);
+                        vec![
+                            (a_key.clone(), a_key.clone()),
+                            (b_key.clone(), a_key.clone()),
+                        ]
+                    } else {
+                        vec![
+                            (a_key.clone(), a_key.clone()),
+                            (b_key.clone(), b_key.clone()),
+                        ]
+                    }
+                })
+                .collect()
+        };
+
+        trace!("getting locks");
+        let unique_locks: OrderMap<String, MutexGuard<PortData>> = port_matches
+            .values()
+            .unique()
+            .map(|v| (v.clone(), inputs[v].lock().unwrap()))
+            .collect();
+        trace!("got locks");
+
+        let data = port_matches
+            .keys()
+            .map(|k| (k.clone(), &unique_locks[&port_matches[k]]))
+            .collect();
+
+        self.fallible_compute(data)
     }
 }
 
@@ -246,11 +286,11 @@ impl GUINode for NodeTemplate {
         }
     }
 
-    fn view<'a>(
-        &'a self,
+    fn view(
+        &self,
         id: u32,
-        input_data: OrderMap<String, &PortDataContainer>,
-    ) -> (iced::Size, iced::Element<'a, Message>) {
+        input_data: OrderMap<String, PortDataContainer>,
+    ) -> (iced::Size, iced::Element<Message>) {
         let dft = default_node_size();
 
         let operation = |s| {
@@ -289,11 +329,11 @@ impl GUINode for NodeTemplate {
         }
     }
 
-    fn config_view<'a>(
-        &'a self,
+    fn config_view(
+        &self,
         id: u32,
-        input_data: OrderMap<String, &PortDataContainer>,
-    ) -> Option<iced::Element<'a, Message>> {
+        input_data: OrderMap<String, PortDataContainer>,
+    ) -> Option<iced::Element<Message>> {
         match &self {
             NodeTemplate::RustNode(rn) => match rn {
                 RustNode::Plot(plot) => plot.config_view(id, input_data),

@@ -1,5 +1,5 @@
 use super::{PortData, RustNode};
-use crate::app::{Message, PortDataContainer};
+use crate::app::{Message, PortDataContainer, PortDataReference};
 use crate::interface::node::{INNER_NODE_WIDTH, NODE_BORDER_WIDTH};
 use crate::math::Vector;
 use crate::nodes::NodeTemplate;
@@ -54,7 +54,7 @@ impl Plot2D {
     pub fn view<'a>(
         &self,
         _id: u32,
-        _input_data: OrderMap<String, &PortDataContainer>,
+        _input_data: OrderMap<String, PortDataContainer>,
     ) -> Element<'a, Message> {
         match &self.image_handle {
             Some(handle) => container(
@@ -69,11 +69,11 @@ impl Plot2D {
         .into()
     }
 
-    pub fn config_view<'a>(
-        &'a self,
+    pub fn config_view(
+        &self,
         id: u32,
-        _input_data: OrderMap<String, &PortDataContainer>,
-    ) -> Option<Element<'a, Message>> {
+        _input_data: OrderMap<String, PortDataContainer>,
+    ) -> Option<Element<'_, Message>> {
         let center = self.rect.center;
         let width = self.rect.width;
         let height = self.rect.height;
@@ -156,10 +156,10 @@ impl Plot2D {
 
     pub(crate) fn input_changed(
         &mut self,
-        input_data: OrderMap<String, PortDataContainer>,
+        input_data: OrderMap<String, PortDataReference>,
     ) -> indexmap::IndexMap<String, PortData> {
         let data = if let Some(port) = input_data.get("a") {
-            match port.lock().unwrap().clone() {
+            match (**port).clone() {
                 PortData::Real2d(a) => a,
                 PortData::Complex2d(a) => Array2::<f64>::from_shape_vec(
                     (a.len().isqrt(), a.len().isqrt()),

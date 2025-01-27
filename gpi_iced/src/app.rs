@@ -19,16 +19,18 @@ use iced::keyboard::key::Named;
 use iced::keyboard::{Key, Modifiers};
 use iced::widget::{column, *};
 use iced::Length::Fill;
-use iced::{Subscription, Task};
+use iced::{window, Subscription, Task};
+use itertools::Itertools;
 use log::{trace, warn};
 use serde::{Deserialize, Serialize};
 use std::fs::read_to_string;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Instant;
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, PartialEq)]
 pub enum Action {
     #[default]
+    InitialLoad,
     Idle,
     CreatingInputWire(PortRef, Option<PortRef>),
     CreatingOutputWire(PortRef, Option<PortRef>),
@@ -40,6 +42,7 @@ type UndoStash = Vec<(
     OrderMap<ShapeId, Point>,
 )>;
 
+pub type PortDataReference<'a> = &'a MutexGuard<'a, PortData>;
 pub type PortDataContainer = Arc<Mutex<PortData>>;
 
 #[derive(Serialize, Deserialize)]
@@ -83,8 +86,10 @@ pub enum Message {
     UpdateNodeTemplate(u32, NodeTemplate),
     AddNode(NodeTemplate),
     DeleteNode(u32),
+
     QueueCompute(u32),
     ComputeComplete(u32, Instant, Result<OrderMap<String, PortData>, NodeError>),
+    ComputeAll,
 
     //// Application
     Config(f32),
@@ -94,6 +99,7 @@ pub enum Message {
     Save,
     Load,
     ReloadNodes,
+    WindowOpen,
 
     //// Focus
     FocusNext,
@@ -150,18 +156,18 @@ impl App {
                 IO::Out => self.action = Action::CreatingOutputWire(port, None),
             },
             Message::PortRelease => {
-                match &self.action.clone() {
+                let task = match &self.action.clone() {
                     Action::CreatingInputWire(input, Some(output))
                     | Action::CreatingOutputWire(output, Some(input)) => {
                         self.stash_state();
                         self.graph.remove_edge(input);
                         self.graph.add_edge_from_ref(output, input);
-                        //self.graph.exectute_sub_network(output.node);
+                        Task::done(Message::QueueCompute(output.node))
                     }
-                    _ => {}
-                }
-
+                    _ => Task::none(),
+                };
                 self.action = Action::Idle;
+                return task;
             }
             Message::PortDelete(port) => {
                 self.stash_state();
@@ -179,7 +185,7 @@ impl App {
             Message::UpdateNodeTemplate(id, template) => {
                 self.stash_state();
                 self.graph.get_mut_node(id).template = template;
-                //self.graph.exectute_sub_network(id);
+                return Task::done(Message::QueueCompute(id));
             }
             Message::AddNode(template) => {
                 self.stash_state();
@@ -192,7 +198,7 @@ impl App {
                 self.shapes.shape_positions.swap_remove(&id);
                 self.selected_shape = None;
                 //PERF: ideally, we should only execute affected nodes
-                //self.graph.execute_network();
+                return Task::done(Message::ComputeAll);
             }
 
             //// Application
@@ -222,10 +228,19 @@ impl App {
                 *self = ron::from_str(&read_to_string("network.ron").expect("Could not read file"))
                     .expect("could not parse file");
                 self.reload_nodes();
+                return Task::done(Message::ComputeAll);
             }
             Message::ReloadNodes => {
                 self.reload_nodes();
+                return Task::done(Message::ComputeAll);
             }
+            Message::WindowOpen => {
+                if self.action == Action::InitialLoad {
+                    self.action = Action::Idle;
+                    return Task::done(Message::ComputeAll);
+                }
+            }
+
             //// Focus
             Message::FocusNext => return focus_next(),
             Message::FocusPrevious => return focus_previous(),
@@ -237,7 +252,7 @@ impl App {
                         .push((self.graph.clone(), self.shapes.shape_positions.clone()));
                     self.graph = prev.0;
                     self.shapes.shape_positions = prev.1;
-                    //self.graph.execute_network();
+                    return Task::done(Message::ComputeAll);
                 }
             }
             Message::Redo => {
@@ -246,27 +261,44 @@ impl App {
                         .push((self.graph.clone(), self.shapes.shape_positions.clone()));
                     self.graph = next.0;
                     self.shapes.shape_positions = next.1;
-                    //self.graph.execute_network();
+                    return Task::done(Message::ComputeAll);
                 }
+            }
+            Message::ComputeAll => {
+                let nodes = self.graph.get_roots();
+                return Task::batch(
+                    nodes
+                        .into_iter()
+                        .map(|nx| Task::done(Message::QueueCompute(nx))),
+                );
             }
             Message::QueueCompute(nx) => {
                 {
                     let node = self.graph.get_mut_node(nx);
+                    if node.status == NodeStatus::Running {
+                        warn!("node already running, requing to try again, {node:?}");
+                        return Task::done(Message::QueueCompute(nx));
+                    };
                     node.status = NodeStatus::Running;
-                    trace!("queing compute: node {nx}\n{node:?}");
+                    trace!("beginning compute: node {nx}\n{node:?}");
                 }
                 let node = self.graph.get_node(nx);
-                let inputs = self.graph.get_input_data(&nx);
-                let inputs = inputs.into_iter().map(|(k, v)| (k, v.clone())).collect();
+                assert_eq!(node.status, NodeStatus::Running);
+                let input_guarded = self.graph.get_input_data(&nx);
                 let start_inst = Instant::now();
                 return Task::perform(
-                    Graph::async_compute(nx, node.clone(), inputs),
+                    Graph::async_compute(nx, node.clone(), input_guarded),
                     move |(nx, res)| Message::ComputeComplete(nx, start_inst, res),
                 );
             }
             Message::ComputeComplete(nx, start_inst, result) => {
                 let node = self.graph.get_mut_node(nx);
-                assert_eq!(node.status, NodeStatus::Running);
+                trace!("compute complete, maybe successful: node {nx}\n{node:?}");
+                match &node.status {
+                    NodeStatus::Idle => panic!("Node should not be idle here!"),
+                    NodeStatus::Running => {}
+                    NodeStatus::Error(_node_error) => {}
+                }
 
                 match result {
                     Ok(output) => {
@@ -276,13 +308,20 @@ impl App {
 
                         self.graph.update_wire_data(nx, output);
                         // attempt to compute children
-                        return dbg!(self.graph.outgoing_edges(&nx)).into_iter().fold(
-                            Task::none(),
-                            |acc, port_ref| {
-                                acc.then(move |_| Task::done(Message::QueueCompute(port_ref.node)))
-                            },
+
+                        let to_queue: Vec<_> = self
+                            .graph
+                            .outgoing_edges(&nx)
+                            .into_iter()
+                            .map(|port_ref| port_ref.node)
+                            .unique()
+                            .collect(); // don't queue a node multiple times
+                        trace!("Queuing nodes for compute {to_queue:?}");
+                        return Task::batch(
+                            to_queue
+                                .into_iter()
+                                .map(|node| Task::done(Message::QueueCompute(node))),
                         );
-                        //.map(|port_ref| )
                     }
                     Err(node_error) => {
                         log::error!("{}", node_error);
@@ -411,6 +450,7 @@ pub fn theme(state: &App) -> Theme {
 pub fn subscriptions(_state: &App) -> Subscription<Message> {
     Subscription::batch([
         file_watch_subscription(),
+        window::open_events().map(|_| Message::WindowOpen),
         listen_with(|event, _status, _id| match event {
             iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
                 key: Key::Named(Named::Tab),

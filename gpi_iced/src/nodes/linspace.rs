@@ -1,5 +1,5 @@
 use super::PortData;
-use crate::app::PortDataContainer;
+use crate::app::PortDataReference;
 use crate::nodes::{NodeTemplate, RustNode};
 use crate::OrderMap;
 use crate::{app::Message, math::linspace};
@@ -37,7 +37,7 @@ impl LinspaceConfig {
 
     pub fn compute(
         &self,
-        _inputs: OrderMap<String, PortDataContainer>,
+        _inputs: OrderMap<String, PortDataReference>,
     ) -> OrderMap<String, PortData> {
         //node after potential modifications
         let LinspaceConfig { start, stop, num } = self;

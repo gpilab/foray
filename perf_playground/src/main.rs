@@ -1,4 +1,7 @@
-use std::time::{self, Duration};
+use std::{
+    sync::{Mutex, MutexGuard},
+    time::{self, Duration},
+};
 
 use perf_playground::{
     scheduler::{injector, schedule},
@@ -6,7 +9,7 @@ use perf_playground::{
     test_ndarray::run,
 };
 fn main() {
-    injector()
+    test_mutex();
 }
 
 fn fft_bench() {
@@ -56,4 +59,13 @@ fn human_readable_size(value: usize) -> String {
         5 => format!("{} PB", value as f32 / (10.0f32.powi(15))),
         _ => panic!("holy smokes!"),
     }
+}
+
+fn test_mutex() {
+    let a = Mutex::new(1);
+
+    let a_guard = &a.lock().unwrap();
+    let b_guard = a_guard;
+
+    println!("{}", *a_guard + *b_guard)
 }

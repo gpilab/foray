@@ -56,7 +56,7 @@ impl Plot {
     pub fn view<'a>(
         &self,
         _id: u32,
-        input_data: OrderMap<String, &PortDataContainer>,
+        input_data: OrderMap<String, PortDataContainer>,
     ) -> Element<'a, Message> {
         let (x, y) =
             if let (Some(x_port), Some(y_port)) = (input_data.get("x"), input_data.get("y")) {
@@ -87,11 +87,11 @@ impl Plot {
         .into()
     }
 
-    pub fn config_view<'a>(
-        &'a self,
+    pub fn config_view(
+        &self,
         id: u32,
-        _input_data: OrderMap<String, &PortDataContainer>,
-    ) -> Option<Element<'a, Message>> {
+        _input_data: OrderMap<String, PortDataContainer>,
+    ) -> Option<Element<'_, Message>> {
         let center = self.rect.center;
         let width = self.rect.width;
         let height = self.rect.height;

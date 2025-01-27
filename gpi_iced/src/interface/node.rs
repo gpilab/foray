@@ -59,8 +59,8 @@ impl App {
                     false => t.extended_palette().secondary.strong.color,
                 },
                 NodeStatus::Running => match is_selected {
-                    true => t.extended_palette().primary.weak.color,
-                    false => t.extended_palette().secondary.weak.color,
+                    true => t.extended_palette().background.strong.color,
+                    false => t.extended_palette().background.weak.color,
                 },
                 NodeStatus::Error(_node_error) => match is_selected {
                     true => t.extended_palette().danger.base.color,
