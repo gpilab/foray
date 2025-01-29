@@ -1,5 +1,4 @@
-#cargo-features = ["codegen-backend"]
-#cargo-features = ["codegen-backend"]
+cargo-features = ["codegen-backend"]
 [package]
 name = "gpi_iced"
 version = "0.1.0"
@@ -41,5 +40,4 @@ console_error_panic_hook = "0.1.7"
 
 [profile.dev]
 debug = 0
-#codegen-backend = "cranelift"
-#codegen-backend = "cranelift"
+codegen-backend = "cranelift"

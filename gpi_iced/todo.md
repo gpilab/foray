@@ -1,4 +1,3 @@
-# Window
 ## System Level
 - [x] undo/redo
 
@@ -8,13 +7,12 @@
 - [x] hot reload nodes
   - [x] notify of node errors
     - [*] Actionable Error Messages. Not cryptic! Ideally point directly to what needs to change.
-    -  [ ]
 ## External Input
 - [x] Nodes that load data from file
   - [ ] run from gpi "headless" from cli
   - [*] Load data from cli arguments (How others will use your network. Shouldn't have to edit the network to point to new files)
 
-# UI
+## UI
  - [x] pan
    - [ ] kinetic pan
  - [ ] zoom
@@ -26,9 +24,13 @@
 
 ## Data manipulation
 - [x] execution
-  - [*] async execution
-  - [*] parallel execution
+  - [x] async execution
+  - [x] parallel execution
   - [ ] pause execution
+  - [ ] consistent styling for execution state
+    - [ ] running indicication (vary alpha over time?)
+    - [ ] unfilled inputs
+    - [ ] waiting for ancestors (?) leaning toward this being unecessary complexity
 
 - [x] load available nodes
 - [x] display available nodes
@@ -47,7 +49,7 @@
 - [x] multiple inputs/outputs
   - [x] render input/output types differently
   - [x] semantic color for data type 
-  - [ ]  and semantic shape for array shape/dimension
+  - [ ] semantic shape for array shape/dimension
 
 - [ ] restrict node connections to only valid ports
   - [?] and convert arrays of data on wires
@@ -62,11 +64,12 @@
   - [ ] floor window level contrast
   - [ ] complex phase vis
 
-# C interface
+## C interface
 - [ ] compilation process
 
 
-# Primary Visualization/Output
+## Primary Visualization/Output
 - [?] compose widgets from multiple nodes together
 
-
+# Bugs
+- [ ] Node running while it's deleted, results come back, but node is gone. crash on unwrapping node

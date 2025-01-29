@@ -8,12 +8,13 @@ use iced::widget::image::Handle;
 use iced::widget::{button, container, horizontal_space, image, row, text, text_input};
 use iced::Alignment::Center;
 use iced::{widget::column, Element};
+use log::trace;
 use ndarray::Array2;
 use serde::{Deserialize, Serialize};
 
 // Rectanlge specified by center position, width and height
 // y is up
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct Rect {
     pub center: Vector,
     pub width: f32,
@@ -43,7 +44,7 @@ impl Default for Rect {
     }
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Plot2D {
     rect: Rect,
     #[serde(skip)]
@@ -154,24 +155,8 @@ impl Plot2D {
         )
     }
 
-    pub(crate) fn input_changed(
-        &mut self,
-        input_data: OrderMap<String, PortDataReference>,
-    ) -> indexmap::IndexMap<String, PortData> {
-        let data = if let Some(port) = input_data.get("a") {
-            match (**port).clone() {
-                PortData::Real2d(a) => a,
-                PortData::Complex2d(a) => Array2::<f64>::from_shape_vec(
-                    (a.len().isqrt(), a.len().isqrt()),
-                    a.iter().map(|v| v.norm_sqr().sqrt()).collect::<Vec<_>>(),
-                )
-                .expect("square matrix"),
-                _ => panic!("unsuported plot types {:?}", port),
-            }
-        } else {
-            Array2::zeros((0, 0))
-        };
-
+    fn create_image_handle(data: &Array2<f64>) -> Handle {
+        trace!("creating image handle for plot2d");
         let max = data.iter().fold(-f64::INFINITY, |a, &b| a.max(b));
         let min = data.iter().fold(f64::INFINITY, |a, &b| a.min(b));
         let img: Vec<u8> = data
@@ -183,11 +168,24 @@ impl Plot2D {
                 [b, b, b, 255]
             })
             .collect();
-        self.image_handle = Some(Handle::from_rgba(
-            data.dim().0 as u32,
-            data.dim().1 as u32,
-            img,
-        ));
-        [].into()
+        Handle::from_rgba(data.dim().0 as u32, data.dim().1 as u32, img)
+    }
+
+    pub(crate) fn input_changed(&mut self, input_data: OrderMap<String, PortDataReference>) {
+        let data = if let Some(port) = input_data.get("a") {
+            match &**port {
+                PortData::Real2d(a) => a,
+                PortData::Complex2d(a) => &Array2::<f64>::from_shape_vec(
+                    (a.len().isqrt(), a.len().isqrt()),
+                    a.iter().map(|v| v.norm_sqr().sqrt()).collect::<Vec<_>>(),
+                )
+                .expect("square matrix"),
+                _ => panic!("unsuported plot types {:?}", port),
+            }
+        } else {
+            &Array2::zeros((0, 0))
+        };
+        trace!("input changed!");
+        self.image_handle = Some(Self::create_image_handle(data));
     }
 }

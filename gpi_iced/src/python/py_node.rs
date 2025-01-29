@@ -21,7 +21,7 @@ use crate::{
 
 use super::{gpipy_compute, gpipy_config};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct PyNode {
     pub name: String,
     pub path: PathBuf,

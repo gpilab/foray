@@ -1,15 +1,14 @@
 use std::{
     collections::HashMap,
-    sync::{Arc, Mutex},
+    sync::{Arc, RwLock},
 };
 
 use itertools::Itertools;
-use log::debug;
 use serde::{Deserialize, Serialize};
 
 use crate::{nodes::status::NodeError, OrderMap};
 
-type WireDataContainer<T> = Arc<Mutex<T>>;
+type WireDataContainer<T> = Arc<RwLock<T>>;
 
 pub trait GraphNode<NodeData, PortType, WireData>
 where
@@ -20,7 +19,7 @@ where
     fn compute(
         self,
         inputs: OrderMap<String, WireDataContainer<WireData>>,
-    ) -> Result<OrderMap<String, WireData>, NodeError>;
+    ) -> Result<(OrderMap<String, WireData>, NodeData), NodeError>;
 }
 
 type PortName = String;
@@ -190,7 +189,6 @@ where
                 }
             })
             .collect();
-        debug!("{port_matches:?}");
         let data = port_matches
             .keys()
             .map(|k| (k.clone(), Arc::clone(data_with_duplicates[k])))
@@ -447,11 +445,15 @@ where
         let wire_data = self.get_input_data(&nx);
         (node.clone(), wire_data)
     }
+    #[allow(clippy::type_complexity)]
     pub fn compute_node(
         nx: NodeIndex,
         node: NodeData,
         input_guarded: OrderMap<String, WireDataContainer<WireData>>,
-    ) -> (u32, Result<indexmap::IndexMap<String, WireData>, NodeError>) {
+    ) -> (
+        u32,
+        Result<(OrderMap<String, WireData>, NodeData), NodeError>,
+    ) {
         let output = { node.compute(input_guarded) };
 
         (nx, output)
@@ -459,8 +461,11 @@ where
     pub async fn async_compute(
         nx: NodeIndex,
         node: NodeData,
-        input_guarded: OrderMap<String, Arc<Mutex<WireData>>>,
-    ) -> (u32, Result<indexmap::IndexMap<String, WireData>, NodeError>) {
+        input_guarded: OrderMap<String, WireDataContainer<WireData>>,
+    ) -> (
+        u32,
+        Result<(OrderMap<String, WireData>, NodeData), NodeError>,
+    ) {
         Self::compute_node(nx, node, input_guarded)
     }
 
@@ -521,12 +526,13 @@ mod test {
         fn compute(
             self,
             inputs: OrderMap<String, WireDataContainer<u32>>,
-        ) -> Result<OrderMap<String, u32>, NodeError> {
+        ) -> Result<(OrderMap<String, u32>, Node), NodeError> {
             Ok(match &self {
-                Node::Identity(_node) => {
-                    [("out".to_string(), *inputs["in"].lock().unwrap())].into()
-                }
-                Node::Constant(node) => [("out".to_string(), node.value)].into(),
+                Node::Identity(_node) => (
+                    [("out".to_string(), *inputs["in"].read().unwrap())].into(),
+                    self,
+                ),
+                Node::Constant(node) => ([("out".to_string(), node.value)].into(), self),
             })
         }
     }
@@ -574,12 +580,12 @@ mod test {
         for nx in g.topological_sort() {
             let (node, input_guarded) = g.get_compute(nx);
             let (_, output) = Graph::compute_node(nx, node, input_guarded);
-            g.update_wire_data(nx, output.unwrap());
+            g.update_wire_data(nx, output.unwrap().0);
         }
 
-        assert_eq!(*g.get_wire_data(&n1, "out").unwrap().lock().unwrap(), 7);
-        assert_eq!(*g.get_wire_data(&n2, "out").unwrap().lock().unwrap(), 7);
-        assert_eq!(*g.get_wire_data(&n3, "out").unwrap().lock().unwrap(), 7);
+        assert_eq!(*g.get_wire_data(&n1, "out").unwrap().read().unwrap(), 7);
+        assert_eq!(*g.get_wire_data(&n2, "out").unwrap().read().unwrap(), 7);
+        assert_eq!(*g.get_wire_data(&n3, "out").unwrap().read().unwrap(), 7);
         assert!(g.get_wire_data(&n_unconnected, "out").is_none());
     }
 }

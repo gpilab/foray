@@ -1,7 +1,5 @@
-use std::sync::{Arc, MutexGuard};
 use std::time::Duration;
 
-pub mod async_compute;
 pub mod constant;
 pub mod linspace;
 pub mod math_nodes;
@@ -22,7 +20,6 @@ use crate::python::py_node::PyNode;
 use crate::OrderMap;
 use iced::widget::text;
 use iced::Font;
-use itertools::Itertools;
 use log::trace;
 use port::{PortData, PortType};
 use serde::{Deserialize, Serialize};
@@ -38,7 +35,7 @@ pub struct NodeData {
     pub run_time: Option<Duration>,
 }
 
-#[derive(Clone, Debug, EnumIter, VariantNames, Serialize, Deserialize)]
+#[derive(Clone, Debug, EnumIter, VariantNames, Serialize, Deserialize, PartialEq)]
 pub enum RustNode {
     Identity,
     Constant(f64),
@@ -56,7 +53,7 @@ pub enum RustNode {
     Reverse,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum NodeTemplate {
     RustNode(RustNode),
     PyNode(PyNode),
@@ -81,49 +78,61 @@ impl NodeData {
     fn fallible_compute(
         &mut self,
         inputs: OrderMap<String, PortDataReference>,
-    ) -> Result<OrderMap<String, PortData>, NodeError> {
-        Ok(match &mut self.template {
-            NodeTemplate::RustNode(rust_node) => match rust_node {
-                RustNode::Identity => [(
-                    "out".to_string(),
-                    (**inputs
-                        .get("a")
-                        .ok_or(NodeError::Input("input 'a' not found".to_string()))?)
-                    .clone(),
-                )]
-                .into(),
-                RustNode::Constant(value) => {
-                    [("out".to_string(), PortData::Real(vec![*value].into()))].into()
-                }
-                RustNode::Add => binary_operation(inputs, Box::new(|a, b| a + b))?,
-                RustNode::Subtract => binary_operation(inputs, Box::new(|a, b| a - b))?,
-                RustNode::Multiply => binary_operation(inputs, Box::new(|a, b| a * b))?,
-                RustNode::Divide => binary_operation(inputs, Box::new(|a, b| a / b))?,
-                RustNode::Join => binary_operation(
-                    inputs,
-                    Box::new(|a, b| a.iter().chain(b).copied().collect()),
-                )?,
-                RustNode::Reverse => {
-                    unary_operation(inputs, Box::new(|a| a.iter().rev().copied().collect()))?
-                }
-                RustNode::Cos => unary_operation(inputs, Box::new(|a| a.cos()))?,
-                RustNode::Sin => unary_operation(inputs, Box::new(|a| a.sin()))?,
-                RustNode::Sinc => unary_operation(
-                    inputs,
-                    Box::new(|a| {
-                        a.map(|x| match x {
-                            0. => 1.,
-                            _ => x.sin() / x,
-                        })
-                    }),
-                )?,
-                RustNode::Linspace(linspace_config) => linspace_config.compute(inputs),
-                RustNode::Plot(_) => [].into(),
-                RustNode::Plot2D(plot_2d) => plot_2d.input_changed(inputs),
-            },
+    ) -> Result<(OrderMap<String, PortData>, NodeData), NodeError> {
+        Ok((
+            match &mut self.template {
+                NodeTemplate::RustNode(rust_node) => match rust_node {
+                    RustNode::Identity => [(
+                        "out".to_string(),
+                        (**inputs
+                            .get("a")
+                            .ok_or(NodeError::Input("input 'a' not found".to_string()))?)
+                        .clone(),
+                    )]
+                    .into(),
+                    RustNode::Constant(value) => {
+                        [("out".to_string(), PortData::Real(vec![*value].into()))].into()
+                    }
+                    RustNode::Add => binary_operation(inputs, Box::new(|a, b| a + b))?,
+                    RustNode::Subtract => binary_operation(inputs, Box::new(|a, b| a - b))?,
+                    RustNode::Multiply => binary_operation(inputs, Box::new(|a, b| a * b))?,
 
-            NodeTemplate::PyNode(py_node) => py_node.compute(inputs)?,
-        })
+                    RustNode::Divide => binary_operation(inputs, Box::new(|a, b| a / b))?,
+
+                    RustNode::Join => binary_operation(
+                        inputs,
+                        Box::new(|a, b| a.iter().chain(b).copied().collect()),
+                    )?,
+
+                    RustNode::Reverse => {
+                        unary_operation(inputs, Box::new(|a| a.iter().rev().copied().collect()))?
+                    }
+                    RustNode::Cos => unary_operation(inputs, Box::new(|a| a.cos()))?,
+
+                    RustNode::Sin => unary_operation(inputs, Box::new(|a| a.sin()))?,
+
+                    RustNode::Sinc => unary_operation(
+                        inputs,
+                        Box::new(|a| {
+                            a.map(|x| match x {
+                                0. => 1.,
+                                _ => x.sin() / x,
+                            })
+                        }),
+                    )?,
+
+                    RustNode::Linspace(linspace_config) => linspace_config.compute(inputs),
+                    RustNode::Plot(_) => [].into(),
+                    RustNode::Plot2D(plot_2d) => {
+                        plot_2d.input_changed(inputs);
+                        [].into()
+                    }
+                },
+
+                NodeTemplate::PyNode(py_node) => py_node.compute(inputs)?,
+            },
+            self.clone(),
+        ))
     }
 
     pub fn available_nodes() -> Vec<NodeData> {
@@ -215,47 +224,14 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
     fn compute(
         mut self,
         inputs: OrderMap<String, PortDataContainer>,
-    ) -> Result<OrderMap<String, PortData>, NodeError> {
-        //unpack mutex
-        let port_matches: OrderMap<String, String> = if inputs.len() == 1 {
-            let key = inputs.keys().next().unwrap();
-            [(key.clone(), key.clone())].into()
-        } else {
-            inputs
-                .iter()
-                .combinations(2)
-                .filter(|v| v[0].0 != v[1].0)
-                .flat_map(|v| {
-                    let (a_key, a_value) = v[0];
-                    let (b_key, b_value) = v[1];
-                    if Arc::ptr_eq(a_value, b_value) {
-                        println!("{} points to the same Arc as {}", a_key, b_key);
-                        vec![
-                            (a_key.clone(), a_key.clone()),
-                            (b_key.clone(), a_key.clone()),
-                        ]
-                    } else {
-                        vec![
-                            (a_key.clone(), a_key.clone()),
-                            (b_key.clone(), b_key.clone()),
-                        ]
-                    }
-                })
-                .collect()
-        };
-
-        trace!("getting locks");
-        let unique_locks: OrderMap<String, MutexGuard<PortData>> = port_matches
-            .values()
-            .unique()
-            .map(|v| (v.clone(), inputs[v].lock().unwrap()))
-            .collect();
-        trace!("got locks");
-
-        let data = port_matches
+    ) -> Result<(OrderMap<String, PortData>, NodeData), NodeError> {
+        // unpack mutex
+        trace!("getting compute locks");
+        let data = inputs
             .keys()
-            .map(|k| (k.clone(), &unique_locks[&port_matches[k]]))
+            .map(|k| (k.clone(), inputs[k].read().unwrap()))
             .collect();
+        trace!("got compute locks");
 
         self.fallible_compute(data)
     }

@@ -21,11 +21,13 @@ use iced::widget::{column, *};
 use iced::Length::Fill;
 use iced::{window, Subscription, Task};
 use itertools::Itertools;
-use log::{trace, warn};
+use log::{error, trace, warn};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs::read_to_string;
-use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::Instant;
+use std::iter::once;
+use std::sync::{Arc, RwLock, RwLockReadGuard};
+use std::time::{Duration, Instant};
 
 #[derive(Default, Clone, PartialEq)]
 pub enum Action {
@@ -42,8 +44,8 @@ type UndoStash = Vec<(
     OrderMap<ShapeId, Point>,
 )>;
 
-pub type PortDataReference<'a> = &'a MutexGuard<'a, PortData>;
-pub type PortDataContainer = Arc<Mutex<PortData>>;
+pub type PortDataReference<'a> = RwLockReadGuard<'a, PortData>;
+pub type PortDataContainer = Arc<RwLock<PortData>>;
 
 #[derive(Serialize, Deserialize)]
 pub struct App {
@@ -53,6 +55,8 @@ pub struct App {
     pub cursor_position: Point,
     pub config: f32,
     pub app_theme: AppTheme,
+    #[serde(skip)]
+    pub queued_nodes: HashSet<u32>,
     #[serde(skip)]
     pub debug: bool,
     #[serde(skip)]
@@ -88,11 +92,15 @@ pub enum Message {
     DeleteNode(u32),
 
     QueueCompute(u32),
-    ComputeComplete(u32, Instant, Result<OrderMap<String, PortData>, NodeError>),
+    ComputeComplete(
+        u32,
+        Result<(OrderMap<String, PortData>, NodeData), NodeError>,
+    ),
     ComputeAll,
 
     //// Application
     Config(f32),
+    AnimationTick,
     ThemeValueChange(AppThemeMessage, GuiColorMessage),
     ToggleDebug,
     TogglePaletteUI,
@@ -112,6 +120,7 @@ pub enum Message {
 
 impl App {
     pub fn update(&mut self, message: Message) -> Task<Message> {
+        trace!("{:?}", message);
         match message {
             //// Workspace
             Message::OnDrag(shape_index, cursor_position) => {
@@ -182,10 +191,13 @@ impl App {
                 }
             }
 
-            Message::UpdateNodeTemplate(id, template) => {
-                self.stash_state();
-                self.graph.get_mut_node(id).template = template;
-                return Task::done(Message::QueueCompute(id));
+            Message::UpdateNodeTemplate(id, new_template) => {
+                let old_template = &mut self.graph.get_mut_node(id).template;
+                if *old_template != new_template {
+                    *old_template = new_template;
+                    self.stash_state();
+                    return Task::done(Message::QueueCompute(id));
+                };
             }
             Message::AddNode(template) => {
                 self.stash_state();
@@ -206,6 +218,7 @@ impl App {
                 println!("\n\n\n CONFIG!!!!!!!!!!!!!!!!!!!!!\n\n\n");
                 self.config = v
             }
+            Message::AnimationTick => {}
             Message::ThemeValueChange(tm, tv) => self.app_theme.update(tm, tv),
             Message::ToggleDebug => {
                 self.debug = !self.debug;
@@ -273,49 +286,70 @@ impl App {
                 );
             }
             Message::QueueCompute(nx) => {
+                //// modify node
                 {
                     let node = self.graph.get_mut_node(nx);
-                    if node.status == NodeStatus::Running {
+
+                    // re-queue
+                    if let NodeStatus::Running(..) = node.status {
                         warn!("node already running, requing to try again, {node:?}");
-                        return Task::done(Message::QueueCompute(nx));
+                        //self.queued_nodes.insert(nx);
+                        return Task::none();
                     };
-                    node.status = NodeStatus::Running;
+
+                    node.status = NodeStatus::Running(Instant::now());
                     trace!("beginning compute: node {nx}\n{node:?}");
                 }
-                let node = self.graph.get_node(nx);
-                assert_eq!(node.status, NodeStatus::Running);
-                let input_guarded = self.graph.get_input_data(&nx);
-                let start_inst = Instant::now();
-                return Task::perform(
-                    Graph::async_compute(nx, node.clone(), input_guarded),
-                    move |(nx, res)| Message::ComputeComplete(nx, start_inst, res),
-                );
-            }
-            Message::ComputeComplete(nx, start_inst, result) => {
-                let node = self.graph.get_mut_node(nx);
-                trace!("compute complete, maybe successful: node {nx}\n{node:?}");
-                match &node.status {
-                    NodeStatus::Idle => panic!("Node should not be idle here!"),
-                    NodeStatus::Running => {}
-                    NodeStatus::Error(_node_error) => {}
-                }
 
+                //// queue compute
+                let node = self.graph.get_node(nx);
+                let input_guarded = self.graph.get_input_data(&nx);
+                let (nx, result) = Graph::compute_node(nx, node.clone(), input_guarded);
+                //return Task::done(Message::ComputeComplete(nx, res));
+                //    move |(nx, res)| Message::ComputeComplete(nx, res),
+                //);
+                //return Task::perform(
+                //    Graph::async_compute(nx, node.clone(), input_guarded),
+                //    move |(nx, res)| Message::ComputeComplete(nx, res),
+                //);
+                //
+                //
+                //// Doing this right away fixes issues with stuttering slider controls.
+                //// Is there additionally somthing going on with overwriting the node
+                //// template as soon as the computeComplete call comes back? Or *not*
+                //// overwriting the themplate? I should draw this out, cause this is going to
+                //// be a pain
                 match result {
-                    Ok(output) => {
-                        node.status = NodeStatus::Idle;
-                        node.run_time = Some(Instant::now() - start_inst);
+                    Ok((output, mut node)) => {
+                        // asser that status is what is expected
+                        let start_inst = match &node.status {
+                            NodeStatus::Idle => panic!("Node should not be idle here!"),
+                            NodeStatus::Running(start_inst) => *start_inst,
+                            NodeStatus::Error(_node_error) => panic!("Node should not be Error, compute should have returned an Error result and node.status is set to Error in the match arm below"),
+                        };
+
                         trace!("compute complete: node {nx}\n{node:?}");
 
+                        //// Update wire
                         self.graph.update_wire_data(nx, output);
-                        // attempt to compute children
 
+                        //// Update node
+                        node.status = NodeStatus::Idle;
+                        node.run_time = Some(Instant::now() - start_inst);
+                        self.graph.set_node_data(nx, node);
+
+                        //// Queue children for compute
                         let to_queue: Vec<_> = self
                             .graph
                             .outgoing_edges(&nx)
                             .into_iter()
                             .map(|port_ref| port_ref.node)
-                            .unique()
-                            .collect(); // don't queue a node multiple times
+                            .unique() // don't queue a child multiple times
+                            //TODO: instead of requeing after compute is done,
+                            // potentially abort the running compute task, and restart
+                            // immediately when new input data is received
+                            .chain(once(self.queued_nodes.remove(&nx).then_some(nx)).flatten()) // re-execute node if it got queued up in the meantime
+                            .collect();
                         trace!("Queuing nodes for compute {to_queue:?}");
                         return Task::batch(
                             to_queue
@@ -324,10 +358,68 @@ impl App {
                         );
                     }
                     Err(node_error) => {
-                        log::error!("{}", node_error);
+                        //// Update Node
+                        let node = self.graph.get_mut_node(nx);
+                        error!("compute failed {node:?},{}", node_error);
                         node.status = NodeStatus::Error(node_error);
                         node.run_time = None;
+
+                        //// Update Wire
                         self.graph.update_wire_data(nx, [].into());
+
+                        return Task::none();
+                    }
+                }
+            }
+            Message::ComputeComplete(nx, result) => {
+                match result {
+                    Ok((output, mut node)) => {
+                        // asser that status is what is expected
+                        let start_inst = match &node.status {
+                            NodeStatus::Idle => panic!("Node should not be idle here!"),
+                            NodeStatus::Running(start_inst) => *start_inst,
+                            NodeStatus::Error(_node_error) => panic!("Node should not be Error, compute should have returned an Error result and node.status is set to Error in the match arm below"),
+                        };
+
+                        trace!("compute complete: node {nx}\n{node:?}");
+
+                        //// Update wire
+                        self.graph.update_wire_data(nx, output);
+
+                        //// Update node
+                        node.status = NodeStatus::Idle;
+                        node.run_time = Some(Instant::now() - start_inst);
+                        self.graph.set_node_data(nx, node);
+
+                        //// Queue children for compute
+                        let to_queue: Vec<_> = self
+                            .graph
+                            .outgoing_edges(&nx)
+                            .into_iter()
+                            .map(|port_ref| port_ref.node)
+                            .unique() // don't queue a child multiple times
+                            //TODO: instead of requeing after compute is done,
+                            // potentially abort the running compute task, and restart
+                            // immediately when new input data is received
+                            .chain(once(self.queued_nodes.remove(&nx).then_some(nx)).flatten()) // re-execute node if it got queued up in the meantime
+                            .collect();
+                        trace!("Queuing nodes for compute {to_queue:?}");
+                        return Task::batch(
+                            to_queue
+                                .into_iter()
+                                .map(|node| Task::done(Message::QueueCompute(node))),
+                        );
+                    }
+                    Err(node_error) => {
+                        //// Update Node
+                        let node = self.graph.get_mut_node(nx);
+                        error!("compute failed {node:?},{}", node_error);
+                        node.status = NodeStatus::Error(node_error);
+                        node.run_time = None;
+
+                        //// Update Wire
+                        self.graph.update_wire_data(nx, [].into());
+
                         return Task::none();
                     }
                 };
@@ -447,7 +539,21 @@ pub fn theme(state: &App) -> Theme {
     state.app_theme.clone().into()
 }
 
-pub fn subscriptions(_state: &App) -> Subscription<Message> {
+pub fn subscriptions(state: &App) -> Subscription<Message> {
+    let animation_running = if state
+        .graph
+        .nodes_ref()
+        .into_iter()
+        .map(|nx| state.graph.get_node(nx))
+        .filter(|node| matches!(node.status, NodeStatus::Running(..)))
+        .collect::<Vec<_>>()
+        .is_empty()
+    {
+        Subscription::none()
+    } else {
+        iced::time::every(Duration::from_micros(1_000_000 / 16)).map(|_| Message::AnimationTick)
+    };
+
     Subscription::batch([
         file_watch_subscription(),
         window::open_events().map(|_| Message::WindowOpen),
@@ -465,6 +571,7 @@ pub fn subscriptions(_state: &App) -> Subscription<Message> {
             }
             _ => None,
         }),
+        animation_running,
     ])
 }
 
@@ -492,6 +599,7 @@ impl Default for App {
                     selected_shape: None,
                     cursor_position: Default::default(),
                     action: Default::default(),
+                    queued_nodes: Default::default(),
 
                     app_theme: Default::default(),
                     availble_nodes: NodeData::available_nodes(),

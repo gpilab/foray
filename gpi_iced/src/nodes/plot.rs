@@ -17,12 +17,13 @@ use serde::{Deserialize, Serialize};
 
 // Rectanlge specified by center position, width and height
 // y is up
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct Rect {
     pub center: Vector,
     pub width: f32,
     pub height: f32,
 }
+
 impl Rect {
     pub fn right(&self) -> f32 {
         self.center.x + self.width / 2.
@@ -47,7 +48,7 @@ impl Default for Rect {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct Plot {
     rect: Rect,
 }
@@ -61,8 +62,8 @@ impl Plot {
         let (x, y) =
             if let (Some(x_port), Some(y_port)) = (input_data.get("x"), input_data.get("y")) {
                 if let (PortData::Real(x), PortData::Real(y)) = (
-                    x_port.lock().unwrap().clone(),
-                    y_port.lock().unwrap().clone(),
+                    x_port.read().unwrap().clone(),
+                    y_port.read().unwrap().clone(),
                 ) {
                     (
                         x.to_vec().into_iter().map(|f| f as f32).collect(),

@@ -1,3 +1,6 @@
+use std::f32::consts::PI;
+use std::time::Instant;
+
 use crate::app::{App, Message, PortDataContainer};
 use crate::graph::{GraphNode, PortRef, IO};
 use crate::gui_node::GUINode;
@@ -52,25 +55,37 @@ impl App {
                 style.border.radius = border::radius(100.);
                 style
             };
-        let node_style = move |status: &NodeStatus, t: &Theme| {
-            let color = match status {
-                NodeStatus::Idle => match is_selected {
+        let node_style = move |node: &NodeData, t: &Theme| {
+            let color = match &node.status {
+                NodeStatus::Idle | NodeStatus::Running(_) => match is_selected {
                     true => t.extended_palette().primary.strong.color,
                     false => t.extended_palette().secondary.strong.color,
-                },
-                NodeStatus::Running => match is_selected {
-                    true => t.extended_palette().background.strong.color,
-                    false => t.extended_palette().background.weak.color,
                 },
                 NodeStatus::Error(_node_error) => match is_selected {
                     true => t.extended_palette().danger.base.color,
                     false => t.extended_palette().danger.weak.color,
                 },
             };
+            let run_time = match &node.status {
+                NodeStatus::Running(start_inst) => (Instant::now() - *start_inst).as_secs_f32(),
+                _ => 0.0,
+            };
+
+            let pulse_freq = 1.0;
+            let pulse = color.scale_alpha(
+                ((run_time  // t
+                        * pulse_freq * 2.0 * PI // f 
+                    ).cos() // start at 1.0
+                    + 1.0 // shift range 0.0-2.0
+                ) * 0.5 // scale range 0.0-1.0
+                    * 0.75  // scale range 0.0-0.75
+                    + 0.25, // shift range 0.25-1.0
+            );
+
             container::transparent(t)
                 .border(
                     border::rounded(NODE_RADIUS)
-                        .color(color)
+                        .color(pulse)
                         .width(NODE_BORDER_WIDTH),
                 )
                 .background(iced::Color::from(self.app_theme.background.base_color))
@@ -145,7 +160,7 @@ impl App {
 
         //// Node
         let node_inner: Element<Message, Theme, Renderer> = container(node_view)
-            .style(move |theme| node_style(&node.status, theme))
+            .style(move |theme| node_style(node, theme))
             .center_x(node_size.width)
             .center_y(node_size.height)
             .into();
@@ -172,7 +187,7 @@ pub fn format_node_output<'a>(
     let node_output = data.into_iter().map(|(port_name, d)| {
         (
             port_name.to_string(),
-            d.map(|d| format!("{}", d.lock().unwrap()))
+            d.map(|d| format!("{}", d.read().unwrap()))
                 .unwrap_or("n/a".to_string()),
         )
     });

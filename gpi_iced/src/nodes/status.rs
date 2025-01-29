@@ -1,7 +1,7 @@
 use derive_more::derive::Display;
 use iced::widget::{text, Text};
 use serde::{Deserialize, Serialize};
-use std::error;
+use std::{error, time::Instant};
 
 use crate::SYMBOL_FONT;
 
@@ -9,7 +9,8 @@ use crate::SYMBOL_FONT;
 pub enum NodeStatus {
     #[default]
     Idle,
-    Running,
+    #[display("Running")]
+    Running(Instant),
     Error(NodeError),
 }
 
@@ -17,7 +18,7 @@ impl NodeStatus {
     pub fn icon(&self) -> Text {
         match self {
             NodeStatus::Idle => text(""),
-            NodeStatus::Running => text(""),
+            NodeStatus::Running(_) => text(""),
             NodeStatus::Error(_) => text("").style(text::danger).font(SYMBOL_FONT),
         }
     }
@@ -25,7 +26,7 @@ impl NodeStatus {
     pub fn text_element(&self) -> Text {
         match self {
             NodeStatus::Idle => text(""),
-            NodeStatus::Running => text("running"),
+            NodeStatus::Running(_) => text("running"),
             NodeStatus::Error(err) => text(err.to_string()).style(text::danger),
         }
     }

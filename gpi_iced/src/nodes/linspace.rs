@@ -13,7 +13,7 @@ use iced::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct LinspaceConfig {
     start: f64,
     stop: f64,
@@ -84,7 +84,7 @@ impl LinspaceConfig {
                     id,
                     NodeTemplate::RustNode(RustNode::Linspace(LinspaceConfig {
                         start: value.parse().unwrap_or(0.),
-                        ..self.clone()
+                        ..*self
                     })),
                 )
             },
@@ -95,7 +95,7 @@ impl LinspaceConfig {
                     id,
                     NodeTemplate::RustNode(RustNode::Linspace(LinspaceConfig {
                         stop: value.parse().unwrap_or(0.),
-                        ..self.clone()
+                        ..*self
                     })),
                 )
             },
@@ -106,7 +106,7 @@ impl LinspaceConfig {
                     id,
                     NodeTemplate::RustNode(RustNode::Linspace(LinspaceConfig {
                         num: value.parse().unwrap_or(0),
-                        ..self.clone()
+                        ..*self
                     })),
                 )
             },
