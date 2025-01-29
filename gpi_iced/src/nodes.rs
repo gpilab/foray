@@ -18,8 +18,10 @@ use crate::nodes::plot::Plot;
 use crate::nodes::plot_complex::Plot2D;
 use crate::python::py_node::PyNode;
 use crate::OrderMap;
+use derive_more::derive::{Debug, Display};
 use iced::widget::text;
 use iced::Font;
+use itertools::Itertools;
 use log::trace;
 use port::{PortData, PortType};
 use serde::{Deserialize, Serialize};
@@ -35,7 +37,7 @@ pub struct NodeData {
     pub run_time: Option<Duration>,
 }
 
-#[derive(Clone, Debug, EnumIter, VariantNames, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Display, EnumIter, VariantNames, Serialize, Deserialize, PartialEq)]
 pub enum RustNode {
     Identity,
     Constant(f64),
@@ -46,16 +48,21 @@ pub enum RustNode {
     Cos,
     Sin,
     Sinc,
+    #[display("Linspace")]
     Linspace(LinspaceConfig),
+    #[display("Plot")]
     Plot(Plot),
+    #[display("Plot2D")]
     Plot2D(Plot2D),
     Join,
     Reverse,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Display, Serialize, Deserialize, PartialEq)]
 pub enum NodeTemplate {
+    #[debug("{_0:?}")]
     RustNode(RustNode),
+    #[debug("{_0:?}")]
     PyNode(PyNode),
 }
 
@@ -138,11 +145,16 @@ impl NodeData {
     pub fn available_nodes() -> Vec<NodeData> {
         let nodes = RustNode::iter()
             .map(|template| template.template_variants())
-            .chain(PyNode::template_variants())
-            .collect();
+            .chain(PyNode::template_variants());
 
-        trace!("loading available nodes:\n{:?}", nodes);
-        nodes
+        trace!(
+            "Loading available nodes:\n{}",
+            nodes
+                .clone()
+                .map(|n| format!("{:?}", n.template))
+                .join("\n")
+        );
+        nodes.collect()
     }
 }
 impl RustNode {
@@ -226,12 +238,10 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
         inputs: OrderMap<String, PortDataContainer>,
     ) -> Result<(OrderMap<String, PortData>, NodeData), NodeError> {
         // unpack mutex
-        trace!("getting compute locks");
         let data = inputs
             .keys()
             .map(|k| (k.clone(), inputs[k].read().unwrap()))
             .collect();
-        trace!("got compute locks");
 
         self.fallible_compute(data)
     }

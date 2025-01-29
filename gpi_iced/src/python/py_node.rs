@@ -4,7 +4,7 @@ use std::{
     str::FromStr,
 };
 
-use derive_more::derive::Debug;
+use derive_more::derive::{Debug, Display};
 use numpy::{PyArrayMethods, ToPyArray};
 use pyo3::{types::PyAnyMethods, FromPyObject, PyObject, Python};
 use serde::{Deserialize, Serialize};
@@ -21,7 +21,8 @@ use crate::{
 
 use super::{gpipy_compute, gpipy_config};
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Display, Serialize, Deserialize, PartialEq)]
+#[display("{}", self.name)]
 pub struct PyNode {
     pub name: String,
     pub path: PathBuf,

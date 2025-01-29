@@ -6,7 +6,7 @@ use crate::math::{Point, Vector};
 use crate::nodes::port::PortData;
 use crate::nodes::port::PortType;
 use crate::nodes::status::{NodeError, NodeStatus};
-use crate::nodes::{NodeData, NodeTemplate};
+use crate::nodes::{NodeData, NodeTemplate, RustNode};
 use crate::python::py_node::PyNode;
 use crate::style::theme::AppTheme;
 use crate::widget::shapes::ShapeId;
@@ -57,6 +57,8 @@ pub struct App {
     pub app_theme: AppTheme,
     #[serde(skip)]
     pub queued_nodes: HashSet<u32>,
+    //#[serde(skip)]
+    //pub compute_task_handles: HashMap<u32, iced::task::Handle>,
     #[serde(skip)]
     pub debug: bool,
     #[serde(skip)]
@@ -71,7 +73,7 @@ pub struct App {
     pub redo_stack: UndoStash,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, derive_more::Debug)]
 pub enum Message {
     //// Workspace
     OnDrag(ShapeId, Point),
@@ -94,7 +96,7 @@ pub enum Message {
     QueueCompute(u32),
     ComputeComplete(
         u32,
-        Result<(OrderMap<String, PortData>, NodeData), NodeError>,
+        #[debug(skip)] Result<(OrderMap<String, PortData>, NodeData), NodeError>,
     ),
     ComputeAll,
 
@@ -120,7 +122,7 @@ pub enum Message {
 
 impl App {
     pub fn update(&mut self, message: Message) -> Task<Message> {
-        trace!("{:?}", message);
+        trace!("---Message--- {:?}", message);
         match message {
             //// Workspace
             Message::OnDrag(shape_index, cursor_position) => {
@@ -192,10 +194,12 @@ impl App {
             }
 
             Message::UpdateNodeTemplate(id, new_template) => {
-                let old_template = &mut self.graph.get_mut_node(id).template;
+                let old_template = &self.graph.get_node(id).template;
                 if *old_template != new_template {
-                    *old_template = new_template;
                     self.stash_state();
+                    // now we can aquire mutable reference
+                    let old_template = &mut self.graph.get_mut_node(id).template;
+                    *old_template = new_template;
                     return Task::done(Message::QueueCompute(id));
                 };
             }
@@ -279,6 +283,7 @@ impl App {
             }
             Message::ComputeAll => {
                 let nodes = self.graph.get_roots();
+                trace!("Queuing root nodes: {nodes:?}");
                 return Task::batch(
                     nodes
                         .into_iter()
@@ -286,110 +291,63 @@ impl App {
                 );
             }
             Message::QueueCompute(nx) => {
-                //// modify node
+                //// modify node status
                 {
                     let node = self.graph.get_mut_node(nx);
 
                     // re-queue
                     if let NodeStatus::Running(..) = node.status {
-                        warn!("node already running, requing to try again, {node:?}");
-                        //self.queued_nodes.insert(nx);
+                        trace!("Re-queue, {} #{nx}", node.template);
+                        self.queued_nodes.insert(nx);
                         return Task::none();
                     };
 
                     node.status = NodeStatus::Running(Instant::now());
-                    trace!("beginning compute: node {nx}\n{node:?}");
+                    trace!("Beginning compute: {} #{nx}", node.template,);
                 }
 
                 //// queue compute
                 let node = self.graph.get_node(nx);
-                let input_guarded = self.graph.get_input_data(&nx);
-                let (nx, result) = Graph::compute_node(nx, node.clone(), input_guarded);
-                //return Task::done(Message::ComputeComplete(nx, res));
-                //    move |(nx, res)| Message::ComputeComplete(nx, res),
-                //);
-                //return Task::perform(
-                //    Graph::async_compute(nx, node.clone(), input_guarded),
-                //    move |(nx, res)| Message::ComputeComplete(nx, res),
-                //);
-                //
-                //
-                //// Doing this right away fixes issues with stuttering slider controls.
-                //// Is there additionally somthing going on with overwriting the node
-                //// template as soon as the computeComplete call comes back? Or *not*
-                //// overwriting the themplate? I should draw this out, cause this is going to
-                //// be a pain
-                match result {
-                    Ok((output, mut node)) => {
-                        // asser that status is what is expected
-                        let start_inst = match &node.status {
-                            NodeStatus::Idle => panic!("Node should not be idle here!"),
-                            NodeStatus::Running(start_inst) => *start_inst,
-                            NodeStatus::Error(_node_error) => panic!("Node should not be Error, compute should have returned an Error result and node.status is set to Error in the match arm below"),
-                        };
-
-                        trace!("compute complete: node {nx}\n{node:?}");
-
-                        //// Update wire
-                        self.graph.update_wire_data(nx, output);
-
-                        //// Update node
-                        node.status = NodeStatus::Idle;
-                        node.run_time = Some(Instant::now() - start_inst);
-                        self.graph.set_node_data(nx, node);
-
-                        //// Queue children for compute
-                        let to_queue: Vec<_> = self
-                            .graph
-                            .outgoing_edges(&nx)
-                            .into_iter()
-                            .map(|port_ref| port_ref.node)
-                            .unique() // don't queue a child multiple times
-                            //TODO: instead of requeing after compute is done,
-                            // potentially abort the running compute task, and restart
-                            // immediately when new input data is received
-                            .chain(once(self.queued_nodes.remove(&nx).then_some(nx)).flatten()) // re-execute node if it got queued up in the meantime
-                            .collect();
-                        trace!("Queuing nodes for compute {to_queue:?}");
-                        return Task::batch(
-                            to_queue
-                                .into_iter()
-                                .map(|node| Task::done(Message::QueueCompute(node))),
-                        );
-                    }
-                    Err(node_error) => {
-                        //// Update Node
-                        let node = self.graph.get_mut_node(nx);
-                        error!("compute failed {node:?},{}", node_error);
-                        node.status = NodeStatus::Error(node_error);
-                        node.run_time = None;
-
-                        //// Update Wire
-                        self.graph.update_wire_data(nx, [].into());
-
-                        return Task::none();
-                    }
-                }
+                return Task::perform(
+                    Graph::async_compute(nx, node.clone(), self.graph.get_input_data(&nx)),
+                    move |(nx, res)| Message::ComputeComplete(nx, res),
+                );
             }
             Message::ComputeComplete(nx, result) => {
                 match result {
-                    Ok((output, mut node)) => {
-                        // asser that status is what is expected
-                        let start_inst = match &node.status {
+                    Ok((output, node)) => {
+                        // assert that status is what is expected
+                        let run_time = match &node.status {
                             NodeStatus::Idle => panic!("Node should not be idle here!"),
-                            NodeStatus::Running(start_inst) => *start_inst,
+                            NodeStatus::Running(start_inst) => Instant::now() - *start_inst,
                             NodeStatus::Error(_node_error) => panic!("Node should not be Error, compute should have returned an Error result and node.status is set to Error in the match arm below"),
                         };
 
-                        trace!("compute complete: node {nx}\n{node:?}");
+                        trace!("Compute complete: {} #{nx}, {run_time:.1?}", node.template,);
 
                         //// Update wire
                         self.graph.update_wire_data(nx, output);
 
                         //// Update node
-                        node.status = NodeStatus::Idle;
-                        node.run_time = Some(Instant::now() - start_inst);
-                        self.graph.set_node_data(nx, node);
+                        self.graph.set_node_data(
+                            nx,
+                            NodeData {
+                                status: NodeStatus::Idle,
+                                run_time: Some(run_time),
+                                // we *don't* update template here for some nodes
+                                // because that causes stuttery behaviour for
+                                // fast update scenarios like the slider of the 'constant'
+                                // node. alternatively, canceling in progress compute tasks
+                                // might address this, and may be necessary in the future.
+                                // similar to TODO: below
+                                template: match node.template {
+                                    NodeTemplate::RustNode(RustNode::Constant(_)) => {
+                                        self.graph.get_node(nx).template.clone()
+                                    }
+                                    _ => node.template,
+                                },
+                            },
+                        );
 
                         //// Queue children for compute
                         let to_queue: Vec<_> = self
@@ -398,12 +356,12 @@ impl App {
                             .into_iter()
                             .map(|port_ref| port_ref.node)
                             .unique() // don't queue a child multiple times
-                            //TODO: instead of requeing after compute is done,
+                            // TODO: instead of requeing after compute is done,
                             // potentially abort the running compute task, and restart
                             // immediately when new input data is received
                             .chain(once(self.queued_nodes.remove(&nx).then_some(nx)).flatten()) // re-execute node if it got queued up in the meantime
                             .collect();
-                        trace!("Queuing nodes for compute {to_queue:?}");
+                        trace!("Queuing children for compute {to_queue:?}");
                         return Task::batch(
                             to_queue
                                 .into_iter()
@@ -413,7 +371,7 @@ impl App {
                     Err(node_error) => {
                         //// Update Node
                         let node = self.graph.get_mut_node(nx);
-                        error!("compute failed {node:?},{}", node_error);
+                        error!("Compute failed {node:?},{}", node_error);
                         node.status = NodeStatus::Error(node_error);
                         node.run_time = None;
 
@@ -463,40 +421,53 @@ impl App {
         }
     }
 
-    /// stash current app state, and reset the redo stack
+    /// Stash current app state, and reset the redo stack
     fn stash_state(&mut self) {
-        //PERF: cloning the wire data in here will be really expensive when large data is used
-        // Need to only store graph structure, and transfer data between undo/redo states.
-        // just need to carefully handle invalid data between states
-        // Also - likely need to re-execute graph after undo/redo, to make sure everything is up to
-        // date!
-        self.undo_stack
-            .push((self.graph.clone(), self.shapes.shape_positions.clone()));
+        let mut graph_snap_shot = self.graph.clone();
+        // We don't want to stash any node.status "running" values
+        let running_nodes: Vec<_> = graph_snap_shot
+            .nodes_ref()
+            .into_iter()
+            .filter(|nx| {
+                matches!(
+                    graph_snap_shot.get_node(*nx).status,
+                    NodeStatus::Running(..)
+                )
+            })
+            .collect();
+        for nx in running_nodes {
+            graph_snap_shot.get_mut_node(nx).status = NodeStatus::Idle;
+        }
 
-        // Don't let the stack get too big, especially while we naively store everything
+        self.undo_stack
+            .push((graph_snap_shot, self.shapes.shape_positions.clone()));
+
+        // Don't let the stack get too big
         self.undo_stack.truncate(10);
 
         self.redo_stack.clear();
     }
 
+    /// Re-calculates node definitions.
+    /// *Does not recompute any nodes.*
     fn reload_nodes(&mut self) {
-        //update any existing nodes in the graph that could change based on file changes
+        // Update any existing nodes in the graph that could change based on file changes
         self.graph.nodes_ref().iter().for_each(|nx| {
             let node = self.graph.get_node(*nx);
             if let NodeTemplate::PyNode(old_py_node) = &node.template {
-                // get old version's ports
+                // Get old version's ports
                 let old_ports = old_py_node.clone().ports.unwrap_or_default();
                 let old_in_ports = old_ports.inputs;
                 let old_out_ports = old_ports.outputs;
 
-                // get new node version, reading from disk
+                // Get new node version, reading from disk
                 let new_py_node = PyNode::new(&old_py_node.name);
                 let new_ports = new_py_node.clone().ports.unwrap_or_default();
 
                 let new_in_ports = new_ports.inputs;
                 let new_out_ports = new_ports.outputs;
 
-                // find any nodes that previously existed, but now do not
+                // Find any nodes that previously existed, but now do not
                 let invalid_in = old_in_ports
                     .into_iter()
                     .filter(|(old_name, old_type)| new_in_ports.get(old_name) != Some(old_type))
@@ -514,24 +485,22 @@ impl App {
                         io: IO::Out,
                     });
 
-                // remove invalid edges from graph
+                // Remove invalid edges from graph
                 invalid_in.chain(invalid_out).for_each(|p| {
                     warn!(
-                        "removing port {:?} from node {:?}",
+                        "Removing port {:?} from node {:?}",
                         p.name, new_py_node.name
                     );
                     self.graph.remove_edge(&p);
                 });
 
-                // update the node with most recent changes
+                // Update the node with most recent changes
                 self.graph
                     .set_node_data(*nx, NodeTemplate::PyNode(new_py_node).into());
             }
         });
-        //update list of available nodes
+        // Update list of available nodes
         self.availble_nodes = NodeData::available_nodes();
-        //recompute all nodes
-        //self.graph.execute_network();
     }
 }
 
@@ -577,7 +546,7 @@ pub fn subscriptions(state: &App) -> Subscription<Message> {
 
 impl Default for App {
     fn default() -> App {
-        // try to load file
+        // Try to load file
         match read_to_string("network.ron").map(|s| ron::from_str::<App>(&s)) {
             Ok(Ok(app)) => {
                 let mut app = app;
@@ -600,7 +569,7 @@ impl Default for App {
                     cursor_position: Default::default(),
                     action: Default::default(),
                     queued_nodes: Default::default(),
-
+                    //compute_task_handles: Default::default(),
                     app_theme: Default::default(),
                     availble_nodes: NodeData::available_nodes(),
                     shapes: workspace::State::new(shapes.into()),

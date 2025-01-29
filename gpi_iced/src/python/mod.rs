@@ -21,7 +21,7 @@ pub fn gpipy_compute<'a>(
     //PERF: cache this in the PyNode
     let node_src = fs::read_to_string(path.join(format!("nodes/{node_type}.py")))
         .map_err(|e| NodeError::FileSys(e.to_string()))?;
-    trace!("running '{node_type}' compute:\n{node_src}");
+    trace!("Running '{node_type}' compute:\n{node_src}");
     //PERF: test if caching this is a big performance win
     //This would be more of a pain to cache becaues of the associated python lifetime, but could
     //potentially be worth it
@@ -79,7 +79,7 @@ pub fn gpipy_config(node_name: &str) -> PyNode {
 
 pub fn gpipy_read_config(node_type: &str, node_src: &str) -> Result<PortDef, NodeError> {
     Python::with_gil(|py| {
-        trace!("reading node '{node_type}' config with src:\n{node_src}");
+        trace!("Reading node config '{node_type}'");
 
         //TODO Clean up error handling
         let node_module = PyModule::from_code(

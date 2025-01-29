@@ -156,7 +156,7 @@ impl Plot2D {
     }
 
     fn create_image_handle(data: &Array2<f64>) -> Handle {
-        trace!("creating image handle for plot2d");
+        trace!("Creating image handle for plot2d, {:?}", data.shape());
         let max = data.iter().fold(-f64::INFINITY, |a, &b| a.max(b));
         let min = data.iter().fold(f64::INFINITY, |a, &b| a.min(b));
         let img: Vec<u8> = data
@@ -185,7 +185,6 @@ impl Plot2D {
         } else {
             &Array2::zeros((0, 0))
         };
-        trace!("input changed!");
         self.image_handle = Some(Self::create_image_handle(data));
     }
 }

@@ -66,11 +66,13 @@ impl std::ops::Mul<f32> for Vector {
     }
 }
 
-#[derive(Default, PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Default, PartialEq, derive_more::Debug, Clone, Copy, Serialize, Deserialize)]
+#[debug("({x:.2},{y:.2})")]
 pub struct Point {
     pub x: f32,
     pub y: f32,
 }
+
 impl Point {
     pub fn new(x: f32, y: f32) -> Self {
         Self { x, y }
