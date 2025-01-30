@@ -5,16 +5,18 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-iced = { version = "0.13.1", features = [
+iced = { version = "0.13.1", default-features=false, features = [
+	"wgpu",
+	"auto-detect-theme",
 	"debug",
 	"lazy",
-	"image",
+	"image-without-codecs",
 	"advanced",
 	"canvas",
 	"async-std",
 ] }
 
-pyo3 = "0.23.3"
+pyo3 = {version = "0.23.3", default-features=false}
 numpy = "0.23.0"
 ndarray = "0.16.1"
 
