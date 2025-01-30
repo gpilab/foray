@@ -39,7 +39,7 @@ where
     Theme: Catalog,
     Renderer: iced::advanced::graphics::geometry::Renderer,
 {
-    contents: Shapes<Element<'a, Message, Theme, Renderer>>,
+    shapes: Shapes<Element<'a, Message, Theme, Renderer>>,
     connections: Vec<(Path, Stroke<'a>)>,
     camera: Camera,
     pan: Option<Box<dyn Fn(Vector) -> Message + 'a>>,
@@ -99,7 +99,7 @@ where
             .iter()
             .map(|(id, position)| (*id, *position))
             .collect();
-        let contents = Shapes(
+        let shapes = Shapes(
             state
                 .shape_positions
                 .iter()
@@ -113,7 +113,7 @@ where
             .collect();
 
         Self {
-            contents,
+            shapes,
             connections,
             camera: state.camera.clone(),
             pan: None,
@@ -175,7 +175,7 @@ where
     fn diff(&self, tree: &mut widget::Tree) {
         tree.diff_children(
             &self
-                .contents
+                .shapes
                 .0
                 .values()
                 .map(|shape| &shape.state)
@@ -191,7 +191,7 @@ where
     }
 
     fn children(&self) -> Vec<Tree> {
-        self.contents
+        self.shapes
             .0
             .values()
             .map(|shape| Tree::new(shape.state.as_widget()))
@@ -208,7 +208,7 @@ where
             //// Fill the screen
             limits.resolve(Length::Fill, Length::Fill, Size::new(50., 50.)),
             ///// Layout child elements
-            self.contents
+            self.shapes
                 .0
                 .values()
                 .zip(&mut tree.children)
@@ -254,8 +254,16 @@ where
         {
             //TODO: apply zoom transform
             //// Render Children in a layer that is bounded to the size of the workspace
-            let elements = self.contents.0.values().zip(&tree.children);
-            for ((shape, tree), c_layout) in elements.zip(workspace_layout.children()) {
+            let elements: Vec<_> = self
+                .shapes
+                .0
+                .values()
+                .zip(&tree.children)
+                .zip(workspace_layout.children())
+                .collect();
+
+            // reverse to render first element on top
+            for ((shape, tree), c_layout) in elements.into_iter().rev() {
                 renderer.with_layer(workspace_layout.bounds(), |renderer| {
                     shape
                         .state
@@ -290,7 +298,7 @@ where
 
         //// Pass event down to children
         let event_status = self
-            .contents
+            .shapes
             .0
             .iter_mut()
             .zip(&mut tree.children)
@@ -316,7 +324,7 @@ where
                 | Event::Touch(FingerPressed { .. }) => {
                     ////Find the first coliding shape
                     if let Some((id, offset)) =
-                        self.contents.find_shape(cursor_position.into(), layout)
+                        self.shapes.find_shape(cursor_position.into(), layout)
                     {
                         //// publish event
                         if let Some(on_shape_click) = &self.on_click {
@@ -409,7 +417,7 @@ where
         viewport: &Rectangle,
         renderer: &Renderer,
     ) -> mouse::Interaction {
-        self.contents
+        self.shapes
             .0
             .values()
             .zip(&tree.children)

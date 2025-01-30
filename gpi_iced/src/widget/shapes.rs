@@ -1,11 +1,14 @@
 use crate::OrderMap;
+use derive_more::derive::Debug;
 use iced::advanced::layout;
 
 use crate::math::{Point, Vector};
 
 pub type ShapeId = u32;
+#[derive(Debug)]
 pub struct Shape<T> {
     pub position: Point,
+    #[debug(skip)]
     pub state: T,
 }
 
@@ -18,6 +21,7 @@ impl<T> Shape<T> {
     }
 }
 
+#[derive(Debug)]
 pub struct Shapes<T>(pub OrderMap<ShapeId, Shape<T>>);
 
 impl<T> Default for Shapes<T> {

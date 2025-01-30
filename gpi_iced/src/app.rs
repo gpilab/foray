@@ -189,6 +189,14 @@ impl App {
             Message::OnSelect(maybe_id) => {
                 self.selected_shape = maybe_id;
                 if let Some(nx) = maybe_id {
+                    // Move selected node to the front
+                    self.shapes.shape_positions.move_index(
+                        self.shapes
+                            .shape_positions
+                            .get_index_of(&nx)
+                            .expect("id exists"),
+                        0,
+                    );
                     return Task::done(Message::QueueCompute(nx));
                 }
             }

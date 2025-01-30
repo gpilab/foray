@@ -28,9 +28,8 @@
   - [x] parallel execution
   - [ ] pause execution
   - [ ] consistent styling for execution state
-    - [ ] running indicication (vary alpha over time?)
+    - [x] running indicication (vary alpha over time?)
     - [ ] unfilled inputs
-    - [ ] waiting for ancestors (?) leaning toward this being unecessary complexity
 
 - [x] load available nodes
 - [x] display available nodes
@@ -42,6 +41,7 @@
   - [ ] select multiple nodes
 
 - [x] render node types differently
+- [x] render nodes ontop of one another in the order that they are most recently selected (Current selected node will always be on top)
 
 - [x] wires
   - [x] create wires via click and drag
