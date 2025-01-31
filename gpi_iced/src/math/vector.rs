@@ -1,21 +1,12 @@
+use derive_more::derive::{Add, Mul, Neg, Sub};
 use serde::{Deserialize, Serialize};
 
-#[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize, Add, Mul, Sub, Neg)]
 pub struct Vector {
     pub x: f32,
     pub y: f32,
 }
 
-impl std::ops::Neg for Vector {
-    type Output = Vector;
-
-    fn neg(self) -> Self::Output {
-        Self {
-            x: -self.x,
-            y: -self.y,
-        }
-    }
-}
 impl Vector {
     pub fn new(x: f32, y: f32) -> Self {
         Self { x, y }
@@ -52,16 +43,6 @@ impl From<[f32; 2]> for Vector {
         Self {
             x: value[0],
             y: value[1],
-        }
-    }
-}
-impl std::ops::Mul<f32> for Vector {
-    type Output = Vector;
-
-    fn mul(self, rhs: f32) -> Self::Output {
-        Self {
-            x: self.x * rhs,
-            y: self.y * rhs,
         }
     }
 }
@@ -128,6 +109,7 @@ impl std::ops::Sub<Vector> for Point {
         }
     }
 }
+
 impl std::ops::Add<Vector> for Point {
     type Output = Point;
 

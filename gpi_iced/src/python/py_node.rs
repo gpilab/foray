@@ -12,7 +12,7 @@ use strum::VariantNames;
 
 use crate::OrderMap;
 use crate::{
-    app::PortDataReference,
+    gui_node::PortDataReference,
     nodes::{
         port::{PortData, PortType},
         status::NodeError,

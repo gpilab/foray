@@ -5,7 +5,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-iced = { version = "0.13.1", default-features=false, features = [
+iced = { version = "0.13.1", default-features = false, features = [
 	"wgpu",
 	"auto-detect-theme",
 	"debug",
@@ -16,7 +16,7 @@ iced = { version = "0.13.1", default-features=false, features = [
 	"async-std",
 ] }
 
-pyo3 = {version = "0.23.3", default-features=false}
+pyo3 = { version = "0.23.3", default-features = false }
 numpy = "0.23.0"
 ndarray = "0.16.1"
 
@@ -25,7 +25,7 @@ indexmap = { version = "2.7.0", features = ["serde"] }
 
 serde = { version = "1.0.217", features = ["serde_derive"] }
 strum = { version = "0.26.3", features = ["derive"] }
-derive_more = { version = "1.0.0", features = ["debug", "display"] }
+derive_more = { version = "1.0.0", features = ["debug", "display","add","mul","not"] }
 float-cmp = "0.10.0"
 notify = { version = "8.0.0", features = ["serde"] }
 notify-debouncer-full = "0.5.0"
@@ -42,4 +42,4 @@ console_error_panic_hook = "0.1.7"
 
 [profile.dev]
 debug = 0
-codegen-backend = "cranelift"
+# codegen-backend = "cranelift"

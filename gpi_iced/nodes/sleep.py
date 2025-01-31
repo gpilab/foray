@@ -10,6 +10,8 @@ def config():
 
 
 def compute(input):
-    time.sleep(2)
     output = input["in"]
+
+    time.sleep(2)
+
     return output

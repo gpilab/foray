@@ -1,5 +1,6 @@
 use super::{PortData, RustNode};
-use crate::app::{Message, PortDataContainer};
+use crate::app::Message;
+use crate::gui_node::PortDataContainer;
 use crate::interface::node::{INNER_NODE_HEIGHT, INNER_NODE_WIDTH, NODE_BORDER_WIDTH};
 use crate::math::{linspace_delta, Vector};
 use crate::nodes::NodeTemplate;
