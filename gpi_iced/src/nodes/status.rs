@@ -3,7 +3,7 @@ use iced::widget::{text, Text};
 use serde::{Deserialize, Serialize};
 use std::{error, time::Instant};
 
-use crate::SYMBOL_FONT;
+use crate::style::icon::icon;
 
 #[derive(Clone, Debug, Default, Display, PartialEq, Eq)]
 pub enum NodeStatus {
@@ -17,16 +17,16 @@ pub enum NodeStatus {
 impl NodeStatus {
     pub fn icon(&self) -> Text {
         match self {
-            NodeStatus::Idle => text(""),
-            NodeStatus::Running(_) => text(""),
-            NodeStatus::Error(_) => text("").style(text::danger).font(SYMBOL_FONT),
+            NodeStatus::Idle => icon(""),
+            NodeStatus::Running(_) => icon(""),
+            NodeStatus::Error(_) => icon("").style(text::danger),
         }
     }
 
     pub fn text_element(&self) -> Text {
         match self {
             NodeStatus::Idle => text(""),
-            NodeStatus::Running(_) => text("running"),
+            NodeStatus::Running(_) => text("Running"),
             NodeStatus::Error(err) => text(err.to_string()).style(text::danger),
         }
     }

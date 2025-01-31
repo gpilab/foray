@@ -1,5 +1,6 @@
 use super::{PortData, RustNode};
-use crate::app::{Message, PortDataContainer, PortDataReference};
+use crate::app::Message;
+use crate::gui_node::{PortDataContainer, PortDataReference};
 use crate::interface::node::{INNER_NODE_WIDTH, NODE_BORDER_WIDTH};
 use crate::math::Vector;
 use crate::nodes::NodeTemplate;
@@ -44,9 +45,9 @@ impl Default for Rect {
     }
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Plot2D {
-    rect: Rect,
+    pub rect: Rect,
     #[serde(skip)]
     pub image_handle: Option<Handle>,
 }
@@ -148,7 +149,16 @@ impl Plot2D {
                     }),
                 ]
                 .spacing(5.0)
-                .align_y(Center)
+                .align_y(Center),
+                match &self.image_handle {
+                    Some(handle) => container(
+                        image(handle)
+                            .filter_method(image::FilterMethod::Nearest)
+                            .width(INNER_NODE_WIDTH * 2.)
+                            .height(INNER_NODE_WIDTH * 2.),
+                    ),
+                    _ => container(text("")),
+                }
             ]
             .spacing(5.0)
             .into(),
@@ -172,19 +182,20 @@ impl Plot2D {
     }
 
     pub(crate) fn input_changed(&mut self, input_data: OrderMap<String, PortDataReference>) {
-        let data = if let Some(port) = input_data.get("a") {
-            match &**port {
-                PortData::Real2d(a) => a,
-                PortData::Complex2d(a) => &Array2::<f64>::from_shape_vec(
-                    (a.len().isqrt(), a.len().isqrt()),
-                    a.iter().map(|v| v.norm_sqr().sqrt()).collect::<Vec<_>>(),
-                )
-                .expect("square matrix"),
-                _ => panic!("unsuported plot types {:?}", port),
+        self.image_handle = match input_data.get("a") {
+            Some(port) => {
+                let data = match &**port {
+                    PortData::Real2d(a) => a,
+                    PortData::Complex2d(a) => &Array2::<f64>::from_shape_vec(
+                        (a.len().isqrt(), a.len().isqrt()),
+                        a.iter().map(|v| v.norm_sqr().sqrt()).collect::<Vec<_>>(),
+                    )
+                    .expect("square matrix"),
+                    _ => panic!("unsuported plot types {:?}", port),
+                };
+                Some(Self::create_image_handle(data))
             }
-        } else {
-            &Array2::zeros((0, 0))
+            None => None,
         };
-        self.image_handle = Some(Self::create_image_handle(data));
     }
 }

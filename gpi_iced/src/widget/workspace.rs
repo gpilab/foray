@@ -45,16 +45,15 @@ where
     pan: Option<Box<dyn Fn(Vector) -> Message + 'a>>,
     zoom: Option<Box<dyn Fn(f32) -> Message + 'a>>,
     on_cursor_move: Option<Box<dyn Fn(Point) -> Message + 'a>>,
-    on_click: Option<Box<dyn Fn(Option<ShapeId>) -> Message + 'a>>,
-    on_shape_drag: Option<Box<dyn Fn(ShapeId, Point) -> Message + 'a>>,
-    on_shape_release: Option<Box<dyn Fn(ShapeId) -> Message + 'a>>,
+    #[allow(clippy::type_complexity)]
+    on_click: Option<Box<dyn Fn(Option<(ShapeId, Vector)>) -> Message + 'a>>,
+    on_shape_release: Option<Message>,
 }
 #[derive(Default, PartialEq, Clone, Debug)]
 enum Action {
     #[default]
     Idle,
-    /// ShapeId and offset of the cursor with respect to the shape position
-    Drag(ShapeId, Vector),
+    Drag,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -120,7 +119,6 @@ where
             zoom: None,
             on_cursor_move: None,
             on_click: None,
-            on_shape_drag: None,
             on_shape_release: None,
         }
     }
@@ -135,18 +133,16 @@ where
         self
     }
 
-    pub fn on_press(mut self, on_press: impl Fn(Option<ShapeId>) -> Message + 'a) -> Self {
+    pub fn on_press(
+        mut self,
+        on_press: impl Fn(Option<(ShapeId, Vector)>) -> Message + 'a,
+    ) -> Self {
         self.on_click = Some(Box::new(on_press));
         self
     }
 
-    pub fn on_shape_drag(mut self, on_shape_drag: impl Fn(ShapeId, Point) -> Message + 'a) -> Self {
-        self.on_shape_drag = Some(Box::new(on_shape_drag));
-        self
-    }
-
-    pub fn on_release(mut self, on_release: impl Fn(ShapeId) -> Message + 'a) -> Self {
-        self.on_shape_release = Some(Box::new(on_release));
+    pub fn on_release(mut self, on_release: Message) -> Self {
+        self.on_shape_release = Some(on_release);
         self
     }
 
@@ -236,9 +232,8 @@ where
         let bounds = workspace_layout.bounds();
         let workspace_offset = Vector::new(bounds.position().x, bounds.position().y);
 
-        //// Draw saved curves
+        ////// Draw saved curves
         let mut frame = renderer.new_frame(bounds.size());
-
         frame.translate((self.camera.position * -1.0).into());
 
         self.connections
@@ -262,7 +257,6 @@ where
                 .zip(workspace_layout.children())
                 .collect();
 
-            // reverse to render first element on top
             for ((shape, tree), c_layout) in elements.into_iter().rev() {
                 renderer.with_layer(workspace_layout.bounds(), |renderer| {
                     shape
@@ -322,20 +316,24 @@ where
             (event::Status::Ignored, Some(cursor_position)) => match event.clone() {
                 Event::Mouse(ButtonPressed(mouse::Button::Left))
                 | Event::Touch(FingerPressed { .. }) => {
-                    ////Find the first coliding shape
-                    if let Some((id, offset)) =
-                        self.shapes.find_shape(cursor_position.into(), layout)
+                    //// Update inner state
+                    inner_state.action = Action::Drag;
+                    //// Find the first coliding shape
+                    if let Some((id, shape_offset)) =
+                        self.shapes.find_shape(Point::from(cursor_position), layout)
                     {
-                        //// publish event
+                        // haven't totally figured out why this is negative...
+                        // but its working as desired
+                        let total_offset = -(shape_offset - workspace_offset);
+
+                        //// Publish event
                         if let Some(on_shape_click) = &self.on_click {
-                            shell.publish(on_shape_click(Some(id)));
+                            shell.publish(on_shape_click(Some((id, total_offset))));
                         }
-                        //// update inner state
-                        inner_state.action = Action::Drag(id, offset);
-                        //// capture event
+                        //// Capture event
                         event::Status::Captured
                     } else {
-                        //// deselect
+                        //// Deselect
                         if bounds.contains(cursor_position) {
                             if let Some(on_shape_click) = &self.on_click {
                                 shell.publish(on_shape_click(None));
@@ -349,34 +347,28 @@ where
                 Event::Mouse(ButtonReleased(mouse::Button::Left))
                 | Event::Touch(FingerLifted { .. })
                 | Event::Touch(FingerLost { .. }) => {
-                    if let Action::Drag(id, _) = &inner_state.action {
-                        //// publish event
+                    if Action::Drag == inner_state.action {
+                        //// Publish event
                         if let Some(on_shape_release) = &self.on_shape_release {
-                            shell.publish(on_shape_release(*id));
+                            shell.publish(on_shape_release.clone());
                         }
-                        //// update inner state
+                        //// Update inner state
                         inner_state.action = Action::Idle;
-                        //// capture event
+                        //// Capture event
                         event::Status::Captured
                     } else {
                         event::Status::Ignored
                     }
                 }
                 Event::Mouse(CursorMoved { .. }) | Event::Touch(FingerMoved { .. }) => {
-                    //TODO: find shape
-                    if let Action::Drag(id, offset) = &inner_state.action {
-                        //// publish event
-                        if let Some(on_drag) = &self.on_shape_drag {
-                            shell.publish(on_drag(*id, Point::from(cursor_position) - *offset));
-                        }
-                        //// capture event
-                        event::Status::Captured
-                    } else {
-                        if let Some(on_move) = &self.on_cursor_move {
-                            shell.publish(on_move(Point::from(cursor_position) - workspace_offset));
-                        }
-                        event::Status::Ignored
+                    if let Some(on_move) = &self.on_cursor_move {
+                        // TODO: limiting mouse events to drag doesn't work well when wires are being
+                        // created via drag. Need to refactor node/wire rendering to make this work
+                        //if inner_state.action == Action::Drag {
+                        shell.publish(on_move(Point::from(cursor_position) - workspace_offset));
+                        //}
                     }
+                    event::Status::Ignored
                 }
                 Event::Mouse(WheelScrolled { delta }) => {
                     if let Some(pan) = &self.pan {
@@ -447,8 +439,6 @@ where
         Self::new(workspace)
     }
 }
-
-// Convenience function
 
 /// Create a new `Workspace`
 pub fn workspace<'a, Message, Theme, Renderer>(

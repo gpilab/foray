@@ -1,5 +1,6 @@
 use crate::file_watch::file_watch_subscription;
 use crate::graph::{Graph, PortRef, IO};
+use crate::gui_node::GuiGraph;
 use crate::interface::theme_config::{AppThemeMessage, GuiColorMessage};
 use crate::interface::{side_bar::side_bar, SEPERATOR};
 use crate::math::{Point, Vector};
@@ -16,8 +17,10 @@ use crate::OrderMap;
 use iced::advanced::graphics::core::Element;
 use iced::event::listen_with;
 use iced::keyboard::key::Named;
-use iced::keyboard::{Key, Modifiers};
+use iced::keyboard::Event::KeyPressed;
+use iced::keyboard::{self, Key, Modifiers};
 use iced::widget::{column, *};
+use iced::Event::Keyboard;
 use iced::Length::Fill;
 use iced::{window, Subscription, Task};
 use itertools::Itertools;
@@ -26,7 +29,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs::read_to_string;
 use std::iter::once;
-use std::sync::{Arc, RwLock, RwLockReadGuard};
 use std::time::{Duration, Instant};
 
 #[derive(Default, Clone, PartialEq)]
@@ -34,6 +36,7 @@ pub enum Action {
     #[default]
     InitialLoad,
     Idle,
+    DraggingNode(u32, Vector),
     CreatingInputWire(PortRef, Option<PortRef>),
     CreatingOutputWire(PortRef, Option<PortRef>),
     AddingNode,
@@ -44,17 +47,16 @@ type UndoStash = Vec<(
     OrderMap<ShapeId, Point>,
 )>;
 
-pub type PortDataReference<'a> = RwLockReadGuard<'a, PortData>;
-pub type PortDataContainer = Arc<RwLock<PortData>>;
-
 #[derive(Serialize, Deserialize)]
 pub struct App {
-    pub graph: Graph<NodeData, PortType, PortData>,
+    pub graph: GuiGraph,
     pub shapes: workspace::State,
     pub selected_shape: Option<ShapeId>,
     pub cursor_position: Point,
     pub config: f32,
     pub app_theme: AppTheme,
+    #[serde(skip)]
+    pub modifiers: Modifiers,
     #[serde(skip)]
     pub queued_nodes: HashSet<u32>,
     //#[serde(skip)]
@@ -76,7 +78,6 @@ pub struct App {
 #[derive(Clone, derive_more::Debug)]
 pub enum Message {
     //// Workspace
-    OnDrag(ShapeId, Point),
     OnMove(Point),
     Pan(Vector),
 
@@ -88,10 +89,11 @@ pub enum Message {
     PortDelete(PortRef),
 
     //// Node
-    OnSelect(Option<ShapeId>),
+    OnShapeDown(Option<(ShapeId, Vector)>),
+    OnShapeUp,
     UpdateNodeTemplate(u32, NodeTemplate),
     AddNode(NodeTemplate),
-    DeleteNode(u32),
+    DeleteSelectedNode,
 
     QueueCompute(u32),
     ComputeComplete(
@@ -110,6 +112,7 @@ pub enum Message {
     Load,
     ReloadNodes,
     WindowOpen,
+    ModifiersChanged(Modifiers),
 
     //// Focus
     FocusNext,
@@ -122,18 +125,24 @@ pub enum Message {
 
 impl App {
     pub fn update(&mut self, message: Message) -> Task<Message> {
-        trace!("---Message--- {:?}", message);
         match message {
-            //// Workspace
-            Message::OnDrag(shape_index, cursor_position) => {
-                //TODO: how to handle undo/redo? Drag End event?
-                *self
-                    .shapes
-                    .shape_positions
-                    .get_mut(&shape_index)
-                    .expect("Shape index must exist") = cursor_position
+            Message::OnMove(_) => {}
+            _ => trace!("---Message--- {:?}", message),
+        }
+        match message {
+            Message::OnMove(cursor_position) => {
+                self.cursor_position = cursor_position;
+
+                // Update node position if currently dragging
+                if let Action::DraggingNode(id, offset) = self.action {
+                    *self
+                        .shapes
+                        .shape_positions
+                        .get_mut(&id)
+                        .expect("Shape index must exist") = cursor_position + offset
+                }
             }
-            Message::OnMove(cursor_position) => self.cursor_position = cursor_position,
+
             Message::Pan(delta) => {
                 self.shapes.camera.position.x -= delta.x * 2.;
                 self.shapes.camera.position.y -= delta.y * 2.;
@@ -186,10 +195,28 @@ impl App {
             }
 
             //// Node
-            Message::OnSelect(maybe_id) => {
-                self.selected_shape = maybe_id;
-                if let Some(nx) = maybe_id {
-                    // Move selected node to the front
+            Message::OnShapeDown(shape_offset) => {
+                if let Some((nx, offset)) = shape_offset {
+                    //// Command Click
+                    let nx = if self.modifiers.command() {
+                        //// Create a new node on Command + Click
+                        self.stash_state();
+                        let original_node = self.graph.get_node(nx);
+                        let original_position = self.shapes.shape_positions[&nx];
+                        let new_nx = self.graph.node(original_node.template.duplicate().into());
+                        self.shapes
+                            .shape_positions
+                            .insert(new_nx, original_position + [5., 5.].into());
+                        new_nx
+                    } else {
+                        nx
+                    };
+
+                    //// Select Shape
+                    self.selected_shape = Some(nx);
+                    //// Start Drag
+                    self.action = Action::DraggingNode(nx, offset);
+                    //// Move selected shape to the top
                     self.shapes.shape_positions.move_index(
                         self.shapes
                             .shape_positions
@@ -198,14 +225,20 @@ impl App {
                         0,
                     );
                     return Task::done(Message::QueueCompute(nx));
+                } else {
+                    self.selected_shape = None;
                 }
+            }
+            Message::OnShapeUp => {
+                // TODO: push undo stack if shape has moved
+                self.action = Action::Idle;
             }
 
             Message::UpdateNodeTemplate(id, new_template) => {
                 let old_template = &self.graph.get_node(id).template;
                 if *old_template != new_template {
                     self.stash_state();
-                    // now we can aquire mutable reference
+                    // Now we can aquire mutable reference
                     let old_template = &mut self.graph.get_mut_node(id).template;
                     *old_template = new_template;
                     return Task::done(Message::QueueCompute(id));
@@ -216,13 +249,15 @@ impl App {
                 let id = self.graph.node(template.into());
                 self.shapes.shape_positions.insert(id, (100., 500.).into());
             }
-            Message::DeleteNode(id) => {
-                self.stash_state();
-                self.graph.delete_node(id);
-                self.shapes.shape_positions.swap_remove(&id);
-                self.selected_shape = None;
-                //PERF: ideally, we should only execute affected nodes
-                return Task::done(Message::ComputeAll);
+            Message::DeleteSelectedNode => {
+                if let Some(id) = self.selected_shape {
+                    self.stash_state();
+                    self.graph.delete_node(id);
+                    self.shapes.shape_positions.swap_remove(&id);
+                    self.selected_shape = None;
+                    //PERF: ideally, we should only execute affected nodes
+                    return Task::done(Message::ComputeAll);
+                }
             }
 
             //// Application
@@ -264,6 +299,9 @@ impl App {
                     self.action = Action::Idle;
                     return Task::done(Message::ComputeAll);
                 }
+            }
+            Message::ModifiersChanged(m) => {
+                self.modifiers = m;
             }
 
             //// Focus
@@ -408,9 +446,10 @@ impl App {
                         //// Wires paths
                         |wire_end_node, points| self.wire_curve(wire_end_node, points),
                     )
-                    .on_shape_drag(Message::OnDrag)
+                    //.on_shape_drag(Message::OnDrag)
                     .on_cursor_move(Message::OnMove)
-                    .on_press(Message::OnSelect)
+                    .on_press(Message::OnShapeDown)
+                    .on_release(Message::OnShapeUp)
                     .pan(Message::Pan)
                 )
                 .height(Fill)
@@ -517,38 +556,31 @@ pub fn theme(state: &App) -> Theme {
 }
 
 pub fn subscriptions(state: &App) -> Subscription<Message> {
-    let animation_running = if state
-        .graph
-        .nodes_ref()
-        .into_iter()
-        .map(|nx| state.graph.get_node(nx))
-        .filter(|node| matches!(node.status, NodeStatus::Running(..)))
-        .collect::<Vec<_>>()
-        .is_empty()
-    {
-        Subscription::none()
-    } else {
-        iced::time::every(Duration::from_micros(1_000_000 / 16)).map(|_| Message::AnimationTick)
-    };
-
     Subscription::batch([
         file_watch_subscription(),
         window::open_events().map(|_| Message::WindowOpen),
         listen_with(|event, _status, _id| match event {
-            iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
-                key: Key::Named(Named::Tab),
-                modifiers,
-                ..
-            }) => {
-                if modifiers.contains(Modifiers::SHIFT) {
-                    Some(Message::FocusPrevious)
-                } else {
-                    Some(Message::FocusNext)
+            Keyboard(keyboard::Event::ModifiersChanged(m)) => Some(Message::ModifiersChanged(m)),
+            Keyboard(KeyPressed { key, modifiers, .. }) => match key {
+                Key::Named(Named::Tab) => {
+                    if modifiers.contains(Modifiers::SHIFT) {
+                        Some(Message::FocusPrevious)
+                    } else {
+                        Some(Message::FocusNext)
+                    }
                 }
-            }
+                Key::Named(Named::Delete) => Some(Message::DeleteSelectedNode),
+                Key::Named(Named::Escape) => Some(Message::OnShapeDown(None)),
+                _ => None,
+            },
             _ => None,
         }),
-        animation_running,
+        // Refresh for animation while nodes are actively running
+        if state.graph.running_nodes().is_empty() {
+            Subscription::none()
+        } else {
+            iced::time::every(Duration::from_micros(1_000_000 / 16)).map(|_| Message::AnimationTick)
+        },
     ])
 }
 
@@ -579,6 +611,7 @@ impl Default for App {
                     queued_nodes: Default::default(),
                     //compute_task_handles: Default::default(),
                     app_theme: Default::default(),
+                    modifiers: Default::default(),
                     availble_nodes: NodeData::available_nodes(),
                     shapes: workspace::State::new(shapes.into()),
                     graph: g,

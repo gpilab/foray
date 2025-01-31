@@ -1,5 +1,5 @@
 use super::PortData;
-use crate::app::PortDataReference;
+use crate::gui_node::PortDataReference;
 use crate::nodes::{NodeTemplate, RustNode};
 use crate::OrderMap;
 use crate::{app::Message, math::linspace};

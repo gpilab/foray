@@ -1,9 +1,9 @@
 use std::f32::consts::PI;
 use std::time::Instant;
 
-use crate::app::{App, Message, PortDataContainer};
+use crate::app::{App, Message};
 use crate::graph::{GraphNode, PortRef, IO};
-use crate::gui_node::GUINode;
+use crate::gui_node::{GUINode, PortDataContainer};
 use crate::math::Point;
 use crate::nodes::port::PortType;
 use crate::nodes::status::NodeStatus;
@@ -113,6 +113,7 @@ impl App {
                         mouse_area(
                             custom_button::Button::new("")
                                 .on_press(Message::PortPress(in_port.clone()))
+                                .on_drag(Message::OnMove)
                                 .on_right_press(Message::PortDelete(in_port.clone()))
                                 .on_release_self(Message::PortRelease)
                                 .style(move |_t, s| port_style(&port.1, &s))
@@ -140,6 +141,7 @@ impl App {
                         mouse_area(
                             custom_button::Button::new(vertical_space())
                                 .on_press(Message::PortPress(out_port.clone()))
+                                .on_drag(Message::OnMove)
                                 .on_right_press(Message::PortDelete(out_port.clone()))
                                 .on_release_self(Message::PortRelease)
                                 .style(move |_t, s| port_style(&port.1, &s))

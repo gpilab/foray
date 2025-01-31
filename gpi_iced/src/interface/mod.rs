@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 pub mod node;
 pub mod side_bar;
 pub mod theme_config;
@@ -5,11 +6,11 @@ pub mod wire;
 
 pub const SEPERATOR: f32 = 1.0;
 
-pub fn debug_format(
-    debug: bool,
-    default_text: &dyn derive_more::Display,
-    debug_info: &dyn derive_more::Debug,
-) -> String {
+pub fn debug_format<T, U>(debug: &bool, default_text: T, debug_info: U) -> String
+where
+    T: derive_more::Display,
+    U: Debug,
+{
     match debug {
         true => format!("{default_text}{debug_info:?}"),
         false => format!("{default_text}"),

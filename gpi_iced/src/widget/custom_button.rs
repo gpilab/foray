@@ -11,6 +11,8 @@ use iced::theme::palette;
 use iced::touch;
 use iced::{Background, Color, Element, Length, Padding, Rectangle, Shadow, Size, Theme, Vector};
 
+use crate::math::Point;
+
 #[allow(missing_debug_implementations)]
 pub struct Button<'a, Message, Theme = iced::Theme, Renderer = iced::Renderer>
 where
@@ -19,6 +21,7 @@ where
 {
     content: Element<'a, Message, Theme, Renderer>,
     on_hover: Option<OnInteract<'a, Message>>,
+    on_drag: Option<Box<dyn Fn(Point) -> Message + 'a>>,
     on_press: Option<OnInteract<'a, Message>>,
     on_right_press: Option<OnInteract<'a, Message>>,
     on_release_self: Option<OnInteract<'a, Message>>,
@@ -57,6 +60,7 @@ where
         Button {
             content,
             on_hover: None,
+            on_drag: None,
             on_press: None,
             on_right_press: None,
             on_release_self: None,
@@ -108,6 +112,11 @@ where
     }
     pub fn on_hover(mut self, on_hover: Message) -> Self {
         self.on_hover = Some(OnInteract::Direct(on_hover));
+        self
+    }
+
+    pub fn on_drag(mut self, on_move: impl Fn(Point) -> Message + 'a) -> Self {
+        self.on_drag = Some(Box::new(on_move));
         self
     }
 
@@ -246,16 +255,14 @@ where
         ) {
             return event::Status::Captured;
         }
+        let state = tree.state.downcast_mut::<State>();
+        let bounds = layout.bounds();
 
         match event {
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
             | Event::Touch(touch::Event::FingerPressed { .. }) => {
                 if let Some(on_press) = self.on_press.as_ref().map(OnInteract::get) {
-                    let bounds = layout.bounds();
-
                     if cursor.is_over(bounds) {
-                        let state = tree.state.downcast_mut::<State>();
-
                         state.is_pressed = true;
                         if cursor.is_over(bounds) {
                             shell.publish(on_press);
@@ -267,11 +274,7 @@ where
             }
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Right)) => {
                 if let Some(on_right_press) = self.on_right_press.as_ref().map(OnInteract::get) {
-                    let bounds = layout.bounds();
-
                     if cursor.is_over(bounds) {
-                        let state = tree.state.downcast_mut::<State>();
-
                         state.is_pressed = false;
                         if cursor.is_over(bounds) {
                             shell.publish(on_right_press);
@@ -284,10 +287,6 @@ where
             Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
             | Event::Touch(touch::Event::FingerLifted { .. }) => {
                 if self.on_press.is_some() {
-                    //let Some(on_press) = self.on_press.as_ref().map(OnInteract::get) {
-                    let state = tree.state.downcast_mut::<State>();
-                    let bounds = layout.bounds();
-
                     if state.is_pressed {
                         state.is_pressed = false;
 
@@ -313,8 +312,6 @@ where
             Event::Mouse(mouse::Event::CursorMoved { .. })
             | Event::Touch(touch::Event::FingerMoved { .. }) => {
                 if let Some(on_hover) = self.on_hover.as_ref().map(OnInteract::get) {
-                    let bounds = layout.bounds();
-
                     if cursor.is_over(bounds) {
                         //let state = tree.state.downcast_mut::<State>();
                         //
@@ -324,6 +321,12 @@ where
                         //}
 
                         return event::Status::Captured;
+                    }
+                }
+
+                if let Some(on_drag) = &self.on_drag {
+                    if state.is_pressed {
+                        shell.publish(on_drag(cursor.position().unwrap().into()));
                     }
                 }
             }

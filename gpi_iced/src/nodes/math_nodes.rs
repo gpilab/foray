@@ -1,6 +1,7 @@
-use super::PortData;
-use crate::{app::PortDataReference, nodes::NodeError, OrderMap};
+use crate::{gui_node::PortDataReference, nodes::NodeError, OrderMap};
 use ndarray::Array1;
+
+use super::port::PortData;
 
 #[allow(clippy::type_complexity)]
 pub fn binary_operation(

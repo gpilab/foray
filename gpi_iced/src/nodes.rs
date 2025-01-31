@@ -8,9 +8,9 @@ pub mod plot_complex;
 pub mod port;
 pub mod status;
 
-use crate::app::{Message, PortDataContainer, PortDataReference};
+use crate::app::Message;
 use crate::graph::GraphNode;
-use crate::gui_node::GUINode;
+use crate::gui_node::{GUINode, PortDataContainer, PortDataReference};
 use crate::interface::node::default_node_size;
 use crate::nodes::linspace::LinspaceConfig;
 use crate::nodes::math_nodes::{binary_operation, unary_operation};
@@ -77,6 +77,19 @@ impl From<NodeTemplate> for NodeData {
             template,
             status: NodeStatus::Idle,
             run_time: None,
+        }
+    }
+}
+impl NodeTemplate {
+    pub fn duplicate(&self) -> Self {
+        match self {
+            NodeTemplate::RustNode(RustNode::Plot2D(plot2d)) => {
+                NodeTemplate::RustNode(RustNode::Plot2D(Plot2D {
+                    image_handle: None,
+                    ..plot2d.clone()
+                }))
+            }
+            _ => self.clone(),
         }
     }
 }

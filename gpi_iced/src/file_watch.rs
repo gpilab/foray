@@ -37,8 +37,6 @@ fn file_watcher() -> impl Stream<Item = Message> {
                         })
                         .collect();
                     if !nodes.is_empty() {
-                        println!("nodes: {nodes:?}");
-                        println!("time: {:?}", std::time::Instant::now());
                         let _ = output.send(Message::ReloadNodes).await;
                     }
                 }
