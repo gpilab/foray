@@ -20,7 +20,7 @@ use crate::python::py_node::PyNode;
 use crate::OrderMap;
 use derive_more::derive::{Debug, Display};
 use iced::widget::text;
-use iced::Font;
+use iced::{Font, Size};
 use itertools::Itertools;
 use log::trace;
 use port::{PortData, PortType};
@@ -308,7 +308,10 @@ impl GUINode for NodeTemplate {
         match self {
             NodeTemplate::RustNode(rn) => match rn {
                 RustNode::Constant(value) => (dft, constant::view(id, *value)),
-                RustNode::Linspace(linspace_config) => (dft, linspace_config.view(id)),
+                RustNode::Linspace(linspace_config) => (
+                    Size::new(dft.width * 2., dft.height),
+                    linspace_config.view(id),
+                ),
                 RustNode::Plot(plot) => (dft * 2., plot.view(id, input_data)),
                 RustNode::Plot2D(plot) => (
                     (dft.width * 2., dft.width * 2.).into(),

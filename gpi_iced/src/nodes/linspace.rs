@@ -4,9 +4,7 @@ use crate::nodes::{NodeTemplate, RustNode};
 use crate::OrderMap;
 use crate::{app::Message, math::linspace};
 use iced::{
-    widget::{
-        column, container, horizontal_rule, horizontal_space, row, text, text_input, TextInput,
-    },
+    widget::{column, container, horizontal_rule, row, text, text_input, TextInput},
     Alignment::Center,
     Color, Element,
     Length::{Fill, Shrink},
@@ -41,7 +39,6 @@ impl LinspaceConfig {
     ) -> OrderMap<String, PortData> {
         //node after potential modifications
         let LinspaceConfig { start, stop, num } = self;
-        //let node: Self = *node.as_ref();
         let data: Vec<_> = linspace(*start as f32, *stop as f32, *num as i32);
 
         [(
@@ -118,7 +115,9 @@ impl LinspaceConfig {
                 .align_y(Center)
                 .padding(5.)
                 .spacing(2.),
-            row![horizontal_space(), text("#"), num_input, horizontal_space()].align_y(Center)
+            row![text("#"), num_input]
+                .align_y(Center)
+                .padding([0.0, 20.0])
         ]
         .into()
     }
