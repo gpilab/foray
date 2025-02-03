@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+pub mod add_node;
 pub mod node;
 pub mod side_bar;
 pub mod theme_config;

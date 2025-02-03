@@ -1,6 +1,7 @@
 use crate::file_watch::file_watch_subscription;
 use crate::graph::{Graph, PortRef, IO};
 use crate::gui_node::GuiGraph;
+use crate::interface::add_node::add_node_panel;
 use crate::interface::theme_config::{AppThemeMessage, GuiColorMessage};
 use crate::interface::{side_bar::side_bar, SEPERATOR};
 use crate::math::{Point, Vector};
@@ -22,7 +23,7 @@ use iced::keyboard::{self, Key, Modifiers};
 use iced::widget::{column, *};
 use iced::Event::Keyboard;
 use iced::Length::Fill;
-use iced::{window, Subscription, Task};
+use iced::{mouse, window, Subscription, Task};
 use itertools::Itertools;
 use log::{error, trace, warn};
 use serde::{Deserialize, Serialize};
@@ -36,7 +37,8 @@ pub enum Action {
     #[default]
     InitialLoad,
     Idle,
-    DraggingNode(u32, Vector),
+    DragPan(Vector),
+    DragNode(u32, Vector),
     CreatingInputWire(PortRef, Option<PortRef>),
     CreatingOutputWire(PortRef, Option<PortRef>),
     AddingNode,
@@ -66,7 +68,7 @@ pub struct App {
     #[serde(skip)]
     pub show_palette_ui: bool,
     #[serde(skip)]
-    pub availble_nodes: Vec<NodeData>,
+    pub available_nodes: Vec<NodeData>,
     #[serde(skip)]
     pub action: Action,
     #[serde(skip)]
@@ -79,7 +81,7 @@ pub struct App {
 pub enum Message {
     //// Workspace
     OnMove(Point),
-    Pan(Vector),
+    ScrollPan(Vector),
 
     //// Port
     PortStartHover(PortRef),
@@ -89,10 +91,12 @@ pub enum Message {
     PortDelete(PortRef),
 
     //// Node
-    OnShapeDown(Option<(ShapeId, Vector)>),
-    OnShapeUp,
-    UpdateNodeTemplate(u32, NodeTemplate),
+    OnCanvasDown(Option<(ShapeId, Vector)>),
+    OnCanvasUp,
+    OpenAddNodeUi,
     AddNode(NodeTemplate),
+
+    UpdateNodeTemplate(u32, NodeTemplate),
     DeleteSelectedNode,
 
     QueueCompute(u32),
@@ -117,6 +121,7 @@ pub enum Message {
     //// Focus
     FocusNext,
     FocusPrevious,
+    Cancel,
 
     //// History
     Undo,
@@ -130,20 +135,27 @@ impl App {
             _ => trace!("---Message--- {:?}", message),
         }
         match message {
+            Message::Cancel => self.action = Action::Idle,
             Message::OnMove(cursor_position) => {
                 self.cursor_position = cursor_position;
 
                 // Update node position if currently dragging
-                if let Action::DraggingNode(id, offset) = self.action {
-                    *self
-                        .shapes
-                        .shape_positions
-                        .get_mut(&id)
-                        .expect("Shape index must exist") = cursor_position + offset
+                match self.action {
+                    Action::DragNode(id, offset) => {
+                        *self
+                            .shapes
+                            .shape_positions
+                            .get_mut(&id)
+                            .expect("Shape index must exist") = cursor_position + offset
+                    }
+                    Action::DragPan(offset) => {
+                        self.shapes.camera.position = -cursor_position.to_vector() + offset;
+                    }
+                    _ => (),
                 }
             }
 
-            Message::Pan(delta) => {
+            Message::ScrollPan(delta) => {
                 self.shapes.camera.position.x -= delta.x * 2.;
                 self.shapes.camera.position.y -= delta.y * 2.;
             }
@@ -195,7 +207,7 @@ impl App {
             }
 
             //// Node
-            Message::OnShapeDown(shape_offset) => {
+            Message::OnCanvasDown(shape_offset) => {
                 if let Some((nx, offset)) = shape_offset {
                     //// Command Click
                     let nx = if self.modifiers.command() {
@@ -215,7 +227,7 @@ impl App {
                     //// Select Shape
                     self.selected_shape = Some(nx);
                     //// Start Drag
-                    self.action = Action::DraggingNode(nx, offset);
+                    self.action = Action::DragNode(nx, offset);
                     //// Move selected shape to the top
                     self.shapes.shape_positions.move_index(
                         self.shapes
@@ -227,12 +239,20 @@ impl App {
                     return Task::done(Message::QueueCompute(nx));
                 } else {
                     self.selected_shape = None;
+                    self.action = Action::DragPan(
+                        self.shapes.camera.position + self.cursor_position.to_vector(),
+                    );
                 }
             }
-            Message::OnShapeUp => {
+            Message::OnCanvasUp => {
                 // TODO: push undo stack if shape has moved
-                self.action = Action::Idle;
+                match self.action {
+                    Action::DragNode(..) => self.action = Action::Idle,
+                    Action::DragPan(_) => self.action = Action::Idle,
+                    _ => (),
+                }
             }
+            Message::OpenAddNodeUi => self.action = Action::AddingNode,
 
             Message::UpdateNodeTemplate(id, new_template) => {
                 let old_template = &self.graph.get_node(id).template;
@@ -247,7 +267,13 @@ impl App {
             Message::AddNode(template) => {
                 self.stash_state();
                 let id = self.graph.node(template.into());
-                self.shapes.shape_positions.insert(id, (100., 500.).into());
+                self.selected_shape = Some(id);
+                self.shapes.shape_positions.insert_before(
+                    0,
+                    id,
+                    self.cursor_position + self.shapes.camera.position,
+                );
+                self.action = Action::DragNode(id, self.shapes.camera.position)
             }
             Message::DeleteSelectedNode => {
                 if let Some(id) = self.selected_shape {
@@ -434,7 +460,7 @@ impl App {
 
     /// App View
     pub fn view(&self) -> Element<Message, Theme, Renderer> {
-        let content: Element<Message, Theme, Renderer> = column![
+        let content = column![
             row![
                 side_bar(self),
                 vertical_rule(SEPERATOR),
@@ -446,11 +472,10 @@ impl App {
                         //// Wires paths
                         |wire_end_node, points| self.wire_curve(wire_end_node, points),
                     )
-                    //.on_shape_drag(Message::OnDrag)
                     .on_cursor_move(Message::OnMove)
-                    .on_press(Message::OnShapeDown)
-                    .on_release(Message::OnShapeUp)
-                    .pan(Message::Pan)
+                    .on_press(Message::OnCanvasDown)
+                    .on_release(Message::OnCanvasUp)
+                    .pan(Message::ScrollPan)
                 )
                 .height(Fill)
                 .width(Fill)
@@ -459,12 +484,40 @@ impl App {
                 true => column![horizontal_rule(SEPERATOR), self.app_theme.view()],
                 false => column![],
             }
-        ]
-        .into();
+        ];
+
+        let modal = container(add_node_panel(&self.available_nodes)).center(Fill);
+        // Potentially add a modal
+        let output: Element<Message, Theme, Renderer> = match self.action {
+            Action::AddingNode => stack![
+                content,
+                // barrier to stop interaction
+                mouse_area(
+                    container(text(""))
+                        .center(Fill)
+                        .style(container::transparent)
+                )
+                //stop any mouseover interactions from showing,
+                .interaction(mouse::Interaction::Idle)
+                .on_press(Message::Cancel),
+                modal
+            ]
+            .into(),
+            _ => content.into(),
+        };
+
+        // Potentially add a specific mouse cursor
+        let output = match self.action {
+            Action::DragNode(_, _) => mouse_area(output)
+                .interaction(mouse::Interaction::Move)
+                .into(),
+            _ => output,
+        };
+
         if self.debug {
-            content.explain(iced::Color::from_rgba(0.7, 0.7, 0.8, 0.2))
+            output.explain(iced::Color::from_rgba(0.7, 0.7, 0.8, 0.2))
         } else {
-            content
+            output
         }
     }
 
@@ -547,7 +600,7 @@ impl App {
             }
         });
         // Update list of available nodes
-        self.availble_nodes = NodeData::available_nodes();
+        self.available_nodes = NodeData::available_nodes();
     }
 }
 
@@ -570,7 +623,14 @@ pub fn subscriptions(state: &App) -> Subscription<Message> {
                     }
                 }
                 Key::Named(Named::Delete) => Some(Message::DeleteSelectedNode),
-                Key::Named(Named::Escape) => Some(Message::OnShapeDown(None)),
+                Key::Named(Named::Escape) => Some(Message::Cancel),
+                Key::Character(smol_str) => {
+                    if smol_str == "a" {
+                        Some(Message::OpenAddNodeUi)
+                    } else {
+                        None
+                    }
+                }
                 _ => None,
             },
             _ => None,
@@ -590,7 +650,7 @@ impl Default for App {
         match read_to_string("network.ron").map(|s| ron::from_str::<App>(&s)) {
             Ok(Ok(app)) => {
                 let mut app = app;
-                app.availble_nodes = NodeData::available_nodes();
+                app.available_nodes = NodeData::available_nodes();
                 app.reload_nodes();
                 app
             }
@@ -612,7 +672,7 @@ impl Default for App {
                     //compute_task_handles: Default::default(),
                     app_theme: Default::default(),
                     modifiers: Default::default(),
-                    availble_nodes: NodeData::available_nodes(),
+                    available_nodes: NodeData::available_nodes(),
                     shapes: workspace::State::new(shapes.into()),
                     graph: g,
                     undo_stack: vec![],

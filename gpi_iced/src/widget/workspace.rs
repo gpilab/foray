@@ -1,13 +1,13 @@
 use iced::advanced::graphics::geometry::frame::Backend;
 use iced::advanced::layout::{self, Layout};
-use iced::advanced::widget::{self, tree, Tree};
+use iced::advanced::widget::{self, Tree};
 use iced::advanced::{Clipboard, Shell, Widget};
 use iced::mouse::Event::{ButtonPressed, ButtonReleased, CursorMoved, WheelScrolled};
 use iced::mouse::ScrollDelta;
 use iced::touch::Event::{FingerLifted, FingerLost, FingerMoved, FingerPressed};
 
 use iced::widget::canvas::{Path, Stroke};
-use iced::{event, keyboard, mouse, Color, Theme};
+use iced::{event, mouse, Color, Theme};
 use iced::{Element, Event};
 use iced::{Length, Rectangle, Size};
 use serde::{Deserialize, Serialize};
@@ -49,12 +49,6 @@ where
     on_click: Option<Box<dyn Fn(Option<(ShapeId, Vector)>) -> Message + 'a>>,
     on_shape_release: Option<Message>,
 }
-#[derive(Default, PartialEq, Clone, Debug)]
-enum Action {
-    #[default]
-    Idle,
-    Drag,
-}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct State {
@@ -75,12 +69,6 @@ impl State {
             shape_positions: shapes,
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Default)]
-struct InnerState {
-    modifiers: keyboard::Modifiers,
-    action: Action,
 }
 
 impl<'a, Message, Theme, Renderer> Workspace<'a, Message, Theme, Renderer>
@@ -160,14 +148,6 @@ where
     Theme: Catalog,
     Renderer: iced::advanced::graphics::geometry::Renderer,
 {
-    fn tag(&self) -> tree::Tag {
-        tree::Tag::of::<InnerState>()
-    }
-
-    fn state(&self) -> tree::State {
-        tree::State::new(InnerState::default())
-    }
-
     fn diff(&self, tree: &mut widget::Tree) {
         tree.diff_children(
             &self
@@ -282,11 +262,6 @@ where
     ) -> event::Status {
         let event_status = event::Status::Ignored;
 
-        // update inner state
-        let inner_state = tree::State::downcast_mut::<InnerState>(&mut tree.state);
-        if let Event::Keyboard(keyboard::Event::ModifiersChanged(modifiers)) = event {
-            inner_state.modifiers = modifiers
-        }
         let bounds = layout.bounds();
         let workspace_offset = Vector::new(bounds.position().x, bounds.position().y);
 
@@ -316,8 +291,6 @@ where
             (event::Status::Ignored, Some(cursor_position)) => match event.clone() {
                 Event::Mouse(ButtonPressed(mouse::Button::Left))
                 | Event::Touch(FingerPressed { .. }) => {
-                    //// Update inner state
-                    inner_state.action = Action::Drag;
                     //// Find the first coliding shape
                     if let Some((id, shape_offset)) =
                         self.shapes.find_shape(Point::from(cursor_position), layout)
@@ -347,26 +320,17 @@ where
                 Event::Mouse(ButtonReleased(mouse::Button::Left))
                 | Event::Touch(FingerLifted { .. })
                 | Event::Touch(FingerLost { .. }) => {
-                    if Action::Drag == inner_state.action {
-                        //// Publish event
-                        if let Some(on_shape_release) = &self.on_shape_release {
-                            shell.publish(on_shape_release.clone());
-                        }
-                        //// Update inner state
-                        inner_state.action = Action::Idle;
-                        //// Capture event
-                        event::Status::Captured
-                    } else {
-                        event::Status::Ignored
+                    //// Publish event
+                    if let Some(on_shape_release) = &self.on_shape_release {
+                        shell.publish(on_shape_release.clone());
                     }
+
+                    //// Capture event
+                    event::Status::Captured
                 }
                 Event::Mouse(CursorMoved { .. }) | Event::Touch(FingerMoved { .. }) => {
                     if let Some(on_move) = &self.on_cursor_move {
-                        // TODO: limiting mouse events to drag doesn't work well when wires are being
-                        // created via drag. Need to refactor node/wire rendering to make this work
-                        //if inner_state.action == Action::Drag {
                         shell.publish(on_move(Point::from(cursor_position) - workspace_offset));
-                        //}
                     }
                     event::Status::Ignored
                 }
@@ -374,14 +338,7 @@ where
                     if let Some(pan) = &self.pan {
                         if bounds.contains(cursor_position) {
                             let offset = match delta {
-                                ScrollDelta::Lines { x, y } => {
-                                    if inner_state.modifiers.shift() {
-                                        //scale scrolled lines to be equivalent to 16 pixels
-                                        Vector::new(y, x) * 16.
-                                    } else {
-                                        Vector::new(x, y) * 16.
-                                    }
-                                }
+                                ScrollDelta::Lines { x, y } => Vector::new(x, y) * 16.,
                                 ScrollDelta::Pixels { x, y } => Vector::new(x, y),
                             };
                             //// publish event

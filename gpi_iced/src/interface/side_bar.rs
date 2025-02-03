@@ -1,6 +1,6 @@
 use crate::app::{App, Message};
 use crate::gui_node::GUINode;
-use crate::interface::node::{format_node_output, node_list_view};
+use crate::interface::node::format_node_output;
 use crate::interface::{debug_format, SEPERATOR};
 use crate::style::button::{primary_icon, secondary_icon};
 use crate::style::icon::icon;
@@ -64,10 +64,6 @@ pub fn side_bar(app: &App) -> Element<'_, Message> {
         column![
             container(text(node.template.name().clone()).size(20.)).center_x(Fill),
             horizontal_rule(0),
-            row![node.status.icon(), node.status.text_element().size(12.)]
-                .align_y(Center)
-                .spacing(4.0),
-            vertical_space().height(10.),
             node.template
                 .config_view(selected_id, input_data)
                 .unwrap_or(text("...").into()),
@@ -84,16 +80,7 @@ pub fn side_bar(app: &App) -> Element<'_, Message> {
         .padding([10., 5.])
         .into()
     } else {
-        let node_list = node_list_view(&app.availble_nodes);
-        column![
-            container(text("Add Node").size(20.)).center_x(Fill),
-            horizontal_rule(0),
-            vertical_space().height(10.),
-            row![vertical_rule(SEPERATOR), scrollable(node_list)],
-        ]
-        .spacing(5.)
-        .padding([10., 5.])
-        .into()
+        text("").into()
     };
     container(
         column![

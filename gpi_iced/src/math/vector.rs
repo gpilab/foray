@@ -59,8 +59,8 @@ impl Point {
         Self { x, y }
     }
 
-    pub fn to_point(self) -> Point {
-        Point {
+    pub fn to_vector(self) -> Vector {
+        Vector {
             x: self.x,
             y: self.y,
         }

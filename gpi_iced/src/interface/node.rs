@@ -11,14 +11,12 @@ use crate::nodes::NodeData;
 use crate::widget::custom_button;
 use crate::widget::node_container::NodeContainer;
 use crate::widget::pin::Pin;
-use crate::{style, OrderMap};
-use iced::Alignment::Center;
-use iced::Length::Fill;
+use crate::OrderMap;
 use iced::{border, color, widget::*, Color, Element};
 
 pub const INNER_NODE_WIDTH: f32 = 120.;
 pub const INNER_NODE_HEIGHT: f32 = 60.;
-pub const PORT_RADIUS: f32 = 7.5;
+pub const PORT_RADIUS: f32 = 8.5;
 pub const NODE_RADIUS: f32 = 5.0;
 pub const NODE_BORDER_WIDTH: f32 = 2.0;
 pub const OUTER_NODE_WIDTH: f32 = INNER_NODE_WIDTH + NODE_BORDER_WIDTH;
@@ -146,7 +144,8 @@ impl App {
                                 .on_release_self(Message::PortRelease)
                                 .style(move |_t, s| port_style(&port.1, &s))
                                 .width(PORT_RADIUS * 2.)
-                                .height(PORT_RADIUS * 2.),
+                                .height(PORT_RADIUS * 2.)
+                                .padding(2.0),
                         )
                         .on_enter(Message::PortStartHover(out_port.clone()))
                         .on_exit(Message::PortEndHover(out_port.clone())),
@@ -199,28 +198,5 @@ pub fn format_node_output<'a>(
             .spacing(5.0)
             .into()
     })))
-    .into()
-}
-
-pub(crate) fn node_list_view<'a>(templates: &[NodeData]) -> Element<'a, Message> {
-    container(container(
-        column(templates.iter().map(|node| {
-            button(
-                row![
-                    horizontal_rule(0.0),
-                    container(text(node.template.name())).padding(4.0),
-                    horizontal_space()
-                ]
-                .align_y(Center),
-            )
-            .padding(0.)
-            .on_press(Message::AddNode(node.clone().into()))
-            .width(Fill)
-            .style(style::button::list)
-            .into()
-        }))
-        .width(Fill),
-    ))
-    .center_x(Fill)
     .into()
 }

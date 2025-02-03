@@ -152,7 +152,7 @@ impl GuiColor {
                     theme_message.clone(),
                     update(v)
                 ))
-                .step(0.1)
+                .step(0.01)
             ]
             .spacing(5.0)
         }
