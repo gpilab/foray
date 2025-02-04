@@ -29,10 +29,7 @@ pub fn default_node_size() -> iced::Size {
 impl App {
     pub fn node_content(&self, id: u32) -> Element<Message, Theme, Renderer> {
         let node = self.graph.get_node(id);
-        let is_selected = match self.selected_shape {
-            Some(s_id) => id == s_id,
-            None => false,
-        };
+        let is_selected = self.selected_shapes.contains(&id);
 
         let port_style =
             move |port_type: &PortType, s: &custom_button::Status| -> custom_button::Style {

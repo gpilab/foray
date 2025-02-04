@@ -53,35 +53,36 @@ pub fn side_bar(app: &App) -> Element<'_, Message> {
     let action_commands = row![horizontal_space(), undo, redo].spacing(4.0);
 
     //// Config
-    let config: Element<Message, Theme, Renderer> = if let Some(selected_id) = app.selected_shape {
-        let node = app.graph.get_node(selected_id);
-        let input_data = app.graph.get_input_data(&selected_id);
-        let out_port_display = if app.debug {
-            format_node_output(&app.graph.get_output_data(selected_id))
+    let config: Element<Message, Theme, Renderer> =
+        if let Some(selected_id) = app.selected_shapes.iter().next() {
+            let node = app.graph.get_node(*selected_id);
+            let input_data = app.graph.get_input_data(selected_id);
+            let out_port_display = if app.debug {
+                format_node_output(&app.graph.get_output_data(*selected_id))
+            } else {
+                text("").into()
+            };
+            column![
+                container(text(node.template.name().clone()).size(20.)).center_x(Fill),
+                horizontal_rule(0),
+                node.template
+                    .config_view(*selected_id, input_data)
+                    .unwrap_or(text("...").into()),
+                vertical_space(),
+                scrollable(out_port_display),
+                row![button(text("delete node"))
+                    .style(button::danger)
+                    .padding([1, 4])
+                    .on_press(Message::DeleteSelectedNode)]
+            ]
+            .align_x(Center)
+            .height(Fill)
+            .spacing(5.)
+            .padding([10., 5.])
+            .into()
         } else {
             text("").into()
         };
-        column![
-            container(text(node.template.name().clone()).size(20.)).center_x(Fill),
-            horizontal_rule(0),
-            node.template
-                .config_view(selected_id, input_data)
-                .unwrap_or(text("...").into()),
-            vertical_space(),
-            scrollable(out_port_display),
-            row![button(text("delete node"))
-                .style(button::danger)
-                .padding([1, 4])
-                .on_press(Message::DeleteSelectedNode)]
-        ]
-        .align_x(Center)
-        .height(Fill)
-        .spacing(5.)
-        .padding([10., 5.])
-        .into()
-    } else {
-        text("").into()
-    };
     container(
         column![
             row![

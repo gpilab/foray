@@ -38,7 +38,7 @@ pub enum Action {
     InitialLoad,
     Idle,
     DragPan(Vector),
-    DragNode(u32, Vector),
+    DragNode(Vec<(u32, Vector)>),
     CreatingInputWire(PortRef, Option<PortRef>),
     CreatingOutputWire(PortRef, Option<PortRef>),
     AddingNode,
@@ -53,7 +53,7 @@ type UndoStash = Vec<(
 pub struct App {
     pub graph: GuiGraph,
     pub shapes: workspace::State,
-    pub selected_shape: Option<ShapeId>,
+    pub selected_shapes: HashSet<ShapeId>,
     pub cursor_position: Point,
     pub config: f32,
     pub app_theme: AppTheme,
@@ -91,7 +91,7 @@ pub enum Message {
     PortDelete(PortRef),
 
     //// Node
-    OnCanvasDown(Option<(ShapeId, Vector)>),
+    OnCanvasDown(Option<ShapeId>),
     OnCanvasUp,
     OpenAddNodeUi,
     AddNode(NodeTemplate),
@@ -140,16 +140,20 @@ impl App {
                 self.cursor_position = cursor_position;
 
                 // Update node position if currently dragging
-                match self.action {
-                    Action::DragNode(id, offset) => {
-                        *self
-                            .shapes
-                            .shape_positions
-                            .get_mut(&id)
-                            .expect("Shape index must exist") = cursor_position + offset
+                match &self.action {
+                    Action::DragNode(offsets) => {
+                        offsets.iter().for_each(|(id, offset)| {
+                            *self
+                                .shapes
+                                .shape_positions
+                                .get_mut(id)
+                                .expect("Shape index must exist") =
+                                //TODO refactor to avoid messy conversions
+                                (cursor_position + self.shapes.camera.position) + *offset
+                        });
                     }
                     Action::DragPan(offset) => {
-                        self.shapes.camera.position = -cursor_position.to_vector() + offset;
+                        self.shapes.camera.position = -cursor_position.to_vector() + *offset;
                     }
                     _ => (),
                 }
@@ -207,27 +211,62 @@ impl App {
             }
 
             //// Node
-            Message::OnCanvasDown(shape_offset) => {
-                if let Some((nx, offset)) = shape_offset {
-                    //// Command Click
-                    let nx = if self.modifiers.command() {
-                        //// Create a new node on Command + Click
+            Message::OnCanvasDown(clicked_id) => {
+                //TODO: break this logic down into pure functions
+                //// Clicked on a node
+                if let Some(nx) = clicked_id {
+                    self.selected_shapes = if self.modifiers.command() {
+                        //// Create new nodes on Command + Click
                         self.stash_state();
-                        let original_node = self.graph.get_node(nx);
-                        let original_position = self.shapes.shape_positions[&nx];
-                        let new_nx = self.graph.node(original_node.template.duplicate().into());
-                        self.shapes
-                            .shape_positions
-                            .insert(new_nx, original_position + [5., 5.].into());
-                        new_nx
+                        let selected_shapes = if self.selected_shapes.contains(&nx) {
+                            // if clicked node is already selected, copy all selected nodes,
+                            self.selected_shapes.clone()
+                        } else {
+                            // otherwise, only copy the clicked node
+                            [nx].into()
+                        };
+                        selected_shapes
+                            .iter()
+                            .map(|id| {
+                                let pos = self.shapes.shape_positions[id] + [5., 5.].into();
+                                let new_node = self.graph.get_node(*id).template.duplicate().into();
+                                // *Mutably* add new node to graph
+                                let new_id = self.graph.node(new_node);
+                                // *Mutably* add new position
+                                self.shapes.shape_positions.insert(new_id, pos);
+                                new_id
+                            })
+                            .collect()
+                    } else if self.modifiers.shift() {
+                        //// Select Multiple nodes if shift is held
+                        self.selected_shapes
+                            .clone()
+                            .into_iter()
+                            .chain(once(nx))
+                            .collect()
+                    } else if !self.selected_shapes.contains(&nx) {
+                        //// Select Single Node if an unselected node is clicked
+                        [nx].into()
                     } else {
-                        nx
+                        //// otherwise keep selection the same
+                        self.selected_shapes.clone()
                     };
 
-                    //// Select Shape
-                    self.selected_shape = Some(nx);
+                    let offsets = self
+                        .selected_shapes
+                        .iter()
+                        .map(|id| {
+                            (
+                                *id,
+                                (self.shapes.shape_positions[id]
+                                    - (self.cursor_position + self.shapes.camera.position)),
+                            )
+                        })
+                        .collect();
+
                     //// Start Drag
-                    self.action = Action::DragNode(nx, offset);
+                    self.action = Action::DragNode(offsets);
+
                     //// Move selected shape to the top
                     self.shapes.shape_positions.move_index(
                         self.shapes
@@ -237,8 +276,13 @@ impl App {
                         0,
                     );
                     return Task::done(Message::QueueCompute(nx));
-                } else {
-                    self.selected_shape = None;
+                } else
+                //// Clicked on the canvas background
+                {
+                    //// Clear selected shapes
+                    self.selected_shapes = Default::default();
+
+                    //// Start Pan
                     self.action = Action::DragPan(
                         self.shapes.camera.position + self.cursor_position.to_vector(),
                     );
@@ -267,20 +311,22 @@ impl App {
             Message::AddNode(template) => {
                 self.stash_state();
                 let id = self.graph.node(template.into());
-                self.selected_shape = Some(id);
+                self.selected_shapes = [id].into();
                 self.shapes.shape_positions.insert_before(
                     0,
                     id,
                     self.cursor_position + self.shapes.camera.position,
                 );
-                self.action = Action::DragNode(id, self.shapes.camera.position)
+                self.action = Action::DragNode(vec![(id, self.shapes.camera.position)])
             }
             Message::DeleteSelectedNode => {
-                if let Some(id) = self.selected_shape {
+                if !self.selected_shapes.is_empty() {
                     self.stash_state();
-                    self.graph.delete_node(id);
-                    self.shapes.shape_positions.swap_remove(&id);
-                    self.selected_shape = None;
+                    self.selected_shapes.iter().for_each(|id| {
+                        self.graph.delete_node(*id);
+                        self.shapes.shape_positions.swap_remove(id);
+                    });
+                    self.selected_shapes = [].into();
                     //PERF: ideally, we should only execute affected nodes
                     return Task::done(Message::ComputeAll);
                 }
@@ -508,7 +554,7 @@ impl App {
 
         // Potentially add a specific mouse cursor
         let output = match self.action {
-            Action::DragNode(_, _) => mouse_area(output)
+            Action::DragNode(_) => mouse_area(output)
                 .interaction(mouse::Interaction::Move)
                 .into(),
             _ => output,
@@ -665,7 +711,7 @@ impl Default for App {
                     show_palette_ui: false,
                     config: 50.,
 
-                    selected_shape: None,
+                    selected_shapes: Default::default(),
                     cursor_position: Default::default(),
                     action: Default::default(),
                     queued_nodes: Default::default(),

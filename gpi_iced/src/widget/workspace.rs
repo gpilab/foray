@@ -46,7 +46,7 @@ where
     zoom: Option<Box<dyn Fn(f32) -> Message + 'a>>,
     on_cursor_move: Option<Box<dyn Fn(Point) -> Message + 'a>>,
     #[allow(clippy::type_complexity)]
-    on_click: Option<Box<dyn Fn(Option<(ShapeId, Vector)>) -> Message + 'a>>,
+    on_click: Option<Box<dyn Fn(Option<ShapeId>) -> Message + 'a>>,
     on_shape_release: Option<Message>,
 }
 
@@ -121,10 +121,7 @@ where
         self
     }
 
-    pub fn on_press(
-        mut self,
-        on_press: impl Fn(Option<(ShapeId, Vector)>) -> Message + 'a,
-    ) -> Self {
+    pub fn on_press(mut self, on_press: impl Fn(Option<ShapeId>) -> Message + 'a) -> Self {
         self.on_click = Some(Box::new(on_press));
         self
     }
@@ -291,17 +288,14 @@ where
             (event::Status::Ignored, Some(cursor_position)) => match event.clone() {
                 Event::Mouse(ButtonPressed(mouse::Button::Left))
                 | Event::Touch(FingerPressed { .. }) => {
+                    //TODO: collapse this logic down more compactly
                     //// Find the first coliding shape
-                    if let Some((id, shape_offset)) =
+                    if let Some((id, _shape_pos)) =
                         self.shapes.find_shape(Point::from(cursor_position), layout)
                     {
-                        // haven't totally figured out why this is negative...
-                        // but its working as desired
-                        let total_offset = -(shape_offset - workspace_offset);
-
                         //// Publish event
                         if let Some(on_shape_click) = &self.on_click {
-                            shell.publish(on_shape_click(Some((id, total_offset))));
+                            shell.publish(on_shape_click(Some(id)));
                         }
                         //// Capture event
                         event::Status::Captured
@@ -324,7 +318,6 @@ where
                     if let Some(on_shape_release) = &self.on_shape_release {
                         shell.publish(on_shape_release.clone());
                     }
-
                     //// Capture event
                     event::Status::Captured
                 }
