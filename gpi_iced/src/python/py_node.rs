@@ -42,6 +42,7 @@ impl PortData {
             PortData::Real2d(array_base) => array_base.to_pyarray(py).into_any().into(),
             PortData::Complex(array_base) => array_base.to_pyarray(py).into_any().into(),
             PortData::Complex2d(array_base) => array_base.to_pyarray(py).into_any().into(),
+            PortData::Real3d(array_base) => array_base.to_pyarray(py).into_any().into(),
         }
     }
 }
@@ -55,29 +56,33 @@ impl PyNode {
         &self,
         inputs: OrderMap<String, PortDataReference>,
     ) -> Result<OrderMap<String, PortData>, NodeError> {
-        // convert inputs to python arrays/objects
-        Python::with_gil(|py| {
-            let py_inputs = inputs
-                .into_iter()
-                .map(|(k, v)| (k.clone(), v.to_py(py)))
-                .collect();
-            let out = gpipy_compute(
-                self.path.file_stem().unwrap().to_str().unwrap(),
-                &py_inputs,
-                py,
-            )
-            .map_err(|err| NodeError::Runtime(err.to_string()))?;
+        match &self.ports {
+            Ok(ports) => {
+                // Convert inputs to python arrays/objects
+                Python::with_gil(|py| {
+                    let py_inputs = inputs
+                        .into_iter()
+                        .map(|(k, v)| (k.clone(), v.to_py(py)))
+                        .collect();
+                    let out = gpipy_compute(
+                        self.path.file_stem().unwrap().to_str().unwrap(),
+                        &py_inputs,
+                        py,
+                    )
+                    .map_err(|err| NodeError::Runtime(err.to_string()))?;
 
-            self.ports
-                .as_ref()
-                .unwrap()
-                .outputs
-                .iter()
-                .map(|(k, port_type)| {
-                    Self::extract_py_data(port_type, &out[k], py).map(|p| (k.clone(), p))
+                    ports
+                        .outputs
+                        .iter()
+                        .map(|(k, port_type)| {
+                            Self::extract_py_data(port_type, &out[k], py).map(|p| (k.clone(), p))
+                        })
+                        .collect()
                 })
-                .collect()
-        })
+            }
+            // If the ports are not valid, don't bother running. Just surface the error
+            Err(e) => Err(e.clone()),
+        }
     }
 
     pub fn py_node_path(node_name: &str) -> PathBuf {
@@ -88,27 +93,57 @@ impl PyNode {
         py_object: &PyObject,
         py: Python,
     ) -> Result<PortData, NodeError> {
+        // unsure how to make the repetion bellow more generic, while still
+        // automatically converting to the PortType
         unsafe {
             Ok(match port_type {
-                PortType::Integer => {
-                    PortData::Integer(py_object.bind(py).downcast()
-                        .map_err(|_e|NodeError::Output(format!("Received unexpected output from node. expected {port_type:?}, found {py_object:?}")))?.as_array().to_owned())
-                }
-                PortType::Real => {
-                    PortData::Real(py_object.bind(py).downcast()
-                        .map_err(|_e|NodeError::Output(format!("Received unexpected output from node. expected {port_type:?}, found {py_object:?}")))?.as_array().to_owned())
-                }
-                PortType::Complex => {
-                    PortData::Complex(py_object.bind(py).downcast()
-                        .map_err(|_e|NodeError::Output(format!("Received unexpected output from node. expected {port_type:?}, found {py_object:?}")))?.as_array().to_owned())
-                }
-                PortType::Real2d => {
-                    PortData::Real2d(py_object.bind(py).downcast()
-                        .map_err(|_e|NodeError::Output(format!("Received unexpected output from node. expected {port_type:?}, found {py_object:?}")))?.as_array().to_owned())
-                }
+                PortType::Integer => PortData::Integer(
+                    py_object
+                        .bind(py)
+                        .downcast()
+                        .map_err(|_e| output_error(port_type, py_object))?
+                        .as_array()
+                        .to_owned(),
+                ),
+                PortType::Real => PortData::Real(
+                    py_object
+                        .bind(py)
+                        .downcast()
+                        .map_err(|_e| output_error(port_type, py_object))?
+                        .as_array()
+                        .to_owned(),
+                ),
+                PortType::Complex => PortData::Complex(
+                    py_object
+                        .bind(py)
+                        .downcast()
+                        .map_err(|_e| output_error(port_type, py_object))?
+                        .as_array()
+                        .to_owned(),
+                ),
+                PortType::Real2d => PortData::Real2d(
+                    py_object
+                        .bind(py)
+                        .downcast()
+                        .map_err(|_e| output_error(port_type, py_object))?
+                        .as_array()
+                        .to_owned(),
+                ),
+                PortType::Real3d => PortData::Real3d(
+                    py_object
+                        .bind(py)
+                        .downcast()
+                        .map_err(|_e| output_error(port_type, py_object))?
+                        .as_array()
+                        .to_owned(),
+                ),
                 PortType::Complex2d => PortData::Complex2d(
-                    py_object.bind(py).downcast()
-                        .map_err(|_e|NodeError::Output(format!("Received unexpected output from node. expected {port_type:?}, found {py_object:?}")))?.as_array().to_owned()
+                    py_object
+                        .bind(py)
+                        .downcast()
+                        .map_err(|_e| output_error(port_type, py_object))?
+                        .as_array()
+                        .to_owned(),
                 ),
             })
         }
@@ -123,6 +158,7 @@ pub struct PyFacingPortDef {
 }
 
 impl TryFrom<PyFacingPortDef> for PortDef {
+    type Error = NodeError;
     fn try_from(value: PyFacingPortDef) -> Result<Self, Self::Error> {
         Ok(PortDef {
             inputs: value
@@ -131,13 +167,14 @@ impl TryFrom<PyFacingPortDef> for PortDef {
                 .into_iter()
                 .map(|(key, value)| PortType::from_str(&value).map(|v| (key, v)))
                 .collect::<Result<OrderMap<_, _>, _>>()
-                .unwrap_or_else(|_| {
-                    panic!(
-                        "Expected port values of {:?}, found {:?}",
+                .map_err(|e| {
+                    NodeError::Output(format!(
+                        "{:#?}\nExpected one of {:#?}, found {:#?}",
+                        e,
                         PortType::VARIANTS,
-                        value.inputs
-                    )
-                }),
+                        value.inputs,
+                    ))
+                })?,
             outputs: value
                 .clone()
                 .outputs
@@ -145,13 +182,19 @@ impl TryFrom<PyFacingPortDef> for PortDef {
                 .map(|(key, value)| PortType::from_str(&value).map(|v| (key, v)))
                 .collect::<Result<OrderMap<_, _>, _>>()
                 .unwrap_or_else(|_| {
+                    //TODO: pass the error up? not sure why this currently just panics
                     panic!(
-                        "Expected port values of {:?}, found {:?}",
+                        "Expected one of {:#?}, found {:#?}",
                         PortType::VARIANTS,
                         value.outputs
                     )
                 }),
         })
     }
-    type Error = NodeError;
+}
+
+fn output_error(port_type: &PortType, py_object: &PyObject) -> NodeError {
+    NodeError::Output(format!(
+        "Received unexpected output from node. Expected one of {port_type:#?}, found {py_object:#?}"
+    ))
 }

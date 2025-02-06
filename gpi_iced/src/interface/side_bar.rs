@@ -65,6 +65,10 @@ pub fn side_bar(app: &App) -> Element<'_, Message> {
             column![
                 container(text(node.template.name().clone()).size(20.)).center_x(Fill),
                 horizontal_rule(0),
+                row![node.status.icon(), node.status.text_element().size(12.)]
+                    .align_y(Center)
+                    .spacing(4.0),
+                vertical_space().height(10.),
                 node.template
                     .config_view(*selected_id, input_data)
                     .unwrap_or(text("...").into()),
@@ -73,7 +77,7 @@ pub fn side_bar(app: &App) -> Element<'_, Message> {
                 row![button(text("delete node"))
                     .style(button::danger)
                     .padding([1, 4])
-                    .on_press(Message::DeleteSelectedNode)]
+                    .on_press(Message::DeleteSelectedNodes)]
             ]
             .align_x(Center)
             .height(Fill)

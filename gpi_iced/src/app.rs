@@ -97,7 +97,7 @@ pub enum Message {
     AddNode(NodeTemplate),
 
     UpdateNodeTemplate(u32, NodeTemplate),
-    DeleteSelectedNode,
+    DeleteSelectedNodes,
 
     QueueCompute(u32),
     ComputeComplete(
@@ -319,7 +319,7 @@ impl App {
                 );
                 self.action = Action::DragNode(vec![(id, [0.0, 0.0].into())])
             }
-            Message::DeleteSelectedNode => {
+            Message::DeleteSelectedNodes => {
                 if !self.selected_shapes.is_empty() {
                     self.stash_state();
                     self.selected_shapes.iter().for_each(|id| {
@@ -668,7 +668,7 @@ pub fn subscriptions(state: &App) -> Subscription<Message> {
                         Some(Message::FocusNext)
                     }
                 }
-                Key::Named(Named::Delete) => Some(Message::DeleteSelectedNode),
+                Key::Named(Named::Delete) => Some(Message::DeleteSelectedNodes),
                 Key::Named(Named::Escape) => Some(Message::Cancel),
                 Key::Character(smol_str) => {
                     if smol_str == "a" {

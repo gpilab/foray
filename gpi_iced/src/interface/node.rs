@@ -40,10 +40,10 @@ impl App {
                         self.app_theme.primary.weak_color().into(),
                         self.app_theme.primary.base_color.into(),
                     ),
-                    //(color!(139, 126, 200), color!(94, 64, 157)),  //purple
                     PortType::Real2d => (color!(67, 133, 190), color!(32, 94, 166)), //blue
                     PortType::Complex => (color!(135, 154, 57), color!(102, 128, 11)), //green
                     PortType::Complex2d => (color!(58, 169, 159), color!(36, 131, 123)), //cyan
+                    PortType::Real3d => (color!(139, 126, 200), color!(94, 64, 157)), //purple
                 };
 
                 let mut style = custom_button::custom(*s, color_pair.1, color_pair.0);

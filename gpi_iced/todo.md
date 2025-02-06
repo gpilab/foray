@@ -29,11 +29,11 @@
  - [x] pan
    - [ ] kinetic pan
  - [ ] zoom
- - [ ] hotkeys
+ - [x] hotkeys
   - [x] delete node
   - [x] deselect node
-  - [ ] copy/paste
-  - [ ] add node
+  - [x] copy/paste
+  - [x] add node
  - [x] duplicate node on command + click
  - [ ] toggle auto reload
  - [ ] visually notify node reloads
@@ -43,7 +43,7 @@
 - [x] render nodes
 
 - [x] select single node
-  - [ ] select multiple nodes
+  - [x] select multiple nodes
 
 ## Data Model
 - [x] execution
