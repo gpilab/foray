@@ -317,7 +317,7 @@ impl App {
                     id,
                     self.cursor_position + self.shapes.camera.position,
                 );
-                self.action = Action::DragNode(vec![(id, self.shapes.camera.position)])
+                self.action = Action::DragNode(vec![(id, [0.0, 0.0].into())])
             }
             Message::DeleteSelectedNode => {
                 if !self.selected_shapes.is_empty() {
