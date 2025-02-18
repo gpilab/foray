@@ -8,15 +8,8 @@ trait Primitive {}
 impl Primitive for u32 {}
 impl Primitive for f32 {}
 impl Primitive for Box<dyn Primitive> {}
-impl<T> Primitive for Box<T> {}
+impl<T: Primitive> Primitive for Box<T> {}
 impl<T: Primitive> Primitive for Port<T> {}
-//impl Primitive for Box<u32> {}
-//impl Primitive for Box<f32> {}
-//impl Primitive for Port<Box<dyn Primitive>> {}
-//impl Primitive for Port<u32> {}
-//impl Primitive for Port<f32> {}
-//impl Primitive for Port<Box<u32>> {}
-//impl Primitive for Port<Box<f32>> {}
 
 enum Port<T>
 where
@@ -31,51 +24,55 @@ where
 }
 
 fn main() {
-    let a = Port::Primitive(5);
-    let b = Port::Primitive(5.1);
-    let b1 = Port::Primitive(Box::new(5.1));
-    let b1 = Port::Primitive(Port::Primitive(5));
-    let c = Port::Array(Shape(vec![2, 2]), vec![1, 2, 3, 4]);
-    let c1 = Port::Array(Shape(vec![2, 2]), vec![1.1, 2.0, 3.1, 4.1]);
+    let primitive_u32 = Port::Primitive(5);
+    let primitive_f32 = Port::Primitive(5.1);
 
-    let ex: Box<dyn Primitive> = Box::new(2u32);
-    let exf: Box<dyn Primitive> = Box::new(2.0f32);
-    let my_struct: Port<u32> = Port::Struct([("foo".to_string(), ex)].into());
-    let my_struct2 = Port::Struct([("bar".to_string(), exf)].into());
+    let primitive_boxed = Port::Primitive(Box::new(5.1));
+    //let non_primitive_boxed = Port::Primitive(Box::new("hi"));
 
-    let ex: Box<dyn Primitive> = Box::new(2u32);
-    let exf: Box<dyn Primitive> = Box::new(2.0f32);
+    // should this be possible? can it be prevented?
+    let nested_port_primitive = Port::Primitive(Port::Primitive(5));
 
-    let d: Port<Box<dyn Primitive>> = Port::Struct(
+    let array_u32 = Port::Array(Shape(vec![2, 2]), vec![1, 2, 3, 4]);
+    let array_f32 = Port::Array(Shape(vec![2, 2]), vec![1.1, 2.0, 3.1, 4.1]);
+    //let array_u32_f32 = Port::Array(Shape(vec![2, 2]), vec![1, 2, 3.1, 4.1]);
+
+    //let struct_no_work: Port<Box<dyn Primitive>> =
+    //    Port::Struct([("bar".to_string(), Box::new(2u32))].into());
+
+    // must specify type before??
+    let box_u32: Box<dyn Primitive> = Box::new(2u32);
+    let box_f32: Box<dyn Primitive> = Box::new(2.0f32);
+    let my_struct: Port<Box<dyn Primitive>> = Port::Struct([("foo".to_string(), box_u32)].into());
+    let my_struct2: Port<Box<dyn Primitive>> = Port::Struct([("bar".to_string(), box_f32)].into());
+
+    let box_u32: Box<dyn Primitive> = Box::new(2u32);
+    let box_f32: Box<dyn Primitive> = Box::new(2.0f32);
+    let my_struct3: Port<Box<dyn Primitive>> =
+        Port::Struct([("foo".to_string(), box_u32), ("bar".to_string(), box_f32)].into());
+
+    // no work let my_struct = Port::Struct([("foo".to_string(), Box::new(primitive_u32))].into());
+    let box_primitive_u32: Box<dyn Primitive> = Box::new(primitive_u32);
+    let box_primitive_f32: Box<dyn Primitive> = Box::new(primitive_f32);
+    let my_struct4: Port<Box<dyn Primitive>> = Port::Struct(
         [
-            ("foo".to_string(), ex),
-            ("bar".to_string(), exf),
-            ("baz1".to_string(), Box::new(a)),
-            ("baz1".to_string(), Box::new(b1)),
-            ("baz2".to_string(), Box::new(5)),
-            ("baz3".to_string(), Box::new(5.0)),
-            ("baz4".to_string(), Box::new(c)),
-            (
-                "baz5".to_string(),
-                Box::new(Port::Array(Shape(vec![1, 2]), vec![1, 2])),
-            ),
-            (
-                "baz6".to_string(),
-                Box::new(Port::Array(Shape(vec![1, 2]), vec![my_struct, my_struct2])),
-            ),
+            ("foo".to_string(), box_primitive_u32),
+            ("bar".to_string(), box_primitive_f32),
         ]
         .into(),
     );
 
-    //let e = Port::Struct(
-    //    [
-    //        ("foo".to_string(), Port::Primitive(1)),
-    //        ("bar".to_string(), Port::Primitive(2.1)),
-    //    ]
-    //    .into(),
-    //);
-    //
-    //dbg!(a, b, c);
+    let box_array_u32: Box<dyn Primitive> = Box::new(array_u32);
+    let box_array_f32: Box<dyn Primitive> = Box::new(array_f32);
+    let box_struct: Box<dyn Primitive> = Box::new(my_struct4);
+    let d: Port<Box<dyn Primitive>> = Port::Struct(
+        [
+            ("baz1".to_string(), box_array_u32),
+            ("baz2".to_string(), box_array_f32),
+            ("baz3".to_string(), box_struct),
+        ]
+        .into(),
+    );
 }
 //struct Node {
 //    ports: HashMap<String, Port<Box<dyn Primitive>>>,
