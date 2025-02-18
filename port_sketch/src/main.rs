@@ -39,7 +39,14 @@ fn main() {
     let ex: Box<dyn Primitive> = Box::new(2u32);
     let exf: Box<dyn Primitive> = Box::new(2.0f32);
 
-    let d: Port<Box<dyn Primitive>> = Port::Struct([("foo".to_string(), ex)].into());
+    let d: Port<Box<dyn Primitive>> = Port::Struct(
+        [
+            ("foo".to_string(), ex),
+            ("bar".to_string(), exf),
+            ("baz".to_string(), Box::new(a)),
+        ]
+        .into(),
+    );
 
     //let e = Port::Struct(
     //    [
