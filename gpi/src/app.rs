@@ -362,7 +362,7 @@ impl App {
             }
             Message::Save => {
                 std::fs::write(
-                    "network.ron",
+                    "networks/network.ron",
                     ron::ser::to_string_pretty(
                         &self,
                         ron::ser::PrettyConfig::default().compact_arrays(true),
@@ -372,8 +372,10 @@ impl App {
                 .expect("Could not save to file");
             }
             Message::Load => {
-                *self = ron::from_str(&read_to_string("network.ron").expect("Could not read file"))
-                    .expect("could not parse file");
+                *self = ron::from_str(
+                    &read_to_string("networks/network.ron").expect("Could not read file"),
+                )
+                .expect("could not parse file");
                 self.reload_nodes();
                 return Task::done(Message::ComputeAll);
             }
@@ -746,7 +748,7 @@ pub fn subscriptions(state: &App) -> Subscription<Message> {
 impl Default for App {
     fn default() -> App {
         // Try to load file
-        match read_to_string("network.ron").map(|s| ron::from_str::<App>(&s)) {
+        match read_to_string("networks/network.ron").map(|s| ron::from_str::<App>(&s)) {
             Ok(Ok(app)) => {
                 let mut app = app;
                 app.available_nodes = NodeData::available_nodes();
