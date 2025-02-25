@@ -1,3 +1,0 @@
-- [ ] iced  
-  - [ ] infinite node canavas
-  - [ ] Dynamic image w/ level control

@@ -1,6 +1,0 @@
-Integer = "Integer"
-Real = "Real"
-Complex = "Complex"
-String = "String"
-Flag = "Flag"
-Image = "Image"
