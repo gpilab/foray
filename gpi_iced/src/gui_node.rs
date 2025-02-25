@@ -11,7 +11,7 @@ use crate::{
         status::NodeStatus,
         NodeData,
     },
-    OrderMap,
+    StableMap,
 };
 
 pub trait GUINode: derive_more::Debug {
@@ -27,7 +27,7 @@ pub trait GUINode: derive_more::Debug {
     fn view(
         &self,
         _id: u32,
-        _input_data: OrderMap<String, PortDataContainer>,
+        _input_data: StableMap<String, PortDataContainer>,
     ) -> (iced::Size, Element<Message>) {
         (default_node_size(), text("default").into())
     }
@@ -35,7 +35,7 @@ pub trait GUINode: derive_more::Debug {
     fn config_view(
         &self,
         _id: u32,
-        _input_data: OrderMap<String, PortDataContainer>,
+        _input_data: StableMap<String, PortDataContainer>,
     ) -> Option<Element<'_, Message>> {
         None
     }

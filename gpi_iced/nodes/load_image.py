@@ -1,19 +1,20 @@
 import numpy as np
 from PIL import Image
 
+from gpi import node, port
+
 
 def config():
-    class out:
-        inputs = {}
-        outputs = {"out": "Real2d"}
+    return node(
+        {},
+        {"out": port.ArrayReal},
+    )
 
-    return out
 
-
-def compute(input):
+def compute(input, _):
     img = Image.open("nodes/data/slogan.png")
 
     # just take blue channel for simplicity
     np_img = np.array(img)[:, :, 0] / 255.0
 
-    return np_img
+    return {"out": np_img}

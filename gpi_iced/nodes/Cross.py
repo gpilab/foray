@@ -4,8 +4,11 @@ from gpi import port
 
 def config():
     class out:
-        inputs = {"a": port.ArrayComplex, "b": port.ArrayComplex}
-        outputs = {"out": port.ArrayComplex}
+        inputs = {
+            "a": port.ArrayReal,
+            "b": port.ArrayReal,
+        }
+        outputs = {"out": port.ArrayReal}
         parameters = {}
 
     return out
@@ -14,5 +17,5 @@ def config():
 def compute(input, _):
     a = input["a"]
     b = input["b"]
-    out = np.multiply(a, b)
+    out = np.cross(a, b)
     return {"out": out}

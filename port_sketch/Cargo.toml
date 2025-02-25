@@ -4,3 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+ndarray = "0.16.1"
+num = "0.4.3"
+numpy = "0.23.0"
+pyo3 = "0.23.4"

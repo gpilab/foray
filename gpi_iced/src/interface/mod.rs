@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 pub mod add_node;
 pub mod node;
+pub mod numeric_input;
 pub mod side_bar;
 pub mod theme_config;
 pub mod wire;

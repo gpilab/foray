@@ -1,7 +1,7 @@
 use super::PortData;
 use crate::gui_node::PortDataReference;
 use crate::nodes::{NodeTemplate, RustNode};
-use crate::OrderMap;
+use crate::StableMap;
 use crate::{app::Message, math::linspace};
 use iced::{
     widget::{column, container, horizontal_rule, row, text, text_input, TextInput},
@@ -9,6 +9,8 @@ use iced::{
     Color, Element,
     Length::{Fill, Shrink},
 };
+use ndarray::ArrayD;
+use numpy::IxDyn;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -35,20 +37,23 @@ impl LinspaceConfig {
 
     pub fn compute(
         &self,
-        _inputs: OrderMap<String, PortDataReference>,
-    ) -> OrderMap<String, PortData> {
+        _inputs: StableMap<String, PortDataReference>,
+    ) -> StableMap<String, PortData> {
         //node after potential modifications
         let LinspaceConfig { start, stop, num } = self;
         let data: Vec<_> = linspace(*start as f32, *stop as f32, *num as i32);
 
         [(
             "out".into(),
-            PortData::Real(
-                data.clone()
-                    .into_iter()
-                    .map(|v| v as f64)
-                    .collect::<Vec<_>>()
-                    .into(),
+            PortData::ArrayReal(
+                ArrayD::from_shape_vec(
+                    IxDyn(&[*num as usize]),
+                    data.clone()
+                        .into_iter()
+                        .map(|v| v as f64)
+                        .collect::<Vec<_>>(),
+                )
+                .expect("1D arrray shape should always work"),
             ),
         )]
         .into()

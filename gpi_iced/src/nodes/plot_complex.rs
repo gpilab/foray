@@ -4,13 +4,13 @@ use crate::gui_node::{PortDataContainer, PortDataReference};
 use crate::interface::node::{INNER_NODE_WIDTH, NODE_BORDER_WIDTH};
 use crate::math::Vector;
 use crate::nodes::NodeTemplate;
-use crate::OrderMap;
+use crate::StableMap;
 use iced::widget::image::Handle;
 use iced::widget::{button, container, horizontal_space, image, row, text, text_input};
 use iced::Alignment::Center;
 use iced::{widget::column, Element};
 use log::trace;
-use ndarray::Array2;
+use ndarray::Array3;
 use serde::{Deserialize, Serialize};
 
 // Rectanlge specified by center position, width and height
@@ -56,7 +56,7 @@ impl Plot2D {
     pub fn view<'a>(
         &self,
         _id: u32,
-        _input_data: OrderMap<String, PortDataContainer>,
+        _input_data: StableMap<String, PortDataContainer>,
     ) -> Element<'a, Message> {
         match &self.image_handle {
             Some(handle) => container(
@@ -74,7 +74,7 @@ impl Plot2D {
     pub fn config_view(
         &self,
         id: u32,
-        _input_data: OrderMap<String, PortDataContainer>,
+        _input_data: StableMap<String, PortDataContainer>,
     ) -> Option<Element<'_, Message>> {
         let center = self.rect.center;
         let width = self.rect.width;
@@ -165,30 +165,53 @@ impl Plot2D {
         )
     }
 
-    fn create_image_handle(data: &Array2<f64>) -> Handle {
+    fn create_image_handle(data: &Array3<f64>) -> Handle {
         trace!("Creating image handle for plot2d, {:?}", data.shape());
         let max = data.iter().fold(-f64::INFINITY, |a, &b| a.max(b));
         let min = data.iter().fold(f64::INFINITY, |a, &b| a.min(b));
         let img: Vec<u8> = data
-            .iter()
-            .flat_map(|p| {
-                let p = ((p - min) / (max - min)) as f32;
-                let p = if p.is_nan() { 1.0 } else { p };
-                let b = (p * 255.0).round() as u8;
-                [b, b, b, 255]
+            .outer_iter()
+            .flat_map(|row| {
+                row.outer_iter()
+                    .flat_map(|p| {
+                        if p.len() == 1 {
+                            let p = p[0];
+                            let p = ((p - min) / (max - min)) as f32;
+                            let p = if p.is_nan() { 1.0 } else { p };
+                            let b = (p * 255.0).round() as u8;
+                            [b, b, b, 255]
+                        } else if p.len() == 3 {
+                            [
+                                ((p[0] + 1.0) * 0.5 * 255.0) as u8,
+                                ((p[1] + 1.0) * 0.5 * 255.0) as u8,
+                                ((p[2] + 1.0) * 0.5 * 255.0) as u8,
+                                255,
+                            ]
+                        } else {
+                            panic!("unsupported array dimensions")
+                        }
+                    })
+                    .collect::<Vec<_>>()
             })
             .collect();
         Handle::from_rgba(data.dim().0 as u32, data.dim().1 as u32, img)
     }
 
-    pub(crate) fn input_changed(&mut self, input_data: OrderMap<String, PortDataReference>) {
+    pub(crate) fn input_changed(&mut self, input_data: StableMap<String, PortDataReference>) {
         self.image_handle = match input_data.get("a") {
             Some(port) => {
                 let data = match &**port {
-                    PortData::Real2d(a) => a,
-                    PortData::Complex2d(a) => &Array2::<f64>::from_shape_vec(
-                        (a.len().isqrt(), a.len().isqrt()),
-                        a.iter().map(|v| v.norm_sqr().sqrt()).collect::<Vec<_>>(),
+                    PortData::ArrayReal(a) => &Array3::<f64>::from_shape_vec(
+                        (a.shape()[0], a.shape()[1], 3),
+                        a.iter().flat_map(|v| [*v, *v, *v]).collect::<Vec<_>>(),
+                    )
+                    .expect("square matrix"),
+                    PortData::ArrayComplex(a) => &Array3::<f64>::from_shape_vec(
+                        (a.len().isqrt(), a.len().isqrt(), 3),
+                        a.iter()
+                            .map(|v| v.norm_sqr().sqrt())
+                            .flat_map(|v| [v, v, v])
+                            .collect::<Vec<_>>(),
                     )
                     .expect("square matrix"),
                     _ => panic!("unsuported plot types {:?}", port),

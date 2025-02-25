@@ -12,10 +12,10 @@ pub fn view<'a>(id: u32, value: f64) -> Element<'a, Message> {
     container(
         column![
             text(format!("{value:.1}")),
-            slider(0.1..=20., value, move |value| {
+            slider(-1.0..=1., value, move |value| {
                 Message::UpdateNodeTemplate(id, NodeTemplate::RustNode(RustNode::Constant(value)))
             })
-            .step(0.1)
+            .step(0.05)
             .width(Fill),
         ]
         .align_x(Center)

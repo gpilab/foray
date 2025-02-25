@@ -1,17 +1,19 @@
+from gpi import port
 import time
 
 
 def config():
     class out:
-        inputs = {"in": "Real"}
-        outputs = {"out": "Real"}
+        inputs = {"in": port.Real}
+        outputs = {"out": port.Real}
+        parameters = {}
 
     return out
 
 
-def compute(input):
+def compute(input, _):
     output = input["in"]
 
     time.sleep(2)
     print(output)
-    return output
+    return {"out": output}

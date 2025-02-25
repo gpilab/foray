@@ -10,10 +10,11 @@ use iced::widget::canvas::{Path, Stroke};
 use iced::{event, mouse, Color, Theme};
 use iced::{Element, Event};
 use iced::{Length, Rectangle, Size};
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
 use crate::math::{Point, Vector};
-use crate::OrderMap;
+use crate::StableMap;
 
 use super::shapes::{Shape, ShapeId, Shapes};
 
@@ -53,7 +54,7 @@ where
 #[derive(Serialize, Deserialize, Clone)]
 pub struct State {
     pub camera: Camera,
-    pub shape_positions: OrderMap<ShapeId, Point>,
+    pub shape_positions: IndexMap<ShapeId, Point>,
 }
 
 impl Default for State {
@@ -63,7 +64,7 @@ impl Default for State {
 }
 
 impl State {
-    pub fn new(shapes: OrderMap<ShapeId, Point>) -> State {
+    pub fn new(shapes: IndexMap<ShapeId, Point>) -> State {
         Self {
             camera: Camera::default(),
             shape_positions: shapes,
@@ -79,7 +80,7 @@ where
     pub fn new(
         state: &'a State,
         node_view: impl Fn(ShapeId) -> Element<'a, Message, Theme, Renderer>,
-        connections_view: impl Fn(ShapeId, &OrderMap<ShapeId, Point>) -> Vec<(Path, Stroke<'a>)>,
+        connections_view: impl Fn(ShapeId, &StableMap<ShapeId, Point>) -> Vec<(Path, Stroke<'a>)>,
     ) -> Self {
         let positions = state
             .shape_positions
@@ -394,7 +395,7 @@ where
 pub fn workspace<'a, Message, Theme, Renderer>(
     state: &'a State,
     node_view: impl Fn(ShapeId) -> Element<'a, Message, Theme, Renderer>,
-    connections_view: impl Fn(ShapeId, &OrderMap<ShapeId, Point>) -> Vec<(Path, Stroke<'a>)>,
+    connections_view: impl Fn(ShapeId, &StableMap<ShapeId, Point>) -> Vec<(Path, Stroke<'a>)>,
 ) -> Workspace<'a, Message, Theme, Renderer>
 where
     Theme: 'a + Catalog,

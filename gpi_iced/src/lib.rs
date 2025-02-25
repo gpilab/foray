@@ -1,9 +1,11 @@
 #![feature(iter_map_windows)]
+#![feature(iter_array_chunks)]
+
+use std::collections::BTreeMap;
 
 use iced::Font;
-use indexmap::IndexMap;
 
-pub type OrderMap<K, V> = IndexMap<K, V>;
+pub type StableMap<K, V> = BTreeMap<K, V>;
 pub const DEFAULT_FONT: Font = Font::with_name("CaskaydiaCove");
 pub const MATH_FONT: Font = Font::with_name("DejaVu Math TeX Gyre");
 pub const SYMBOL_FONT: Font = Font::with_name("CaskaydiaCove Nerd Font");

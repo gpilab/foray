@@ -3,7 +3,7 @@ use std::iter::once;
 use crate::app::{Action, App};
 use crate::math::Point;
 use crate::style::theme::AppTheme;
-use crate::OrderMap;
+use crate::StableMap;
 use canvas::{Path, Stroke};
 use iced::widget::*;
 
@@ -11,7 +11,7 @@ impl App {
     pub fn wire_curve(
         &self,
         wire_end_node: u32,
-        points: &OrderMap<u32, Point>,
+        points: &StableMap<u32, Point>,
     ) -> Vec<(Path, Stroke)> {
         let port_position = |port: &PortRef| {
             points[&port.node] + find_port_offset(port, self.graph.port_index(port)).into()

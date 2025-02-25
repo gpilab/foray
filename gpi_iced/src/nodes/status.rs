@@ -18,7 +18,7 @@ impl NodeStatus {
     pub fn icon(&self) -> Text {
         match self {
             NodeStatus::Idle => icon(""),
-            NodeStatus::Running(_) => icon(""),
+            NodeStatus::Running(_) => icon(""), //icon(""),
             NodeStatus::Error(_) => icon("").style(text::danger),
         }
     }
@@ -26,7 +26,7 @@ impl NodeStatus {
     pub fn text_element(&self) -> Text {
         match self {
             NodeStatus::Idle => text(""),
-            NodeStatus::Running(_) => text("Running"),
+            NodeStatus::Running(_) => text(""),
             NodeStatus::Error(err) => text(err.to_string()).style(text::danger),
         }
     }

@@ -11,8 +11,12 @@ use crate::nodes::NodeData;
 use crate::widget::custom_button;
 use crate::widget::node_container::NodeContainer;
 use crate::widget::pin::Pin;
-use crate::OrderMap;
-use iced::{border, color, widget::*, Color, Element};
+use crate::StableMap;
+use iced::{
+    border, color,
+    widget::{column, *},
+    Color, Element,
+};
 
 pub const INNER_NODE_WIDTH: f32 = 120.;
 pub const INNER_NODE_HEIGHT: f32 = 60.;
@@ -40,10 +44,12 @@ impl App {
                         self.app_theme.primary.weak_color().into(),
                         self.app_theme.primary.base_color.into(),
                     ),
-                    PortType::Real2d => (color!(67, 133, 190), color!(32, 94, 166)), //blue
                     PortType::Complex => (color!(135, 154, 57), color!(102, 128, 11)), //green
-                    PortType::Complex2d => (color!(58, 169, 159), color!(36, 131, 123)), //cyan
-                    PortType::Real3d => (color!(139, 126, 200), color!(94, 64, 157)), //purple
+                    PortType::ArrayInteger => (color!(209, 77, 65), color!(175, 48, 41)), //red
+                    PortType::ArrayReal => (color!(67, 133, 190), color!(32, 94, 166)), //blue
+                    PortType::ArrayComplex => (color!(58, 169, 159), color!(36, 131, 123)), //cyan
+                    PortType::Dynamic => (color!(209, 150, 65), color!(175, 125, 41)), //orange
+                    PortType::Object(_) => (color!(229, 180, 65), color!(200, 160, 41)), //yellow
                 };
 
                 let mut style = custom_button::custom(*s, color_pair.1, color_pair.0);
@@ -179,10 +185,11 @@ impl App {
 }
 
 pub fn format_node_output<'a>(
-    data: &OrderMap<String, Option<&PortDataContainer>>,
+    node: &NodeData,
+    data: &StableMap<String, Option<&PortDataContainer>>,
 ) -> Element<'a, Message> {
     //TODO: clean this up by iterating straight to text elements?
-    let node_output = data.into_iter().map(|(port_name, d)| {
+    let node_output = data.iter().map(|(port_name, d)| {
         (
             port_name.to_string(),
             d.map(|d| format!("{}", d.read().unwrap()))
@@ -190,10 +197,13 @@ pub fn format_node_output<'a>(
         )
     });
 
-    container(column(node_output.map(|(lbl, val)| {
-        row![text(lbl).size(12.), text(val).size(12.)]
-            .spacing(5.0)
-            .into()
-    })))
+    container(column![
+        text(format!("{:#?}", node)).size(12.),
+        column(node_output.map(|(lbl, val)| {
+            row![text(lbl).size(12.), text(val).size(12.)]
+                .spacing(5.0)
+                .into()
+        }))
+    ])
     .into()
 }

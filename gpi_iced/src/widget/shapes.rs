@@ -1,4 +1,4 @@
-use crate::OrderMap;
+use crate::StableMap;
 use derive_more::derive::Debug;
 use iced::advanced::layout;
 
@@ -22,11 +22,11 @@ impl<T> Shape<T> {
 }
 
 #[derive(Debug)]
-pub struct Shapes<T>(pub OrderMap<ShapeId, Shape<T>>);
+pub struct Shapes<T>(pub StableMap<ShapeId, Shape<T>>);
 
 impl<T> Default for Shapes<T> {
     fn default() -> Self {
-        Self(OrderMap::new())
+        Self(StableMap::new())
     }
 }
 

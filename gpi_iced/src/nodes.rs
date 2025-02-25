@@ -7,6 +7,7 @@ pub mod plot;
 pub mod plot_complex;
 pub mod port;
 pub mod status;
+pub mod vector_field;
 
 use crate::app::Message;
 use crate::graph::GraphNode;
@@ -17,7 +18,7 @@ use crate::nodes::math_nodes::{binary_operation, unary_operation};
 use crate::nodes::plot::Plot;
 use crate::nodes::plot_complex::Plot2D;
 use crate::python::py_node::PyNode;
-use crate::OrderMap;
+use crate::StableMap;
 use derive_more::derive::{Debug, Display};
 use iced::widget::text;
 use iced::{Font, Size};
@@ -27,6 +28,7 @@ use port::{PortData, PortType};
 use serde::{Deserialize, Serialize};
 use status::{NodeError, NodeStatus};
 use strum::{EnumIter, IntoEnumIterator, VariantNames};
+use vector_field::VectorField;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeData {
@@ -54,8 +56,8 @@ pub enum RustNode {
     Plot(Plot),
     #[display("Plot2D")]
     Plot2D(Plot2D),
-    Join,
-    Reverse,
+    #[display("VectorField")]
+    VectorField(VectorField),
 }
 
 #[derive(Clone, Debug, Display, Serialize, Deserialize, PartialEq)]
@@ -97,8 +99,8 @@ impl NodeTemplate {
 impl NodeData {
     fn fallible_compute(
         &mut self,
-        inputs: OrderMap<String, PortDataReference>,
-    ) -> Result<(OrderMap<String, PortData>, NodeData), NodeError> {
+        inputs: StableMap<String, PortDataReference>,
+    ) -> Result<(StableMap<String, PortData>, NodeData), NodeError> {
         Ok((
             match &mut self.template {
                 NodeTemplate::RustNode(rust_node) => match rust_node {
@@ -111,7 +113,7 @@ impl NodeData {
                     )]
                     .into(),
                     RustNode::Constant(value) => {
-                        [("out".to_string(), PortData::Real(vec![*value].into()))].into()
+                        [("out".to_string(), PortData::Real(*value))].into()
                     }
                     RustNode::Add => binary_operation(inputs, Box::new(|a, b| a + b))?,
                     RustNode::Subtract => binary_operation(inputs, Box::new(|a, b| a - b))?,
@@ -119,14 +121,6 @@ impl NodeData {
 
                     RustNode::Divide => binary_operation(inputs, Box::new(|a, b| a / b))?,
 
-                    RustNode::Join => binary_operation(
-                        inputs,
-                        Box::new(|a, b| a.iter().chain(b).copied().collect()),
-                    )?,
-
-                    RustNode::Reverse => {
-                        unary_operation(inputs, Box::new(|a| a.iter().rev().copied().collect()))?
-                    }
                     RustNode::Cos => unary_operation(inputs, Box::new(|a| a.cos()))?,
 
                     RustNode::Sin => unary_operation(inputs, Box::new(|a| a.sin()))?,
@@ -147,6 +141,7 @@ impl NodeData {
                         plot_2d.input_changed(inputs);
                         [].into()
                     }
+                    RustNode::VectorField(_) => [].into(),
                 },
 
                 NodeTemplate::PyNode(py_node) => py_node.compute(inputs)?,
@@ -190,7 +185,7 @@ impl PyNode {
 }
 
 impl GraphNode<NodeData, PortType, PortData> for NodeData {
-    fn inputs(&self) -> OrderMap<String, PortType> {
+    fn inputs(&self) -> StableMap<String, PortType> {
         let binary_in = [
             ("a".to_string(), PortType::Real),
             ("b".to_string(), PortType::Real),
@@ -206,8 +201,6 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
                 RustNode::Subtract => binary_in,
                 RustNode::Multiply => binary_in,
                 RustNode::Divide => binary_in,
-                RustNode::Join => binary_in,
-                RustNode::Reverse => unary_in,
                 RustNode::Cos => unary_in,
                 RustNode::Sin => unary_in,
                 RustNode::Sinc => unary_in,
@@ -217,13 +210,14 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
                     ("y".to_string(), PortType::Real),
                 ]
                 .into(),
-                RustNode::Plot2D(_) => [("a".to_string(), PortType::Real2d)].into(),
+                RustNode::Plot2D(_) => [("a".to_string(), PortType::ArrayReal)].into(),
+                RustNode::VectorField(_) => [("a".to_string(), PortType::ArrayReal)].into(),
             },
             NodeTemplate::PyNode(py_node) => py_node.ports.clone().unwrap_or_default().inputs,
         }
     }
 
-    fn outputs(&self) -> OrderMap<String, PortType> {
+    fn outputs(&self) -> StableMap<String, PortType> {
         let real_out = [("out".to_string(), PortType::Real)].into();
         match &self.template {
             NodeTemplate::RustNode(rn) => match rn {
@@ -233,14 +227,13 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
                 RustNode::Subtract => real_out,
                 RustNode::Multiply => real_out,
                 RustNode::Divide => real_out,
-                RustNode::Join => real_out,
-                RustNode::Reverse => real_out,
                 RustNode::Cos => real_out,
                 RustNode::Sin => real_out,
                 RustNode::Sinc => real_out,
                 RustNode::Linspace(_) => real_out,
                 RustNode::Plot(_) => [].into(),
                 RustNode::Plot2D(_) => [].into(),
+                RustNode::VectorField(_) => [].into(),
             },
             NodeTemplate::PyNode(py_node) => py_node.ports.clone().unwrap_or_default().outputs,
         }
@@ -248,8 +241,8 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
 
     fn compute(
         mut self,
-        inputs: OrderMap<String, PortDataContainer>,
-    ) -> Result<(OrderMap<String, PortData>, NodeData), NodeError> {
+        inputs: StableMap<String, PortDataContainer>,
+    ) -> Result<(StableMap<String, PortData>, NodeData), NodeError> {
         // unpack mutex
         let data = inputs
             .keys()
@@ -270,14 +263,13 @@ impl GUINode for NodeTemplate {
                 RustNode::Subtract => "Subtract".to_string(),
                 RustNode::Multiply => "Multiply".to_string(),
                 RustNode::Divide => "Divide".to_string(),
-                RustNode::Join => "Join".to_string(),
-                RustNode::Reverse => "Reverse".to_string(),
                 RustNode::Cos => "cos".to_string(),
                 RustNode::Sin => "sin".to_string(),
                 RustNode::Sinc => "sinc".to_string(),
                 RustNode::Linspace(_linspace_config) => "Linspace".to_string(),
                 RustNode::Plot(_) => "Plot".to_string(),
                 RustNode::Plot2D(_) => "Plot 2D".to_string(),
+                RustNode::VectorField(_) => "Plot Vector Field".to_string(),
             },
             NodeTemplate::PyNode(py_node) => {
                 py_node.path.file_stem().unwrap().to_string_lossy().into()
@@ -288,7 +280,7 @@ impl GUINode for NodeTemplate {
     fn view(
         &self,
         id: u32,
-        input_data: OrderMap<String, PortDataContainer>,
+        input_data: StableMap<String, PortDataContainer>,
     ) -> (iced::Size, iced::Element<Message>) {
         let dft = default_node_size();
 
@@ -317,6 +309,10 @@ impl GUINode for NodeTemplate {
                     (dft.width * 2., dft.width * 2.).into(),
                     plot.view(id, input_data),
                 ),
+                RustNode::VectorField(vf) => (
+                    (dft.width * 2., dft.width * 2.).into(),
+                    vf.view(id, input_data),
+                ),
                 RustNode::Add => (dft, operation("+")),
                 RustNode::Subtract => (dft, operation("−")),
                 RustNode::Multiply => (dft, operation("×")),
@@ -334,15 +330,16 @@ impl GUINode for NodeTemplate {
     fn config_view(
         &self,
         id: u32,
-        input_data: OrderMap<String, PortDataContainer>,
+        input_data: StableMap<String, PortDataContainer>,
     ) -> Option<iced::Element<Message>> {
         match &self {
             NodeTemplate::RustNode(rn) => match rn {
                 RustNode::Plot(plot) => plot.config_view(id, input_data),
                 RustNode::Plot2D(plot) => plot.config_view(id, input_data),
+                RustNode::VectorField(plot) => plot.config_view(id, input_data),
                 _ => None,
             },
-            _ => None,
+            NodeTemplate::PyNode(pn) => pn.config_view(id, input_data),
         }
     }
 }

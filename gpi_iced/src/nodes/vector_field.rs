@@ -1,19 +1,25 @@
+use std::f32::consts::PI;
+
 use super::{PortData, RustNode};
 use crate::app::Message;
 use crate::gui_node::PortDataContainer;
-use crate::interface::node::{INNER_NODE_HEIGHT, INNER_NODE_WIDTH, NODE_BORDER_WIDTH};
+use crate::interface::node::{INNER_NODE_WIDTH, NODE_BORDER_WIDTH};
 use crate::math::{linspace_delta, Vector};
 use crate::nodes::NodeTemplate;
 use crate::StableMap;
+use colorgrad::Gradient;
+use glam::{Mat3, Vec3};
+use iced::mouse;
+use iced::widget::canvas::path::Builder;
 use iced::widget::canvas::{Path, Stroke};
 use iced::widget::{container, horizontal_space, row, text, text_input};
 use iced::Alignment::Center;
-use iced::{mouse, Point};
 use iced::{
     widget::{canvas, column},
     Element,
 };
 use iced::{Rectangle, Renderer, Theme};
+use ndarray::Array4;
 use serde::{Deserialize, Serialize};
 
 // Rectanlge specified by center position, width and height
@@ -43,58 +49,76 @@ impl Default for Rect {
     fn default() -> Self {
         Rect {
             center: [0., 0.].into(),
-            width: 20.,
-            height: 20. * (INNER_NODE_HEIGHT / INNER_NODE_WIDTH),
+            width: 64.,
+            height: 64., // * (INNER_NODE_HEIGHT / INNER_NODE_WIDTH),
         }
     }
 }
 
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq)]
-pub struct Plot {
+pub struct VectorField {
     rect: Rect,
+    z_index: usize,
 }
 
-impl Plot {
+impl VectorField {
     pub fn view<'a>(
         &self,
         _id: u32,
         input_data: StableMap<String, PortDataContainer>,
     ) -> Element<'a, Message> {
-        let (x, y) =
-            if let (Some(x_port), Some(y_port)) = (input_data.get("x"), input_data.get("y")) {
-                if let (PortData::ArrayReal(x), PortData::ArrayReal(y)) = (
-                    x_port.read().unwrap().clone(),
-                    y_port.read().unwrap().clone(),
-                ) {
-                    (
-                        x.into_raw_vec_and_offset()
-                            .0
-                            .into_iter()
-                            .map(|f| f as f32)
-                            .collect(),
-                        y.into_raw_vec_and_offset()
-                            .0
-                            .into_iter()
-                            .map(|f| f as f32)
-                            .collect(),
+        match input_data.get("a") {
+            Some(port) => {
+                let data = match (**port).read().unwrap().clone() {
+                    PortData::ArrayComplex(a) => Array4::<f64>::from_shape_vec(
+                        (a.len().isqrt(), a.len().isqrt(), 1, 3),
+                        a.iter()
+                            .flat_map(|v| {
+                                let (r, theta) = v.to_polar();
+                                [theta.sin(), theta.cos(), r]
+                            })
+                            .collect::<Vec<_>>(),
                     )
-                } else {
-                    panic!("unsuported plot types ")
-                }
-            } else {
-                (vec![], vec![])
-            };
-        container(
-            canvas(PlotCanvas {
-                x,
-                y,
-                config: *self,
-            })
-            .width(INNER_NODE_WIDTH * 2.)
-            .height(INNER_NODE_HEIGHT * 2.),
-        )
-        .padding(NODE_BORDER_WIDTH)
-        .into()
+                    .expect("square matrix"),
+                    PortData::ArrayReal(a) => {
+                        let xy_len = (a.len() / 3).isqrt();
+                        a.into_shape_with_order((xy_len, xy_len, 1, 3)).unwrap()
+                        //a.outer
+                        //a.into_shape
+                        //let edge_length = (a.len() / 3).isqrt();
+                        //&Array2::<(f64, f64, f64)>::from_shape_vec(
+                        //    (edge_length, edge_length),
+                        //    a.axis_iter()
+                        //    a.axis_chunks_iter(ndarray::Axis(2), 3)
+                        //        .into_iter()
+                        //        .map(|v| (v[0], v[1], v[2]))
+                        //        .collect(),
+                        //)
+                        //.expect("square matrix")
+                    }
+                    //PortData::Dynamic(a) => {a.reshape(())
+                    _ => panic!("unsuported plot types {:?}", port),
+                };
+                container(
+                    canvas(VectorFieldCanvas {
+                        data,
+                        config: *self,
+                    })
+                    .width(INNER_NODE_WIDTH * 2.)
+                    .height(INNER_NODE_WIDTH * 2.),
+                )
+                .padding(NODE_BORDER_WIDTH)
+                .into()
+                //Some(Self::create_image_handle(data))
+            }
+            None => container(
+                container(text("n/a"))
+                    .width(INNER_NODE_WIDTH * 2.)
+                    .height(INNER_NODE_WIDTH * 2.),
+            )
+            .padding(NODE_BORDER_WIDTH)
+            .into(),
+        }
     }
 
     pub fn config_view(
@@ -106,7 +130,11 @@ impl Plot {
         let width = self.rect.width;
         let height = self.rect.height;
         let message = move |rect| {
-            Message::UpdateNodeTemplate(id, NodeTemplate::RustNode(RustNode::Plot(Plot { rect })))
+            Message::UpdateNodeTemplate(
+                id,
+                //TODO: handle z_index
+                NodeTemplate::RustNode(RustNode::VectorField(VectorField { rect, z_index: 0 })),
+            )
         };
         Some(
             column![
@@ -156,13 +184,12 @@ impl Plot {
 }
 
 #[derive(Debug)]
-struct PlotCanvas {
-    x: Vec<f32>,
-    y: Vec<f32>,
-    config: Plot,
+struct VectorFieldCanvas {
+    data: Array4<f64>,
+    config: VectorField,
 }
 
-impl<Message> canvas::Program<Message> for PlotCanvas {
+impl<Message> canvas::Program<Message> for VectorFieldCanvas {
     // No internal state
     type State = ();
 
@@ -233,41 +260,51 @@ impl<Message> canvas::Program<Message> for PlotCanvas {
             }
         }
 
-        let line_stroke = Stroke::default()
-            .with_color(theme.extended_palette().success.strong.color)
-            .with_width(2.);
-        self.x
-            .clone()
-            .into_iter()
-            .zip(self.y.clone())
-            .map_windows(|[from, to]| {
-                if from.0.is_finite() && from.1.is_finite() && to.0.is_finite() && to.1.is_finite()
-                {
+        let vec_scale = 1.5;
+        //dbg!(&self.data);
+        self.data
+            .indexed_iter()
+            .array_chunks()
+            .map(
+                |[((x, y, z, _), vx), ((_, _, _, _), vy), ((_, _, _, _), vz)]| {
+                    let v = Vec3::from([
+                        *vx as f32 * vec_scale,
+                        *vy as f32 * vec_scale,
+                        *vz as f32 * vec_scale,
+                    ]);
+
+                    let arrow_angle = PI / 8.0;
+                    let arrow_left = Mat3::from_rotation_z(arrow_angle) * (v * 0.8);
+                    let arrow_right = Mat3::from_rotation_z(-arrow_angle) * (v * 0.8);
+
+                    //let (a,b,c) = (chunk[0],chunk[1],chunk[2]);
+                    let v_tail = Vec3::from([x as f32 - 5.0, y as f32 - 5.0, z as f32]);
+                    let v_tip = v_tail + v;
+                    let tip_left = v_tail + arrow_left;
+                    let tip_right = v_tail + arrow_right;
+
+                    let mut path = Builder::new();
+                    path.move_to((v_tail[0], v_tail[1]).into());
+                    path.line_to((v_tip[0], v_tip[1]).into());
+                    path.line_to((tip_left[0], tip_left[1]).into());
+                    path.move_to((v_tip[0], v_tip[1]).into());
+                    path.line_to((tip_right[0], tip_right[1]).into());
+                    let color = colorgrad::preset::spectral().at((*vz as f32 + 1.0) / 2.0);
                     (
-                        Path::line(Point::from(*from), Point::from(*to)),
-                        line_stroke,
+                        path.build(),
+                        //TODO: change line stroke based on z
+                        Stroke::default()
+                            .with_color(iced::Color {
+                                r: color.r,
+                                g: color.g,
+                                b: color.b,
+                                a: 1.0,
+                            })
+                            .with_line_join(canvas::LineJoin::Miter)
+                            .with_width(1.),
                     )
-                } else if from.0.is_finite() && to.0.is_finite() {
-                    (
-                        Path::line(
-                            Point::from((from.0, self.config.rect.center.y)),
-                            Point::from((to.0, self.config.rect.center.y)),
-                        ),
-                        line_stroke.with_color(theme.palette().danger),
-                    )
-                } else {
-                    (
-                        Path::circle(
-                            Point::from((
-                                self.config.rect.right() - 1.,
-                                self.config.rect.top() - 1.,
-                            )),
-                            0.75,
-                        ),
-                        line_stroke.with_color(theme.palette().danger),
-                    )
-                }
-            })
+                },
+            )
             .for_each(|(path, stroke)| frame.stroke(&path, stroke));
 
         frame.pop_transform();
@@ -322,3 +359,10 @@ fn grid_path(
 
     h_lines.chain(v_lines).collect()
 }
+
+//fn color_map(val: f32) -> Color {
+//    let r = (-(val * 2.0 * PI).cos()).max(0.0);
+//    let g = (val * 2.0 * PI).sin().max(0.0);
+//    let b = (val * 2.0 * PI).cos().max(0.0);
+//    Color::new(r, g, b, 1.0)
+//}

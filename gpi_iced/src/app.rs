@@ -9,11 +9,11 @@ use crate::nodes::port::PortData;
 use crate::nodes::port::PortType;
 use crate::nodes::status::{NodeError, NodeStatus};
 use crate::nodes::{NodeData, NodeTemplate, RustNode};
-use crate::python::py_node::PyNode;
+use crate::python::py_node::{NodeUIWidget, PyNode};
 use crate::style::theme::AppTheme;
 use crate::widget::shapes::ShapeId;
 use crate::widget::workspace::{self, workspace};
-use crate::OrderMap;
+use crate::StableMap;
 
 use iced::advanced::graphics::core::Element;
 use iced::event::listen_with;
@@ -24,12 +24,14 @@ use iced::widget::{column, *};
 use iced::Event::Keyboard;
 use iced::Length::Fill;
 use iced::{mouse, window, Subscription, Task};
+use indexmap::IndexMap;
 use itertools::Itertools;
 use log::{error, trace, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs::read_to_string;
 use std::iter::once;
+use std::mem::discriminant;
 use std::time::{Duration, Instant};
 
 #[derive(Default, Clone, PartialEq)]
@@ -46,7 +48,7 @@ pub enum Action {
 
 type UndoStash = Vec<(
     Graph<NodeData, PortType, PortData>,
-    OrderMap<ShapeId, Point>,
+    IndexMap<ShapeId, Point>,
 )>;
 
 #[derive(Serialize, Deserialize)]
@@ -97,12 +99,13 @@ pub enum Message {
     AddNode(NodeTemplate),
 
     UpdateNodeTemplate(u32, NodeTemplate),
+    UpdateNodeParameter(u32, String, NodeUIWidget),
     DeleteSelectedNodes,
 
     QueueCompute(u32),
     ComputeComplete(
         u32,
-        #[debug(skip)] Result<(OrderMap<String, PortData>, NodeData), NodeError>,
+        #[debug(skip)] Result<(StableMap<String, PortData>, NodeData), NodeError>,
     ),
     ComputeAll,
 
@@ -308,6 +311,18 @@ impl App {
                     return Task::done(Message::QueueCompute(id));
                 };
             }
+            Message::UpdateNodeParameter(id, name, updated_widget) => {
+                self.stash_state();
+                let old_template = &mut self.graph.get_mut_node(id).template;
+                // TODO: support all node types, not just py_node
+                if let NodeTemplate::PyNode(node) = old_template {
+                    node.parameters
+                        .as_mut()
+                        .expect("parameters must exist if they are being edited")
+                        .insert(name, updated_widget);
+                    return Task::done(Message::QueueCompute(id));
+                }
+            }
             Message::AddNode(template) => {
                 self.stash_state();
                 let id = self.graph.node(template.into());
@@ -462,6 +477,9 @@ impl App {
                                     NodeTemplate::RustNode(RustNode::Constant(_)) => {
                                         self.graph.get_node(nx).template.clone()
                                     }
+                                    NodeTemplate::PyNode(_) => {
+                                        self.graph.get_node(nx).template.clone()
+                                    }
                                     _ => node.template,
                                 },
                             },
@@ -594,53 +612,88 @@ impl App {
         self.redo_stack.clear();
     }
 
-    /// Re-calculates node definitions.
-    /// *Does not recompute any nodes.*
+    /// Read node definitions from disk, and copies node configuration (parameters and port connections) forward.
+    /// *Does not trigger the compute function of any nodes.*
     fn reload_nodes(&mut self) {
         // Update any existing nodes in the graph that could change based on file changes
         self.graph.nodes_ref().iter().for_each(|nx| {
-            let node = self.graph.get_node(*nx);
-            if let NodeTemplate::PyNode(old_py_node) = &node.template {
-                // Get old version's ports
-                let old_ports = old_py_node.clone().ports.unwrap_or_default();
-                let old_in_ports = old_ports.inputs;
-                let old_out_ports = old_ports.outputs;
+            let node = self.graph.get_node(*nx).clone();
+            if let NodeTemplate::PyNode(old_py_node) = node.template {
+                let PyNode {
+                    name: node_name,
+                    path: _old_path,
+                    ports: old_ports,
+                    parameters: old_parameters,
+                } = dbg!(old_py_node);
+                //// Read new node from disk
+                let mut new_py_node = dbg!(PyNode::new(&node_name));
 
-                // Get new node version, reading from disk
-                let new_py_node = PyNode::new(&old_py_node.name);
-                let new_ports = new_py_node.clone().ports.unwrap_or_default();
+                //// Update Parameters
+                new_py_node.parameters = {
+                    // If Ok, copy old parameters to new parameters
+                    if let (Ok(new_parameters), Ok(old_param)) =
+                        (new_py_node.parameters.clone(), old_parameters)
+                    {
+                        // Only keep old values that are still present in the new parameters list
+                        Ok(new_parameters
+                            .clone()
+                            .into_iter()
+                            .chain(old_param.into_iter().filter(|(k, v)| {
+                                if let Some(new_v) = new_parameters.get(k) {
+                                    discriminant(v) == discriminant(new_v)
+                                } else {
+                                    false
+                                }
+                            }))
+                            .collect())
+                    } else {
+                        new_py_node.parameters
+                    }
+                };
 
-                let new_in_ports = new_ports.inputs;
-                let new_out_ports = new_ports.outputs;
+                //// Update Ports, and Graph Edges
+                {
+                    let new_ports = new_py_node.ports.clone().unwrap_or_default();
 
-                // Find any nodes that previously existed, but now do not
-                let invalid_in = old_in_ports
-                    .into_iter()
-                    .filter(|(old_name, old_type)| new_in_ports.get(old_name) != Some(old_type))
-                    .map(|(old_name, _)| PortRef {
-                        node: *nx,
-                        name: old_name,
-                        io: IO::In,
+                    let new_in_ports = new_ports.inputs;
+                    let new_out_ports = new_ports.outputs;
+
+                    // Get old version's ports
+                    let old_ports = old_ports.unwrap_or_default();
+                    let old_in_ports = old_ports.inputs;
+                    let old_out_ports = old_ports.outputs;
+
+                    // Find any nodes that previously existed, but now doesn't
+                    let invalid_in = old_in_ports
+                        .into_iter()
+                        .filter(|(old_name, old_type)| new_in_ports.get(old_name) != Some(old_type))
+                        .map(|(old_name, _)| PortRef {
+                            node: *nx,
+                            name: old_name,
+                            io: IO::In,
+                        });
+                    let invalid_out = old_out_ports
+                        .into_iter()
+                        .filter(|(old_name, old_type)| {
+                            new_out_ports.get(old_name) != Some(old_type)
+                        })
+                        .map(|(old_name, _)| PortRef {
+                            node: *nx,
+                            name: old_name,
+                            io: IO::Out,
+                        });
+
+                    // Remove invalid edges from Graph
+                    invalid_in.chain(invalid_out).for_each(|p| {
+                        warn!(
+                            "Removing port {:?} from node {:?}",
+                            p.name, new_py_node.name
+                        );
+                        self.graph.remove_edge(&p);
                     });
-                let invalid_out = old_out_ports
-                    .into_iter()
-                    .filter(|(old_name, old_type)| new_out_ports.get(old_name) != Some(old_type))
-                    .map(|(old_name, _)| PortRef {
-                        node: *nx,
-                        name: old_name,
-                        io: IO::Out,
-                    });
+                }
 
-                // Remove invalid edges from graph
-                invalid_in.chain(invalid_out).for_each(|p| {
-                    warn!(
-                        "Removing port {:?} from node {:?}",
-                        p.name, new_py_node.name
-                    );
-                    self.graph.remove_edge(&p);
-                });
-
-                // Update the node with most recent changes
+                // Update Graph Node
                 self.graph
                     .set_node_data(*nx, NodeTemplate::PyNode(new_py_node).into());
             }
@@ -671,7 +724,7 @@ pub fn subscriptions(state: &App) -> Subscription<Message> {
                 Key::Named(Named::Delete) => Some(Message::DeleteSelectedNodes),
                 Key::Named(Named::Escape) => Some(Message::Cancel),
                 Key::Character(smol_str) => {
-                    if smol_str == "a" {
+                    if modifiers.control() && smol_str == "a" {
                         Some(Message::OpenAddNodeUi)
                     } else {
                         None

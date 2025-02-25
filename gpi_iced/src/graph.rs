@@ -6,7 +6,7 @@ use std::{
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use crate::{nodes::status::NodeError, OrderMap};
+use crate::{nodes::status::NodeError, StableMap};
 
 type WireDataContainer<T> = Arc<RwLock<T>>;
 
@@ -14,12 +14,12 @@ pub trait GraphNode<NodeData, PortType, WireData>
 where
     PortType: Clone,
 {
-    fn inputs(&self) -> OrderMap<String, PortType>;
-    fn outputs(&self) -> OrderMap<String, PortType>;
+    fn inputs(&self) -> StableMap<String, PortType>;
+    fn outputs(&self) -> StableMap<String, PortType>;
     fn compute(
         self,
-        inputs: OrderMap<String, WireDataContainer<WireData>>,
-    ) -> Result<(OrderMap<String, WireData>, NodeData), NodeError>;
+        inputs: StableMap<String, WireDataContainer<WireData>>,
+    ) -> Result<(StableMap<String, WireData>, NodeData), NodeError>;
 }
 
 type PortName = String;
@@ -48,7 +48,7 @@ where
     PortType: Clone,
     WireData: std::fmt::Debug,
 {
-    nodes: crate::OrderMap<NodeIndex, NodeData>,
+    nodes: crate::StableMap<NodeIndex, NodeData>,
     edges: Vec<Edge>,
     #[serde(skip, default = "default_wire_data")]
     wire_data: HashMap<(NodeIndex, PortName), WireDataContainer<WireData>>,
@@ -85,7 +85,7 @@ where
 {
     pub fn new() -> Self {
         Self {
-            nodes: OrderMap::new(),
+            nodes: StableMap::new(),
             edges: vec![],
             wire_data: HashMap::new(),
             next_id: 0,
@@ -103,7 +103,7 @@ where
 
     /// Remove a node and all edges associated with it
     pub fn delete_node(&mut self, id: NodeIndex) {
-        self.nodes.swap_remove(&id);
+        self.nodes.remove(&id);
         self.edges
             .retain(|(from, to)| from.node != id && to.node != id)
     }
@@ -123,7 +123,7 @@ where
     pub fn get_output_data(
         &self,
         nx: NodeIndex,
-    ) -> OrderMap<String, Option<&WireDataContainer<WireData>>> {
+    ) -> StableMap<String, Option<&WireDataContainer<WireData>>> {
         self.get_node(nx)
             .outputs()
             .clone()
@@ -136,7 +136,7 @@ where
             })
             .collect()
     }
-    pub fn get_input_data(&self, nx: &NodeIndex) -> OrderMap<String, WireDataContainer<WireData>> {
+    pub fn get_input_data(&self, nx: &NodeIndex) -> StableMap<String, WireDataContainer<WireData>> {
         self.get_node(*nx)
             .inputs()
             .keys()
@@ -147,15 +147,15 @@ where
                         .map(|data| (port_name.clone(), data.clone()))
                 })
             })
-            .collect::<Option<OrderMap<_, _>>>()
+            .collect::<Option<StableMap<_, _>>>()
             .unwrap_or([].into())
     }
     pub fn get_input_data_mapped(
         &self,
         nx: &NodeIndex,
     ) -> (
-        OrderMap<String, String>,
-        OrderMap<String, WireDataContainer<WireData>>,
+        StableMap<String, String>,
+        StableMap<String, WireDataContainer<WireData>>,
     ) {
         let inputs = self.get_node(*nx).inputs();
 
@@ -168,10 +168,10 @@ where
                         .map(|data| (port_name.clone(), data))
                 })
             })
-            .collect::<Option<OrderMap<_, _>>>()
+            .collect::<Option<StableMap<_, _>>>()
             .unwrap_or([].into());
 
-        let port_matches: OrderMap<String, String> = data_with_duplicates
+        let port_matches: StableMap<String, String> = data_with_duplicates
             .iter()
             .combinations(2)
             .filter(|v| v[0].0 != v[1].0)
@@ -210,7 +210,7 @@ where
         *self.nodes.get_mut(&nx).unwrap() = value;
     }
 
-    pub fn update_wire_data(&mut self, nx: NodeIndex, outputs: OrderMap<PortName, WireData>) {
+    pub fn update_wire_data(&mut self, nx: NodeIndex, outputs: StableMap<PortName, WireData>) {
         for (port_name, wire_data) in outputs.into_iter() {
             self.wire_data
                 .insert((nx, port_name), Arc::new(wire_data.into()));
@@ -440,7 +440,7 @@ where
     pub fn get_compute(
         &self,
         nx: NodeIndex,
-    ) -> (NodeData, OrderMap<String, WireDataContainer<WireData>>) {
+    ) -> (NodeData, StableMap<String, WireDataContainer<WireData>>) {
         let node = self.get_node(nx);
         let wire_data = self.get_input_data(&nx);
         (node.clone(), wire_data)
@@ -449,10 +449,10 @@ where
     pub fn compute_node(
         nx: NodeIndex,
         node: NodeData,
-        input_guarded: OrderMap<String, WireDataContainer<WireData>>,
+        input_guarded: StableMap<String, WireDataContainer<WireData>>,
     ) -> (
         u32,
-        Result<(OrderMap<String, WireData>, NodeData), NodeError>,
+        Result<(StableMap<String, WireData>, NodeData), NodeError>,
     ) {
         let output = { node.compute(input_guarded) };
 
@@ -461,10 +461,10 @@ where
     pub async fn async_compute(
         nx: NodeIndex,
         node: NodeData,
-        input_guarded: OrderMap<String, WireDataContainer<WireData>>,
+        input_guarded: StableMap<String, WireDataContainer<WireData>>,
     ) -> (
         u32,
-        Result<(OrderMap<String, WireData>, NodeData), NodeError>,
+        Result<(StableMap<String, WireData>, NodeData), NodeError>,
     ) {
         Self::compute_node(nx, node, input_guarded)
     }
@@ -509,14 +509,14 @@ mod test {
     }
 
     impl GraphNode<Node, (), u32> for Node {
-        fn inputs(&self) -> OrderMap<String, ()> {
+        fn inputs(&self) -> StableMap<String, ()> {
             match self {
                 Node::Identity(_node) => [("in".to_string(), ())].into(),
                 Node::Constant(_node) => [].into(),
             }
         }
 
-        fn outputs(&self) -> OrderMap<String, ()> {
+        fn outputs(&self) -> StableMap<String, ()> {
             match self {
                 Node::Identity(_node) => [("out".to_string(), ())].into(),
                 Node::Constant(_node) => [("out".to_string(), ())].into(),
@@ -525,8 +525,8 @@ mod test {
 
         fn compute(
             self,
-            inputs: OrderMap<String, WireDataContainer<u32>>,
-        ) -> Result<(OrderMap<String, u32>, Node), NodeError> {
+            inputs: StableMap<String, WireDataContainer<u32>>,
+        ) -> Result<(StableMap<String, u32>, Node), NodeError> {
             Ok(match &self {
                 Node::Identity(_node) => (
                     [("out".to_string(), *inputs["in"].read().unwrap())].into(),
@@ -589,49 +589,3 @@ mod test {
         assert!(g.get_wire_data(&n_unconnected, "out").is_none());
     }
 }
-//#[test]
-//fn vertex() {
-//    type Node<'a> = HashMap<&'a str, Vec<u32>>;
-//
-//    let mut g: Graph<Vec<u32>, &str, ()> = Graph::new();
-//    let n1 = g.add_node([("out", vec![1, 2, 3])].into());
-//    let n2 = g.add_node([("out", vec![4, 5, 6])].into());
-//    let n3 = g.add_node([("out", vec![])].into());
-//    let n4 = g.add_node([("out", vec![])].into());
-//
-//    g.add_edge((n1, "o1"), (n2, "i2"));
-//    g.add_edge((n1, "o1"), (n3, "i3"));
-//    g.add_edge((n2, "o2"), (n3, "i3"));
-//    g.add_edge((n3, "o3"), (n4, "i4"));
-//
-//    g.topological_sort().iter_mut().for_each(|nx| {
-//        let new_vec: Vec<_> = g
-//            .incoming_edges(nx)
-//            .into_iter()
-//            .flat_map(|(from, _to)| g.get_node(from.0)["out"].clone())
-//            .collect();
-//
-//        let node = g.get_mut_node(*nx);
-//        node.get_mut("out").unwrap().extend(new_vec);
-//    });
-//    assert_eq!(*g.get_node(n1)["out"], vec![1, 2, 3]);
-//    assert_eq!(*g.get_node(n2)["out"], vec![4, 5, 6, 1, 2, 3]);
-//    assert_eq!(*g.get_node(n3)["out"], vec![1, 2, 3, 4, 5, 6, 1, 2, 3]);
-//    assert_eq!(*g.get_node(n4)["out"], vec![1, 2, 3, 4, 5, 6, 1, 2, 3]);
-//}
-//
-//use numpy::PyArrayMethods;
-//use pyo3::{prepare_freethreaded_python, Python};
-//
-//#[test]
-//fn simple_ndarray() {
-//    prepare_freethreaded_python();
-//
-//    Python::with_gil(|py| {
-//        let res = get_array(py).readonly();
-//        let slice = res.as_slice().unwrap();
-//
-//        assert_eq!(&[1, 2, 3], slice);
-//    })
-//}
-//}
