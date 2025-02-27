@@ -1,7 +1,7 @@
 # .cargo/config.toml
 [env]
-PYO3_PYTHON = "/home/john/projects/gpi_v2/gpi/nodes/.venv/bin/python"
-#PYO3_PYTHON = "/Users/jechristens3/projects/gpi_v2/gpi_iced/nodes/.venv/bin/python"
+PYO3_PYTHON = "/home/john/projects/gpi_v2/nodes/.venv/bin/python"
+#PYO3_PYTHON = "/Users/jechristens3/projects/gpi_v2/nodes/.venv/bin/python"
 #PYO3_PYTHON = "./nodes/.venv/bin/python"
 
 [build]
