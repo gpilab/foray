@@ -261,7 +261,7 @@ impl<Message> canvas::Program<Message> for VectorFieldCanvas {
         }
 
         let vec_scale = 1.5;
-        //dbg!(&self.data);
+
         self.data
             .indexed_iter()
             .array_chunks()

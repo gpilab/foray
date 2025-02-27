@@ -236,12 +236,22 @@ where
         renderer: &Renderer,
         translation: Vector,
     ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
-        self.main_content.as_widget_mut().overlay(
-            tree.children.iter_mut().next().unwrap(),
-            layout.children().next().unwrap(),
-            renderer,
-            translation,
-        )
+        let child_overlays: Vec<_> = iter::once(&mut self.main_content)
+            .chain(&mut self.absolute_children)
+            .zip(&mut tree.children)
+            .zip(layout.children())
+            .filter_map(|((child, tree), layout)| {
+                child
+                    .as_widget_mut()
+                    .overlay(tree, layout, renderer, translation)
+            })
+            .collect();
+
+        if child_overlays.is_empty() {
+            None
+        } else {
+            Some(overlay::Group::with_children(child_overlays).into())
+        }
     }
 }
 

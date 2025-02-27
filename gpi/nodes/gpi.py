@@ -10,7 +10,7 @@ class port(str, Enum):
     ArrayComplex = "ArrayComplex"
     ArrayReal = "ArrayReal"
     Dynamic = "Dynamic"
-    Object = "Object"
+    # Object = "Object" just nest dictionary definititions!
 
 
 class ui:

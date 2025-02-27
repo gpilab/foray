@@ -1,5 +1,6 @@
 use iced::advanced::graphics::geometry::frame::Backend;
 use iced::advanced::layout::{self, Layout};
+use iced::advanced::overlay;
 use iced::advanced::widget::{self, Tree};
 use iced::advanced::{Clipboard, Shell, Widget};
 use iced::mouse::Event::{ButtonPressed, ButtonReleased, CursorMoved, WheelScrolled};
@@ -373,6 +374,32 @@ where
             })
             .max()
             .unwrap_or_default()
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut widget::Tree,
+        layout: Layout<'_>,
+        renderer: &Renderer,
+        translation: iced::Vector,
+    ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
+        let child_overlays: Vec<_> = self
+            .shapes
+            .0
+            .values_mut()
+            .zip(layout.children())
+            .zip(tree.children.iter_mut())
+            .filter_map(|((e, layout), tree)| {
+                e.state
+                    .as_widget_mut()
+                    .overlay(tree, layout, renderer, translation)
+            })
+            .collect();
+        if child_overlays.is_empty() {
+            None
+        } else {
+            Some(overlay::Group::with_children(child_overlays).into())
+        }
     }
 }
 

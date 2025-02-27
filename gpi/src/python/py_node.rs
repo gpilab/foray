@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     ffi::CString,
     fs,
     path::{Path, PathBuf},
@@ -12,7 +11,6 @@ use iced::{
     Alignment::Center,
 };
 use iced::{Element, Length::Fill};
-use indexmap::IndexMap;
 use log::trace;
 use numpy::{Complex64, PyArrayMethods, ToPyArray};
 use pyo3::{
@@ -21,11 +19,11 @@ use pyo3::{
     Bound, FromPyObject, IntoPyObject, PyAny, PyErr, PyObject, PyResult, Python,
 };
 use serde::{Deserialize, Serialize};
-use strum::{EnumString, VariantNames};
+use strum::VariantNames;
 
 use crate::{
     app::Message,
-    interface::numeric_input::{self, PartialUIValue},
+    interface::node_config::{NodeUIParameters, NodeUIWidget},
     StableMap,
 };
 use crate::{
@@ -45,60 +43,6 @@ pub struct PyNode {
     pub parameters: Result<NodeUIParameters, NodeError>,
 }
 
-pub type NodeUIParameters = StableMap<String, NodeUIWidget>;
-
-#[derive(Clone, Debug, Display, EnumString, VariantNames, Serialize, Deserialize, PartialEq)]
-pub enum NodeUIWidget {
-    #[display("{_0}")]
-    Slider(f32, #[serde(skip)] PartialUIValue),
-    #[display("{_0}")]
-    NumberField(f32, #[serde(skip)] PartialUIValue),
-    CheckBox(bool),
-}
-
-impl NodeUIWidget {
-    pub fn view<'a, F>(&'a self, update_message: F) -> Element<'a, Message>
-    where
-        F: Fn(NodeUIWidget) -> Message + Clone + 'a,
-    {
-        // need 2 of these for borrow checker (is there a cleaner way?)
-        let update_message_2 = update_message.clone();
-        match self {
-            NodeUIWidget::Slider(v, in_progress) => row![
-                row![numeric_input::numeric_input(
-                    *v,
-                    in_progress.clone(),
-                    move |new_v, in_progress: PartialUIValue| {
-                        update_message(Self::Slider(new_v, in_progress))
-                    },
-                )]
-                .width(60.0),
-                slider(-1.0..=1.0, *v, move |new_v| {
-                    update_message_2(Self::Slider(new_v, PartialUIValue::Complete))
-                })
-                .step(0.01)
-            ]
-            .align_y(Center)
-            .spacing(4.0)
-            .into(),
-            NodeUIWidget::NumberField(v, in_progress) => row![
-                horizontal_space(),
-                row![numeric_input::numeric_input(
-                    *v,
-                    in_progress.clone(),
-                    move |new_v, in_progress: PartialUIValue| {
-                        update_message(Self::NumberField(new_v, in_progress))
-                    },
-                )]
-                .width(60.0)
-            ]
-            .align_y(Center)
-            .into(),
-            NodeUIWidget::CheckBox(_v) => todo!(),
-        }
-    }
-}
-
 #[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, FromPyObject)]
 pub struct PortDef {
     pub inputs: StableMap<String, PortType>,
@@ -114,7 +58,7 @@ impl<'py> FromPyObject<'py> for PortType {
             }
         } else {
             Ok(PortType::Object(
-                ob.extract::<HashMap<String, PortType>>()?
+                ob.extract::<StableMap<String, PortType>>()?
                     .into_iter()
                     .collect(),
             ))
@@ -216,18 +160,18 @@ impl PyNode {
             .map_err(|_| NodeError::MissingCompute("Could not find compute function".to_string()))?
             .call(
                 (
-                    inputs.iter().collect::<HashMap<_, _>>(),
+                    inputs.iter().collect::<StableMap<_, _>>(),
                     parameters
                         .iter()
                         .map(|(k, v)| (k, v.to_string()))
-                        .collect::<HashMap<_, _>>(),
+                        .collect::<StableMap<_, _>>(),
                 ),
                 None,
             )
             .map_err(|e| NodeError::Runtime(format!("Python Error:\n{e}")))?;
 
         node_output
-            .extract::<HashMap<String, PyObject>>()
+            .extract::<StableMap<String, PyObject>>()
             .map_err(|e| {
                 NodeError::Output(format!("Unable to understand python return value:\n{e}"))
             })?
@@ -319,7 +263,7 @@ impl PyNode {
                         .bind(py)
                         .downcast()
                         .map_err(|_e| output_error(port_type, py_object))?;
-                    let indexmap: IndexMap<String, PortData> = dict
+                    let rust_dict: StableMap<String, PortData> = dict
                         .iter()
                         .map(|(k, v)| {
                             let key = k.extract::<String>().map_err(|e| {
@@ -328,13 +272,12 @@ impl PyNode {
                             key.map(|k| {
                                 (
                                     k.clone(),
-                                    Self::extract_py_data(dbg!(&types[&k]), &dbg!(v).into(), py)
-                                        .unwrap(),
+                                    Self::extract_py_data(&types[&k], &v.into(), py).unwrap(),
                                 )
                             })
                         })
                         .collect::<Result<_, _>>()?;
-                    PortData::Object(indexmap)
+                    PortData::Object(rust_dict)
                 }
             })
         }
@@ -449,7 +392,7 @@ impl PyNode {
                         })
                         .and_then(|out_py| {
                             out_py
-                                .extract::<HashMap<String, String>>()
+                                .extract::<StableMap<String, String>>()
                                 .map_err(|e| {
                                     NodeError::Config(format!(
                                     "Failed to interperet  {node_name}'s `config`: {e}, {out_py}"
@@ -497,7 +440,7 @@ impl TryFrom<PyFacingNodeDef> for NodeUIParameters {
             .clone()
             .parameters
             .into_iter()
-            .map(|(key, value)| NodeUIWidget::from_str(&dbg!(value)).map(|v| (key, v)))
+            .map(|(key, value)| NodeUIWidget::from_str(&value).map(|v| (key, v)))
             .collect::<Result<StableMap<_, _>, _>>()
             .map_err(|e| {
                 NodeError::Output(format!(

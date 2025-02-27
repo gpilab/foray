@@ -2,6 +2,7 @@ use crate::file_watch::file_watch_subscription;
 use crate::graph::{Graph, PortRef, IO};
 use crate::gui_node::GuiGraph;
 use crate::interface::add_node::add_node_panel;
+use crate::interface::node_config::NodeUIWidget;
 use crate::interface::theme_config::{AppThemeMessage, GuiColorMessage};
 use crate::interface::{side_bar::side_bar, SEPERATOR};
 use crate::math::{Point, Vector};
@@ -9,7 +10,7 @@ use crate::nodes::port::PortData;
 use crate::nodes::port::PortType;
 use crate::nodes::status::{NodeError, NodeStatus};
 use crate::nodes::{NodeData, NodeTemplate, RustNode};
-use crate::python::py_node::{NodeUIWidget, PyNode};
+use crate::python::py_node::PyNode;
 use crate::style::theme::AppTheme;
 use crate::widget::shapes::ShapeId;
 use crate::widget::workspace::{self, workspace};
@@ -626,9 +627,9 @@ impl App {
                     path: _old_path,
                     ports: old_ports,
                     parameters: old_parameters,
-                } = dbg!(old_py_node);
+                } = old_py_node;
                 //// Read new node from disk
-                let mut new_py_node = dbg!(PyNode::new(&node_name));
+                let mut new_py_node = PyNode::new(&node_name);
 
                 //// Update Parameters
                 new_py_node.parameters = {

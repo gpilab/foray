@@ -1,11 +1,13 @@
-use indexmap::IndexMap;
+use derive_more::derive::Display;
 use itertools::Itertools;
 use ndarray::{ArrayD, ArrayView, AsArray};
 use numpy::Complex64;
 use serde::{Deserialize, Serialize};
 use strum::{EnumDiscriminants, EnumString, VariantNames};
 
-#[derive(Clone, Debug, EnumString, VariantNames, PartialEq, Serialize, Deserialize)]
+use crate::StableMap;
+
+#[derive(Clone, Display, Debug, EnumString, VariantNames, PartialEq, Serialize, Deserialize)]
 pub enum PortType {
     Integer,
     Real,
@@ -14,12 +16,13 @@ pub enum PortType {
     ArrayReal,
     ArrayComplex,
     Dynamic,
-    Object(IndexMap<String, PortType>),
+    #[display("{_0:?}")]
+    Object(StableMap<String, PortType>),
 }
 
 impl Default for PortType {
     fn default() -> Self {
-        Self::Object(IndexMap::default())
+        Self::Object(StableMap::default())
     }
 }
 
@@ -33,7 +36,7 @@ pub enum PortData {
     ArrayReal(ArrayD<f64>),
     ArrayComplex(ArrayD<Complex64>),
     Dynamic(ArrayD<f64>),
-    Object(IndexMap<String, PortData>),
+    Object(StableMap<String, PortData>),
 }
 
 fn write_nd_array<'a, A, T, D>(data: T) -> String

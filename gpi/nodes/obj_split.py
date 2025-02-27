@@ -3,7 +3,7 @@ from gpi import port
 
 def config():
     class out:
-        inputs = {"a": port.Object}
+        inputs = {"a": port.ArrayReal}
         outputs = {"a1": port.Integer, "a2": port.Real}
         parameters = {}
 
