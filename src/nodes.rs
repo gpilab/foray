@@ -18,7 +18,7 @@ use crate::nodes::math_nodes::{binary_operation, unary_operation};
 use crate::nodes::plot::Plot;
 use crate::nodes::plot_complex::Plot2D;
 use crate::python::py_node::PyNode;
-use crate::StableMap;
+use crate::{nodes_dir, StableMap};
 use derive_more::derive::{Debug, Display};
 use iced::widget::text;
 use iced::{Font, Size};
@@ -347,7 +347,7 @@ impl GUINode for NodeTemplate {
 fn load_node_names() -> Vec<String> {
     use glob::glob;
 
-    glob(&(env!("CARGO_MANIFEST_DIR").to_string() + "/nodes/*.py"))
+    glob(&(nodes_dir().to_string_lossy() + "/*.py"))
         .expect("valid glob")
         .filter_map(Result::ok)
         .filter_map(|entry| {

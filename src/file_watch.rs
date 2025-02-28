@@ -8,13 +8,13 @@ use iced::stream;
 use iced::Subscription;
 use notify::RecursiveMode;
 use notify_debouncer_full::new_debouncer;
-use std::path::Path;
 
 use crate::app::Message;
+use crate::nodes_dir;
 
 fn file_watcher() -> impl Stream<Item = Message> {
     stream::channel(0, |mut output| async move {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("nodes");
+        let path = nodes_dir();
         let (sender, receiver) = std::sync::mpsc::channel();
         let mut debouncer = new_debouncer(Duration::from_millis(250), None, sender).unwrap();
         debouncer.watch(path, RecursiveMode::Recursive).unwrap();

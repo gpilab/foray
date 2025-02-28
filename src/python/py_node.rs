@@ -1,9 +1,4 @@
-use std::{
-    ffi::CString,
-    fs,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::{ffi::CString, fs, path::PathBuf, str::FromStr};
 
 use derive_more::derive::{Debug, Display};
 use iced::{
@@ -24,7 +19,7 @@ use strum::VariantNames;
 use crate::{
     app::Message,
     interface::node_config::{NodeUIParameters, NodeUIWidget},
-    StableMap,
+    nodes_dir, StableMap,
 };
 use crate::{
     gui_node::PortDataReference,
@@ -120,24 +115,23 @@ impl PyNode {
     }
 
     fn py_node_path(node_name: &str) -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("nodes/{node_name}.py"))
+        nodes_dir().join(format!("{node_name}.py"))
     }
 
     #[allow(clippy::complexity)]
     /// Run a python node's compute function
     fn gpipy_compute<'py>(
         &self,
-        node_type: &str,
+        node_name: &str,
         inputs: &StableMap<String, PyObject>,
         parameters: &NodeUIParameters,
         py: Python<'py>,
     ) -> Result<StableMap<String, PortData>, NodeError> {
         //TODO: use self parameters, instead of taking unecessary inputs
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"));
         //PERF: cache this in the PyNode
-        let node_src = fs::read_to_string(path.join(format!("nodes/{node_type}.py")))
+        let node_src = fs::read_to_string(Self::py_node_path(node_name))
             .map_err(|e| NodeError::FileSys(e.to_string()))?;
-        trace!("Running '{node_type}' compute:\n{node_src}");
+        trace!("Running '{node_name}' compute:\n{node_src}");
         //PERF: test if caching this is a big performance win
         //This would be more of a pain to cache becaues of the associated python lifetime, but could
         //potentially be worth it
@@ -148,7 +142,7 @@ impl PyNode {
             CString::new(node_src)
                 .map_err(|e| NodeError::FileSys(e.to_string()))?
                 .as_c_str(),
-            &CString::new(format!("{}.py", node_type))
+            &CString::new(format!("{}.py", node_name))
                 .expect("Node names should not contain invalid characters"),
             c_str!("gpi_node"),
         )

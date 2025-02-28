@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::PathBuf};
 
 use iced::Font;
 
@@ -17,3 +17,10 @@ pub mod nodes;
 pub mod python;
 pub mod style;
 pub mod widget;
+
+pub fn nodes_dir() -> PathBuf {
+    PathBuf::from("/home/john/projects/gpi_v2/nodes/")
+}
+pub fn venv_dir() -> PathBuf {
+    PathBuf::from("/home/john/projects/gpi_v2/nodes/.venv")
+}
