@@ -19,6 +19,7 @@ use iced::{
     Element,
 };
 use iced::{Rectangle, Renderer, Theme};
+use itertools::Itertools;
 use ndarray::Array4;
 use serde::{Deserialize, Serialize};
 
@@ -71,7 +72,12 @@ impl VectorField {
             Some(port) => {
                 let data = match (**port).read().unwrap().clone() {
                     PortData::ArrayComplex(a) => Array4::<f64>::from_shape_vec(
-                        (a.len().isqrt(), a.len().isqrt(), 1, 3),
+                        [
+                            (a.len() as f32).sqrt() as usize,
+                            (a.len() as f32).sqrt() as usize,
+                            1,
+                            3,
+                        ],
                         a.iter()
                             .flat_map(|v| {
                                 let (r, theta) = v.to_polar();
@@ -81,22 +87,9 @@ impl VectorField {
                     )
                     .expect("square matrix"),
                     PortData::ArrayReal(a) => {
-                        let xy_len = (a.len() / 3).isqrt();
-                        a.into_shape_with_order((xy_len, xy_len, 1, 3)).unwrap()
-                        //a.outer
-                        //a.into_shape
-                        //let edge_length = (a.len() / 3).isqrt();
-                        //&Array2::<(f64, f64, f64)>::from_shape_vec(
-                        //    (edge_length, edge_length),
-                        //    a.axis_iter()
-                        //    a.axis_chunks_iter(ndarray::Axis(2), 3)
-                        //        .into_iter()
-                        //        .map(|v| (v[0], v[1], v[2]))
-                        //        .collect(),
-                        //)
-                        //.expect("square matrix")
+                        let xy_len = (a.len() as f32 / 3.0).sqrt() as usize;
+                        a.into_shape_with_order([xy_len, xy_len, 1, 3]).unwrap()
                     }
-                    //PortData::Dynamic(a) => {a.reshape(())
                     _ => panic!("unsuported plot types {:?}", port),
                 };
                 container(
@@ -109,7 +102,6 @@ impl VectorField {
                 )
                 .padding(NODE_BORDER_WIDTH)
                 .into()
-                //Some(Self::create_image_handle(data))
             }
             None => container(
                 container(text("n/a"))
@@ -221,10 +213,10 @@ impl<Message> canvas::Program<Message> for VectorFieldCanvas {
             node_width / self.config.rect.width,
             node_height / self.config.rect.height,
         );
-        // scale for the conifgured height/width
+        // Scale for the conifgured height/width
         frame.scale_nonuniform(scale);
 
-        //move the center point to the center of our canvas
+        // Move the center point to the center of our canvas
         frame.translate((-self.config.rect.center).into());
 
         // The frame is now centered on center, and goes from:
@@ -264,47 +256,53 @@ impl<Message> canvas::Program<Message> for VectorFieldCanvas {
 
         self.data
             .indexed_iter()
-            .array_chunks()
-            .map(
-                |[((x, y, z, _), vx), ((_, _, _, _), vy), ((_, _, _, _), vz)]| {
-                    let v = Vec3::from([
-                        *vx as f32 * vec_scale,
-                        *vy as f32 * vec_scale,
-                        *vz as f32 * vec_scale,
-                    ]);
+            // This looks nicer(don't need to do the chunk.collect() weirdness below) with
+            // the nightly iter_array_chunks feature
+            .chunks(3)
+            .into_iter()
+            .map(|chunk| {
+                let [((x, y, z, _), vx), ((_, _, _, _), vy), ((_, _, _, _), vz)] =
+                    chunk.collect::<Vec<_>>()[..]
+                else {
+                    panic!("array4 is in an unexpected format")
+                };
 
-                    let arrow_angle = PI / 8.0;
-                    let arrow_left = Mat3::from_rotation_z(arrow_angle) * (v * 0.8);
-                    let arrow_right = Mat3::from_rotation_z(-arrow_angle) * (v * 0.8);
+                let v = Vec3::from([
+                    *vx as f32 * vec_scale,
+                    *vy as f32 * vec_scale,
+                    *vz as f32 * vec_scale,
+                ]);
 
-                    //let (a,b,c) = (chunk[0],chunk[1],chunk[2]);
-                    let v_tail = Vec3::from([x as f32 - 5.0, y as f32 - 5.0, z as f32]);
-                    let v_tip = v_tail + v;
-                    let tip_left = v_tail + arrow_left;
-                    let tip_right = v_tail + arrow_right;
+                let arrow_angle = PI / 8.0;
+                let arrow_left = Mat3::from_rotation_z(arrow_angle) * (v * 0.8);
+                let arrow_right = Mat3::from_rotation_z(-arrow_angle) * (v * 0.8);
 
-                    let mut path = Builder::new();
-                    path.move_to((v_tail[0], v_tail[1]).into());
-                    path.line_to((v_tip[0], v_tip[1]).into());
-                    path.line_to((tip_left[0], tip_left[1]).into());
-                    path.move_to((v_tip[0], v_tip[1]).into());
-                    path.line_to((tip_right[0], tip_right[1]).into());
-                    let color = colorgrad::preset::spectral().at((*vz as f32 + 1.0) / 2.0);
-                    (
-                        path.build(),
-                        //TODO: change line stroke based on z
-                        Stroke::default()
-                            .with_color(iced::Color {
-                                r: color.r,
-                                g: color.g,
-                                b: color.b,
-                                a: 1.0,
-                            })
-                            .with_line_join(canvas::LineJoin::Miter)
-                            .with_width(1.),
-                    )
-                },
-            )
+                let v_tail = Vec3::from([x as f32 - 5.0, y as f32 - 5.0, z as f32]);
+                let v_tip = v_tail + v;
+                let tip_left = v_tail + arrow_left;
+                let tip_right = v_tail + arrow_right;
+
+                let mut path = Builder::new();
+                path.move_to((v_tail[0], v_tail[1]).into());
+                path.line_to((v_tip[0], v_tip[1]).into());
+                path.line_to((tip_left[0], tip_left[1]).into());
+                path.move_to((v_tip[0], v_tip[1]).into());
+                path.line_to((tip_right[0], tip_right[1]).into());
+                let color = colorgrad::preset::spectral().at((*vz as f32 + 1.0) / 2.0);
+                (
+                    path.build(),
+                    //TODO: change line stroke based on z
+                    Stroke::default()
+                        .with_color(iced::Color {
+                            r: color.r,
+                            g: color.g,
+                            b: color.b,
+                            a: 1.0,
+                        })
+                        .with_line_join(canvas::LineJoin::Miter)
+                        .with_width(1.),
+                )
+            })
             .for_each(|(path, stroke)| frame.stroke(&path, stroke));
 
         frame.pop_transform();
@@ -359,10 +357,3 @@ fn grid_path(
 
     h_lines.chain(v_lines).collect()
 }
-
-//fn color_map(val: f32) -> Color {
-//    let r = (-(val * 2.0 * PI).cos()).max(0.0);
-//    let g = (val * 2.0 * PI).sin().max(0.0);
-//    let b = (val * 2.0 * PI).cos().max(0.0);
-//    Color::new(r, g, b, 1.0)
-//}

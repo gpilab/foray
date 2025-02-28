@@ -207,7 +207,11 @@ impl Plot2D {
                     )
                     .expect("square matrix"),
                     PortData::ArrayComplex(a) => &Array3::<f64>::from_shape_vec(
-                        (a.len().isqrt(), a.len().isqrt(), 3),
+                        (
+                            (a.len() as f32).sqrt() as usize,
+                            (a.len() as f32).sqrt() as usize,
+                            3,
+                        ),
                         a.iter()
                             .map(|v| v.norm_sqr().sqrt())
                             .flat_map(|v| [v, v, v])

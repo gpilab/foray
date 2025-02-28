@@ -14,6 +14,7 @@ use iced::{
     Element,
 };
 use iced::{Rectangle, Renderer, Theme};
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 // Rectanlge specified by center position, width and height
@@ -240,13 +241,11 @@ impl<Message> canvas::Program<Message> for PlotCanvas {
             .clone()
             .into_iter()
             .zip(self.y.clone())
-            .map_windows(|[from, to]| {
+            .tuple_windows()
+            .map(|(from, to)| {
                 if from.0.is_finite() && from.1.is_finite() && to.0.is_finite() && to.1.is_finite()
                 {
-                    (
-                        Path::line(Point::from(*from), Point::from(*to)),
-                        line_stroke,
-                    )
+                    (Path::line(Point::from(from), Point::from(to)), line_stroke)
                 } else if from.0.is_finite() && to.0.is_finite() {
                     (
                         Path::line(

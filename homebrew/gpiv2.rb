@@ -1,4 +1,4 @@
-class gpiv2 < Formula
+class Gpiv2 < Formula
     desc "Visual programming environment for scientific computation"
     homepage "https://github.com/gpilab/gpi-v2"
     url "https://github.com/gpilab/gpi-v2.git",

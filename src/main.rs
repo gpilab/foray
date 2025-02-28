@@ -8,7 +8,6 @@ use std::{
 use glob::glob;
 use gpi::app::{subscriptions, theme, App};
 use iced::{application, Font};
-use itertools::Itertools;
 use log::warn;
 use pyo3::{types::PyAnyMethods, PyResult, Python};
 use serde::{Deserialize, Serialize};

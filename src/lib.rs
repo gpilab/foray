@@ -1,6 +1,3 @@
-#![feature(iter_map_windows)]
-#![feature(iter_array_chunks)]
-
 use std::collections::BTreeMap;
 
 use iced::Font;
