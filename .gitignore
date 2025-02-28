@@ -1,6 +1,8 @@
 # Application
 *.ron
 
+.cargo
+
 # Logs
 logs
 *.log
