@@ -1,20 +1,19 @@
 use std::ffi::OsStr;
 use std::path::Component;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use iced::futures::sink::SinkExt;
-use iced::futures::Stream;
 use iced::stream;
 use iced::Subscription;
 use notify::RecursiveMode;
 use notify_debouncer_full::new_debouncer;
 
 use crate::app::Message;
-use crate::nodes_dir;
 
-fn file_watcher() -> impl Stream<Item = Message> {
-    stream::channel(0, |mut output| async move {
-        let path = nodes_dir();
+pub fn file_watch_subscription(nodes_dir: PathBuf) -> Subscription<Message> {
+    let stream = stream::channel(0, |mut output| async move {
+        let path = nodes_dir;
         let (sender, receiver) = std::sync::mpsc::channel();
         let mut debouncer = new_debouncer(Duration::from_millis(250), None, sender).unwrap();
         debouncer.watch(path, RecursiveMode::Recursive).unwrap();
@@ -43,9 +42,6 @@ fn file_watcher() -> impl Stream<Item = Message> {
                 Err(error) => log::error!("Error: {error:?}"),
             }
         }
-    })
-}
-
-pub fn file_watch_subscription() -> Subscription<Message> {
-    Subscription::run(file_watcher)
+    });
+    Subscription::run_with_id(1, stream)
 }

@@ -19,7 +19,7 @@ use strum::VariantNames;
 use crate::{
     app::Message,
     interface::node_config::{NodeUIParameters, NodeUIWidget},
-    nodes_dir, StableMap,
+    StableMap,
 };
 use crate::{
     gui_node::PortDataReference,
@@ -83,8 +83,8 @@ impl PortData {
 }
 
 impl PyNode {
-    pub fn new(name: &str) -> Self {
-        Self::gpipy_config(name)
+    pub fn new(path: PathBuf) -> Self {
+        Self::gpipy_config(&path)
     }
 
     pub fn compute(
@@ -101,7 +101,7 @@ impl PyNode {
                         .collect();
                     //TODO: refactor to not pass this data as params
                     self.gpipy_compute(
-                        self.path.file_stem().unwrap().to_str().unwrap(),
+                        &self.path,
                         &py_inputs,
                         &self.parameters.clone().unwrap_or_default(),
                         py,
@@ -114,82 +114,84 @@ impl PyNode {
         }
     }
 
-    fn py_node_path(node_name: &str) -> PathBuf {
-        nodes_dir().join(format!("{node_name}.py"))
-    }
-
     #[allow(clippy::complexity)]
     /// Run a python node's compute function
     fn gpipy_compute<'py>(
         &self,
-        node_name: &str,
+        node_path: &PathBuf,
         inputs: &StableMap<String, PyObject>,
         parameters: &NodeUIParameters,
         py: Python<'py>,
     ) -> Result<StableMap<String, PortData>, NodeError> {
-        //TODO: use self parameters, instead of taking unecessary inputs
-        //PERF: cache this in the PyNode
-        let node_src = fs::read_to_string(Self::py_node_path(node_name))
-            .map_err(|e| NodeError::FileSys(e.to_string()))?;
-        trace!("Running '{node_name}' compute:\n{node_src}");
-        //PERF: test if caching this is a big performance win
-        //This would be more of a pain to cache becaues of the associated python lifetime, but could
-        //potentially be worth it
-        //Update: It may be possible to package the py type without a lifetime? pyo3 docs
+        if let Some(node_name) = node_path.file_stem() {
+            //TODO: use self parameters, instead of taking unecessary inputs
+            //PERF: cache this in the PyNode
+            let node_src = fs::read_to_string(node_path.clone())
+                .map_err(|e| NodeError::FileSys(e.to_string()))?;
+            trace!("Running '{:?}' compute:\n{node_src}", node_path.file_stem());
+            //PERF: test if caching this is a big performance win
+            //This would be more of a pain to cache becaues of the associated python lifetime, but could
+            //potentially be worth it
+            //Update: It may be possible to package the py type without a lifetime? pyo3 docs
 
-        let node_module = PyModule::from_code(
-            py,
-            CString::new(node_src)
-                .map_err(|e| NodeError::FileSys(e.to_string()))?
-                .as_c_str(),
-            &CString::new(format!("{}.py", node_name))
-                .expect("Node names should not contain invalid characters"),
-            c_str!("gpi_node"),
-        )
-        .map_err(|e| NodeError::Syntax(e.to_string()))?;
-
-        //// COMPUTE
-        let node_output = node_module
-            .getattr("compute")
-            .map_err(|_| NodeError::MissingCompute("Could not find compute function".to_string()))?
-            .call(
-                (
-                    inputs.iter().collect::<StableMap<_, _>>(),
-                    parameters
-                        .iter()
-                        .map(|(k, v)| (k, v.to_string()))
-                        .collect::<StableMap<_, _>>(),
-                ),
-                None,
+            let node_module = PyModule::from_code(
+                py,
+                CString::new(node_src)
+                    .map_err(|e| NodeError::FileSys(e.to_string()))?
+                    .as_c_str(),
+                &CString::new(format!("{:?}.py", node_name))
+                    .expect("Node names should not contain invalid characters"),
+                c_str!("gpi_node"),
             )
-            .map_err(|e| NodeError::Runtime(format!("Python Error:\n{e}")))?;
+            .map_err(|e| NodeError::Syntax(e.to_string()))?;
 
-        node_output
-            .extract::<StableMap<String, PyObject>>()
-            .map_err(|e| {
-                NodeError::Output(format!("Unable to understand python return value:\n{e}"))
-            })?
-            .into_iter()
-            .map(|(k, v)| {
-                Ok((
-                    k.clone(),
-                    PyNode::extract_py_data(
-                        &self
-                            .ports
-                            .as_ref()
-                            .expect("ports must be valid to compute")
-                            .outputs[&k],
-                        &v,
-                        py,
-                    )
-                    .map_err(|e| {
-                        NodeError::Output(format!(
-                            "Unable to understand port in python return value:\n{e}"
-                        ))
-                    })?,
-                ))
-            })
-            .collect::<Result<StableMap<String, PortData>, NodeError>>()
+            //// COMPUTE
+            let node_output = node_module
+                .getattr("compute")
+                .map_err(|_| {
+                    NodeError::MissingCompute("Could not find compute function".to_string())
+                })?
+                .call(
+                    (
+                        inputs.iter().collect::<StableMap<_, _>>(),
+                        parameters
+                            .iter()
+                            .map(|(k, v)| (k, v.to_string()))
+                            .collect::<StableMap<_, _>>(),
+                    ),
+                    None,
+                )
+                .map_err(|e| NodeError::Runtime(format!("Python Error:\n{e}")))?;
+
+            node_output
+                .extract::<StableMap<String, PyObject>>()
+                .map_err(|e| {
+                    NodeError::Output(format!("Unable to understand python return value:\n{e}"))
+                })?
+                .into_iter()
+                .map(|(k, v)| {
+                    Ok((
+                        k.clone(),
+                        PyNode::extract_py_data(
+                            &self
+                                .ports
+                                .as_ref()
+                                .expect("ports must be valid to compute")
+                                .outputs[&k],
+                            &v,
+                            py,
+                        )
+                        .map_err(|e| {
+                            NodeError::Output(format!(
+                                "Unable to understand port in python return value:\n{e}"
+                            ))
+                        })?,
+                    ))
+                })
+                .collect::<Result<StableMap<String, PortData>, NodeError>>()
+        } else {
+            panic!("Node not found {:?}", node_path)
+        }
     }
 
     pub fn extract_py_data(
@@ -304,18 +306,19 @@ impl PyNode {
     }
 
     /// Get a python node's configuration information
-    pub fn gpipy_config(node_name: &str) -> PyNode {
+    pub fn gpipy_config(node_path: &PathBuf) -> PyNode {
         //// Get necessary info
-        let path = PyNode::py_node_path(node_name);
+        let binding = node_path.clone();
+        let node_name = binding.file_stem().expect("node exists").to_string_lossy();
         let node_src =
-            match fs::read_to_string(&path).map_err(|e| NodeError::FileSys(e.to_string())) {
+            match fs::read_to_string(node_path).map_err(|e| NodeError::FileSys(e.to_string())) {
                 Ok(src) => src,
                 Err(_) => {
                     let py_node = PyNode {
                         name: node_name.to_string(),
-                        path,
-                        ports: Err(NodeError::FileSys("could not find src file".into())),
-                        parameters: Err(NodeError::FileSys("could not find src file".into())),
+                        path: node_path.clone(),
+                        ports: Err(NodeError::FileSys("Could not find src file".into())),
+                        parameters: Err(NodeError::FileSys("Could not find src file".into())),
                     };
                     log::error!("Failed to load node {node_name} {py_node:?}");
                     return py_node;
@@ -340,7 +343,7 @@ impl PyNode {
                             NodeError::Syntax(format!("Error with node name {node_name}{e}"))
                         })?
                         .as_c_str(),
-                    CString::new(node_name)
+                    CString::new(node_name.to_string())
                         .map_err(|e| {
                             NodeError::Syntax(format!("Error with node name {node_name}{e}"))
                         })?
@@ -403,14 +406,14 @@ impl PyNode {
 
                     PyNode {
                         name: node_name.to_string(),
-                        path,
+                        path: node_path.clone(),
                         ports,
                         parameters,
                     }
                 }
                 Err(e) => PyNode {
                     name: node_name.to_string(),
-                    path,
+                    path: node_path.clone(),
                     ports: Err(e.clone()),
                     parameters: Err(e),
                 },

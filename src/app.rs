@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::file_watch::file_watch_subscription;
 use crate::graph::{Graph, PortRef, IO};
 use crate::gui_node::GuiGraph;
@@ -58,8 +59,9 @@ pub struct App {
     pub shapes: workspace::State,
     pub selected_shapes: HashSet<ShapeId>,
     pub cursor_position: Point,
-    pub config: f32,
     pub app_theme: AppTheme,
+    #[serde(skip)]
+    pub config: Config,
     #[serde(skip)]
     pub modifiers: Modifiers,
     #[serde(skip)]
@@ -111,7 +113,6 @@ pub enum Message {
     ComputeAll,
 
     //// Application
-    Config(f32),
     AnimationTick,
     ThemeValueChange(AppThemeMessage, GuiColorMessage),
     ToggleDebug,
@@ -152,7 +153,6 @@ impl App {
                                 .shape_positions
                                 .get_mut(id)
                                 .expect("Shape index must exist") =
-                                //TODO refactor to avoid messy conversions
                                 (cursor_position + self.shapes.camera.position) + *offset
                         });
                     }
@@ -223,10 +223,10 @@ impl App {
                         //// Create new nodes on Command + Click
                         self.stash_state();
                         let selected_shapes = if self.selected_shapes.contains(&nx) {
-                            // if clicked node is already selected, copy all selected nodes,
+                            // If clicked node is already selected, copy all selected nodes,
                             self.selected_shapes.clone()
                         } else {
-                            // otherwise, only copy the clicked node
+                            // Otherwise, only copy the clicked node
                             [nx].into()
                         };
                         selected_shapes
@@ -252,7 +252,7 @@ impl App {
                         //// Select Single Node if an unselected node is clicked
                         [nx].into()
                     } else {
-                        //// otherwise keep selection the same
+                        //// Otherwise keep selection the same
                         self.selected_shapes.clone()
                     };
 
@@ -348,11 +348,6 @@ impl App {
                 }
             }
 
-            //// Application
-            Message::Config(v) => {
-                println!("\n\n\n CONFIG!!!!!!!!!!!!!!!!!!!!!\n\n\n");
-                self.config = v
-            }
             Message::AnimationTick => {}
             Message::ThemeValueChange(tm, tv) => self.app_theme.update(tm, tv),
             Message::ToggleDebug => {
@@ -427,11 +422,11 @@ impl App {
                 );
             }
             Message::QueueCompute(nx) => {
-                //// modify node status
+                //// Modify node status
                 {
                     let node = self.graph.get_mut_node(nx);
 
-                    // re-queue
+                    // Re-queue
                     if let NodeStatus::Running(..) = node.status {
                         trace!("Re-queue, {} #{nx}", node.template);
                         self.queued_nodes.insert(nx);
@@ -442,7 +437,7 @@ impl App {
                     trace!("Beginning compute: {} #{nx}", node.template,);
                 }
 
-                //// queue compute
+                //// Queue compute
                 let node = self.graph.get_node(nx);
                 return Task::perform(
                     Graph::async_compute(nx, node.clone(), self.graph.get_input_data(&nx)),
@@ -452,7 +447,7 @@ impl App {
             Message::ComputeComplete(nx, result) => {
                 match result {
                     Ok((output, node)) => {
-                        // assert that status is what is expected
+                        // Assert that status is what is expected
                         let run_time = match &node.status {
                             NodeStatus::Idle => panic!("Node should not be idle here!"),
                             NodeStatus::Running(start_inst) => Instant::now() - *start_inst,
@@ -470,7 +465,7 @@ impl App {
                             NodeData {
                                 status: NodeStatus::Idle,
                                 run_time: Some(run_time),
-                                // we *don't* update template here for some nodes
+                                // We *don't* update template here for some nodes
                                 // because that causes stuttery behaviour for
                                 // fast update scenarios like the slider of the 'constant'
                                 // node. alternatively, canceling in progress compute tasks
@@ -494,11 +489,11 @@ impl App {
                             .outgoing_edges(&nx)
                             .into_iter()
                             .map(|port_ref| port_ref.node)
-                            .unique() // don't queue a child multiple times
+                            .unique() // Don't queue a child multiple times
                             // TODO: instead of requeing after compute is done,
                             // potentially abort the running compute task, and restart
                             // immediately when new input data is received
-                            .chain(once(self.queued_nodes.remove(&nx).then_some(nx)).flatten()) // re-execute node if it got queued up in the meantime
+                            .chain(once(self.queued_nodes.remove(&nx).then_some(nx)).flatten()) // Re-execute node if it got queued up in the meantime
                             .collect();
                         trace!("Queuing children for compute {to_queue:?}");
                         return Task::batch(
@@ -558,13 +553,13 @@ impl App {
         let output: Element<Message, Theme, Renderer> = match self.action {
             Action::AddingNode => stack![
                 content,
-                // barrier to stop interaction
+                // Barrier to stop interaction
                 mouse_area(
                     container(text(""))
                         .center(Fill)
                         .style(container::transparent)
                 )
-                //stop any mouseover interactions from showing,
+                // Stop any mouseover interactions from showing,
                 .interaction(mouse::Interaction::Idle)
                 .on_press(Message::Cancel),
                 modal
@@ -623,13 +618,13 @@ impl App {
             let node = self.graph.get_node(*nx).clone();
             if let NodeTemplate::PyNode(old_py_node) = node.template {
                 let PyNode {
-                    name: node_name,
-                    path: _old_path,
+                    name: _node_name,
+                    path,
                     ports: old_ports,
                     parameters: old_parameters,
                 } = old_py_node;
                 //// Read new node from disk
-                let mut new_py_node = PyNode::new(&node_name);
+                let mut new_py_node = PyNode::new(path);
 
                 //// Update Parameters
                 new_py_node.parameters = {
@@ -702,7 +697,7 @@ impl App {
             }
         });
         // Update list of available nodes
-        self.available_nodes = NodeData::available_nodes();
+        self.available_nodes = NodeData::available_nodes(self.config.nodes_dir());
     }
 }
 
@@ -712,7 +707,7 @@ pub fn theme(state: &App) -> Theme {
 
 pub fn subscriptions(state: &App) -> Subscription<Message> {
     Subscription::batch([
-        file_watch_subscription(),
+        file_watch_subscription(state.config.nodes_dir().clone()),
         window::open_events().map(|_| Message::WindowOpen),
         listen_with(|event, _status, _id| match event {
             Keyboard(keyboard::Event::ModifiersChanged(m)) => Some(Message::ModifiersChanged(m)),
@@ -748,11 +743,15 @@ pub fn subscriptions(state: &App) -> Subscription<Message> {
 
 impl Default for App {
     fn default() -> App {
+        let config = Config::new();
+        config.setup_environment();
+
         // Try to load file
         match read_to_string("networks/network.ron").map(|s| ron::from_str::<App>(&s)) {
             Ok(Ok(app)) => {
                 let mut app = app;
-                app.available_nodes = NodeData::available_nodes();
+                app.available_nodes = NodeData::available_nodes(config.nodes_dir());
+                app.config = config;
                 app.reload_nodes();
                 app
             }
@@ -765,7 +764,8 @@ impl Default for App {
                 Self {
                     debug: false,
                     show_palette_ui: false,
-                    config: 50.,
+                    available_nodes: NodeData::available_nodes(config.nodes_dir()),
+                    config,
 
                     selected_shapes: Default::default(),
                     cursor_position: Default::default(),
@@ -774,7 +774,6 @@ impl Default for App {
                     //compute_task_handles: Default::default(),
                     app_theme: Default::default(),
                     modifiers: Default::default(),
-                    available_nodes: NodeData::available_nodes(),
                     shapes: workspace::State::new(shapes.into()),
                     graph: g,
                     undo_stack: vec![],

@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::time::Duration;
 
 pub mod constant;
@@ -18,7 +19,7 @@ use crate::nodes::math_nodes::{binary_operation, unary_operation};
 use crate::nodes::plot::Plot;
 use crate::nodes::plot_complex::Plot2D;
 use crate::python::py_node::PyNode;
-use crate::{nodes_dir, StableMap};
+use crate::StableMap;
 use derive_more::derive::{Debug, Display};
 use iced::widget::text;
 use iced::{Font, Size};
@@ -150,10 +151,10 @@ impl NodeData {
         ))
     }
 
-    pub fn available_nodes() -> Vec<NodeData> {
+    pub fn available_nodes(nodes_dir: &Path) -> Vec<NodeData> {
         let nodes = RustNode::iter()
             .map(|template| template.template_variants())
-            .chain(PyNode::template_variants());
+            .chain(PyNode::available_nodes(nodes_dir));
 
         trace!(
             "Loading available nodes:\n{}",
@@ -175,11 +176,13 @@ impl RustNode {
     }
 }
 impl PyNode {
-    pub fn template_variants() -> Vec<NodeData> {
-        let py_nodes = load_node_names();
-        py_nodes
-            .into_iter()
-            .map(|name| NodeTemplate::PyNode(PyNode::new(&name)).into())
+    pub fn available_nodes(nodes_dir: &Path) -> Vec<NodeData> {
+        use glob::glob;
+
+        glob(&(nodes_dir.to_string_lossy() + "/*.py"))
+            .expect("valid glob")
+            .filter_map(Result::ok)
+            .map(|path| NodeTemplate::PyNode(PyNode::new(path)).into())
             .collect()
     }
 }
@@ -342,18 +345,4 @@ impl GUINode for NodeTemplate {
             NodeTemplate::PyNode(pn) => pn.config_view(id, input_data),
         }
     }
-}
-
-fn load_node_names() -> Vec<String> {
-    use glob::glob;
-
-    glob(&(nodes_dir().to_string_lossy() + "/*.py"))
-        .expect("valid glob")
-        .filter_map(Result::ok)
-        .filter_map(|entry| {
-            entry
-                .file_stem()
-                .map(|stem| stem.to_string_lossy().to_string())
-        })
-        .collect()
 }

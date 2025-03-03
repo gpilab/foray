@@ -43,6 +43,8 @@ glob = "0.3.2"
 itertools = "0.14.0"
 glam = "0.29.2"
 colorgrad = "0.7.0"
+directories = "6.0.0"
+toml = "0.8.20"
 
 [profile.dev]
 debug = 0
