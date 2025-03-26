@@ -53,33 +53,69 @@ type UndoStash = Vec<(
     IndexMap<ShapeId, Point>,
 )>;
 
-#[derive(Serialize, Deserialize)]
 pub struct App {
-    pub graph: GuiGraph,
-    pub shapes: workspace::State,
+    pub network: Network,
     pub selected_shapes: HashSet<ShapeId>,
     pub cursor_position: Point,
     pub app_theme: AppTheme,
-    #[serde(skip)]
     pub config: Config,
-    #[serde(skip)]
     pub modifiers: Modifiers,
-    #[serde(skip)]
     pub queued_nodes: HashSet<u32>,
     //#[serde(skip)]
     //pub compute_task_handles: HashMap<u32, iced::task::Handle>,
-    #[serde(skip)]
     pub debug: bool,
-    #[serde(skip)]
     pub show_palette_ui: bool,
-    #[serde(skip)]
     pub available_nodes: Vec<NodeData>,
-    #[serde(skip)]
     pub action: Action,
-    #[serde(skip)]
     pub undo_stack: UndoStash,
-    #[serde(skip)]
     pub redo_stack: UndoStash,
+}
+impl Default for App {
+    fn default() -> Self {
+        let config = Config::default();
+        config.setup_environment();
+        let app_theme = Config::load_theme();
+
+        let network =
+            match read_to_string("networks/network.ron").map(|s| ron::from_str::<Network>(&s)) {
+                Ok(Ok(network)) => network,
+                Ok(Err(e)) => {
+                    error!("Could not open file {e}");
+                    warn!("creating default file");
+                    Network::default()
+                }
+                Err(e) => {
+                    error!("Could not parse file {e}");
+                    warn!("creating default file");
+                    Network::default()
+                }
+            };
+
+        let available_nodes = NodeData::available_nodes(config.nodes_dir());
+        App {
+            network,
+            config,
+
+            debug: false,
+            show_palette_ui: false,
+            available_nodes,
+            selected_shapes: Default::default(),
+            cursor_position: Default::default(),
+            action: Default::default(),
+            queued_nodes: Default::default(),
+            //compute_task_handles: Default::default(),
+            app_theme,
+            modifiers: Default::default(),
+            undo_stack: vec![],
+            redo_stack: vec![],
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Default)]
+pub struct Network {
+    pub graph: GuiGraph,
+    pub shapes: workspace::State,
 }
 
 #[derive(Clone, derive_more::Debug)]
@@ -149,23 +185,25 @@ impl App {
                     Action::DragNode(offsets) => {
                         offsets.iter().for_each(|(id, offset)| {
                             *self
+                                .network
                                 .shapes
                                 .shape_positions
                                 .get_mut(id)
                                 .expect("Shape index must exist") =
-                                (cursor_position + self.shapes.camera.position) + *offset
+                                (cursor_position + self.network.shapes.camera.position) + *offset
                         });
                     }
                     Action::DragPan(offset) => {
-                        self.shapes.camera.position = -cursor_position.to_vector() + *offset;
+                        self.network.shapes.camera.position =
+                            -cursor_position.to_vector() + *offset;
                     }
                     _ => (),
                 }
             }
 
             Message::ScrollPan(delta) => {
-                self.shapes.camera.position.x -= delta.x * 2.;
-                self.shapes.camera.position.y -= delta.y * 2.;
+                self.network.shapes.camera.position.x -= delta.x * 2.;
+                self.network.shapes.camera.position.y -= delta.y * 2.;
             }
 
             //// Port
@@ -200,8 +238,8 @@ impl App {
                     Action::CreatingInputWire(input, Some(output))
                     | Action::CreatingOutputWire(output, Some(input)) => {
                         self.stash_state();
-                        self.graph.remove_edge(input);
-                        self.graph.add_edge_from_ref(output, input);
+                        self.network.graph.remove_edge(input);
+                        self.network.graph.add_edge_from_ref(output, input);
                         Task::done(Message::QueueCompute(output.node))
                     }
                     _ => Task::none(),
@@ -211,7 +249,7 @@ impl App {
             }
             Message::PortDelete(port) => {
                 self.stash_state();
-                self.graph.remove_edge(&port)
+                self.network.graph.remove_edge(&port)
             }
 
             //// Node
@@ -232,12 +270,13 @@ impl App {
                         selected_shapes
                             .iter()
                             .map(|id| {
-                                let pos = self.shapes.shape_positions[id] + [5., 5.].into();
-                                let new_node = self.graph.get_node(*id).template.duplicate().into();
+                                let pos = self.network.shapes.shape_positions[id] + [5., 5.].into();
+                                let new_node =
+                                    self.network.graph.get_node(*id).template.duplicate().into();
                                 // *Mutably* add new node to graph
-                                let new_id = self.graph.node(new_node);
+                                let new_id = self.network.graph.node(new_node);
                                 // *Mutably* add new position
-                                self.shapes.shape_positions.insert(new_id, pos);
+                                self.network.shapes.shape_positions.insert(new_id, pos);
                                 new_id
                             })
                             .collect()
@@ -262,8 +301,8 @@ impl App {
                         .map(|id| {
                             (
                                 *id,
-                                (self.shapes.shape_positions[id]
-                                    - (self.cursor_position + self.shapes.camera.position)),
+                                (self.network.shapes.shape_positions[id]
+                                    - (self.cursor_position + self.network.shapes.camera.position)),
                             )
                         })
                         .collect();
@@ -272,8 +311,9 @@ impl App {
                     self.action = Action::DragNode(offsets);
 
                     //// Move selected shape to the top
-                    self.shapes.shape_positions.move_index(
-                        self.shapes
+                    self.network.shapes.shape_positions.move_index(
+                        self.network
+                            .shapes
                             .shape_positions
                             .get_index_of(&nx)
                             .expect("id exists"),
@@ -288,7 +328,7 @@ impl App {
 
                     //// Start Pan
                     self.action = Action::DragPan(
-                        self.shapes.camera.position + self.cursor_position.to_vector(),
+                        self.network.shapes.camera.position + self.cursor_position.to_vector(),
                     );
                 }
             }
@@ -303,18 +343,18 @@ impl App {
             Message::OpenAddNodeUi => self.action = Action::AddingNode,
 
             Message::UpdateNodeTemplate(id, new_template) => {
-                let old_template = &self.graph.get_node(id).template;
+                let old_template = &self.network.graph.get_node(id).template;
                 if *old_template != new_template {
                     self.stash_state();
                     // Now we can aquire mutable reference
-                    let old_template = &mut self.graph.get_mut_node(id).template;
+                    let old_template = &mut self.network.graph.get_mut_node(id).template;
                     *old_template = new_template;
                     return Task::done(Message::QueueCompute(id));
                 };
             }
             Message::UpdateNodeParameter(id, name, updated_widget) => {
                 self.stash_state();
-                let old_template = &mut self.graph.get_mut_node(id).template;
+                let old_template = &mut self.network.graph.get_mut_node(id).template;
                 // TODO: support all node types, not just py_node
                 if let NodeTemplate::PyNode(node) = old_template {
                     node.parameters
@@ -326,12 +366,12 @@ impl App {
             }
             Message::AddNode(template) => {
                 self.stash_state();
-                let id = self.graph.node(template.into());
+                let id = self.network.graph.node(template.into());
                 self.selected_shapes = [id].into();
-                self.shapes.shape_positions.insert_before(
+                self.network.shapes.shape_positions.insert_before(
                     0,
                     id,
-                    self.cursor_position + self.shapes.camera.position,
+                    self.cursor_position + self.network.shapes.camera.position,
                 );
                 self.action = Action::DragNode(vec![(id, [0.0, 0.0].into())])
             }
@@ -339,8 +379,8 @@ impl App {
                 if !self.selected_shapes.is_empty() {
                     self.stash_state();
                     self.selected_shapes.iter().for_each(|id| {
-                        self.graph.delete_node(*id);
-                        self.shapes.shape_positions.swap_remove(id);
+                        self.network.graph.delete_node(*id);
+                        self.network.shapes.shape_positions.swap_remove(id);
                     });
                     self.selected_shapes = [].into();
                     //PERF: ideally, we should only execute affected nodes
@@ -360,7 +400,7 @@ impl App {
                 std::fs::write(
                     "networks/network.ron",
                     ron::ser::to_string_pretty(
-                        &self,
+                        &self.network,
                         ron::ser::PrettyConfig::default().compact_arrays(true),
                     )
                     .unwrap(),
@@ -368,7 +408,7 @@ impl App {
                 .expect("Could not save to file");
             }
             Message::Load => {
-                *self = ron::from_str(
+                self.network = ron::from_str(
                     &read_to_string("networks/network.ron").expect("Could not read file"),
                 )
                 .expect("could not parse file");
@@ -396,24 +436,28 @@ impl App {
             //// History
             Message::Undo => {
                 if let Some(prev) = self.undo_stack.pop() {
-                    self.redo_stack
-                        .push((self.graph.clone(), self.shapes.shape_positions.clone()));
-                    self.graph = prev.0;
-                    self.shapes.shape_positions = prev.1;
+                    self.redo_stack.push((
+                        self.network.graph.clone(),
+                        self.network.shapes.shape_positions.clone(),
+                    ));
+                    self.network.graph = prev.0;
+                    self.network.shapes.shape_positions = prev.1;
                     return Task::done(Message::ComputeAll);
                 }
             }
             Message::Redo => {
                 if let Some(next) = self.redo_stack.pop() {
-                    self.undo_stack
-                        .push((self.graph.clone(), self.shapes.shape_positions.clone()));
-                    self.graph = next.0;
-                    self.shapes.shape_positions = next.1;
+                    self.undo_stack.push((
+                        self.network.graph.clone(),
+                        self.network.shapes.shape_positions.clone(),
+                    ));
+                    self.network.graph = next.0;
+                    self.network.shapes.shape_positions = next.1;
                     return Task::done(Message::ComputeAll);
                 }
             }
             Message::ComputeAll => {
-                let nodes = self.graph.get_roots();
+                let nodes = self.network.graph.get_roots();
                 trace!("Queuing root nodes: {nodes:?}");
                 return Task::batch(
                     nodes
@@ -424,7 +468,7 @@ impl App {
             Message::QueueCompute(nx) => {
                 //// Modify node status
                 {
-                    let node = self.graph.get_mut_node(nx);
+                    let node = self.network.graph.get_mut_node(nx);
 
                     // Re-queue
                     if let NodeStatus::Running(..) = node.status {
@@ -438,9 +482,9 @@ impl App {
                 }
 
                 //// Queue compute
-                let node = self.graph.get_node(nx);
+                let node = self.network.graph.get_node(nx);
                 return Task::perform(
-                    Graph::async_compute(nx, node.clone(), self.graph.get_input_data(&nx)),
+                    Graph::async_compute(nx, node.clone(), self.network.graph.get_input_data(&nx)),
                     move |(nx, res)| Message::ComputeComplete(nx, res),
                 );
             }
@@ -457,10 +501,10 @@ impl App {
                         trace!("Compute complete: {} #{nx}, {run_time:.1?}", node.template,);
 
                         //// Update wire
-                        self.graph.update_wire_data(nx, output);
+                        self.network.graph.update_wire_data(nx, output);
 
                         //// Update node
-                        self.graph.set_node_data(
+                        self.network.graph.set_node_data(
                             nx,
                             NodeData {
                                 status: NodeStatus::Idle,
@@ -473,10 +517,10 @@ impl App {
                                 // similar to TODO: below
                                 template: match node.template {
                                     NodeTemplate::RustNode(RustNode::Constant(_)) => {
-                                        self.graph.get_node(nx).template.clone()
+                                        self.network.graph.get_node(nx).template.clone()
                                     }
                                     NodeTemplate::PyNode(_) => {
-                                        self.graph.get_node(nx).template.clone()
+                                        self.network.graph.get_node(nx).template.clone()
                                     }
                                     _ => node.template,
                                 },
@@ -485,6 +529,7 @@ impl App {
 
                         //// Queue children for compute
                         let to_queue: Vec<_> = self
+                            .network
                             .graph
                             .outgoing_edges(&nx)
                             .into_iter()
@@ -504,13 +549,13 @@ impl App {
                     }
                     Err(node_error) => {
                         //// Update Node
-                        let node = self.graph.get_mut_node(nx);
+                        let node = self.network.graph.get_mut_node(nx);
                         error!("Compute failed {node:?},{}", node_error);
                         node.status = NodeStatus::Error(node_error);
                         node.run_time = None;
 
                         //// Update Wire
-                        self.graph.update_wire_data(nx, [].into());
+                        self.network.graph.update_wire_data(nx, [].into());
 
                         return Task::none();
                     }
@@ -528,7 +573,7 @@ impl App {
                 vertical_rule(SEPERATOR),
                 container(
                     workspace(
-                        &self.shapes,
+                        &self.network.shapes,
                         //// Node view
                         |id| self.node_content(id),
                         //// Wires paths
@@ -585,7 +630,7 @@ impl App {
 
     /// Stash current app state, and reset the redo stack
     fn stash_state(&mut self) {
-        let mut graph_snap_shot = self.graph.clone();
+        let mut graph_snap_shot = self.network.graph.clone();
         // We don't want to stash any node.status "running" values
         let running_nodes: Vec<_> = graph_snap_shot
             .nodes_ref()
@@ -602,7 +647,7 @@ impl App {
         }
 
         self.undo_stack
-            .push((graph_snap_shot, self.shapes.shape_positions.clone()));
+            .push((graph_snap_shot, self.network.shapes.shape_positions.clone()));
 
         // Don't let the stack get too big
         self.undo_stack.truncate(10);
@@ -614,8 +659,8 @@ impl App {
     /// *Does not trigger the compute function of any nodes.*
     fn reload_nodes(&mut self) {
         // Update any existing nodes in the graph that could change based on file changes
-        self.graph.nodes_ref().iter().for_each(|nx| {
-            let node = self.graph.get_node(*nx).clone();
+        self.network.graph.nodes_ref().iter().for_each(|nx| {
+            let node = self.network.graph.get_node(*nx).clone();
             if let NodeTemplate::PyNode(old_py_node) = node.template {
                 let PyNode {
                     name: _node_name,
@@ -687,12 +732,13 @@ impl App {
                             "Removing port {:?} from node {:?}",
                             p.name, new_py_node.name
                         );
-                        self.graph.remove_edge(&p);
+                        self.network.graph.remove_edge(&p);
                     });
                 }
 
                 // Update Graph Node
-                self.graph
+                self.network
+                    .graph
                     .set_node_data(*nx, NodeTemplate::PyNode(new_py_node).into());
             }
         });
@@ -733,53 +779,10 @@ pub fn subscriptions(state: &App) -> Subscription<Message> {
             _ => None,
         }),
         // Refresh for animation while nodes are actively running
-        if state.graph.running_nodes().is_empty() {
+        if state.network.graph.running_nodes().is_empty() {
             Subscription::none()
         } else {
             iced::time::every(Duration::from_micros(1_000_000 / 16)).map(|_| Message::AnimationTick)
         },
     ])
-}
-
-impl Default for App {
-    fn default() -> App {
-        let config = Config::new();
-        config.setup_environment();
-
-        // Try to load file
-        match read_to_string("networks/network.ron").map(|s| ron::from_str::<App>(&s)) {
-            Ok(Ok(app)) => {
-                let mut app = app;
-                app.available_nodes = NodeData::available_nodes(config.nodes_dir());
-                app.config = config;
-                app.reload_nodes();
-                app
-            }
-            _ => {
-                println!("Failed to load file, loading defaults");
-                let g = Graph::<NodeData, PortType, PortData>::new();
-
-                let shapes = [];
-
-                Self {
-                    debug: false,
-                    show_palette_ui: false,
-                    available_nodes: NodeData::available_nodes(config.nodes_dir()),
-                    config,
-
-                    selected_shapes: Default::default(),
-                    cursor_position: Default::default(),
-                    action: Default::default(),
-                    queued_nodes: Default::default(),
-                    //compute_task_handles: Default::default(),
-                    app_theme: Default::default(),
-                    modifiers: Default::default(),
-                    shapes: workspace::State::new(shapes.into()),
-                    graph: g,
-                    undo_stack: vec![],
-                    redo_stack: vec![],
-                }
-            }
-        }
-    }
 }

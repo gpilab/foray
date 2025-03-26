@@ -7,9 +7,11 @@ use std::{
     process::Command,
 };
 
-use log::{info, warn};
+use log::{error, info, warn};
 use pyo3::{py_run, types::PyAnyMethods, PyResult, Python};
 use serde::{Deserialize, Serialize};
+
+use crate::style::theme::AppTheme;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
@@ -19,12 +21,6 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Config {
-    pub fn new() -> Self {
         let user_dirs =
             directories::UserDirs::new().expect("application configuration folder is accessible");
         let config_dir = user_dirs.home_dir().join(".config/gpi");
@@ -44,9 +40,9 @@ impl Config {
                 let nodes_dir = user_dirs.home_dir().join("gpi_default");
                 let venv_dir = nodes_dir.join(".venv");
 
-                print!("No configuration file found at {config_file:?} creating default config");
+                println!("No configuration file found at {config_file:?} creating default config");
                 if fs::read_dir(&nodes_dir).is_err() {
-                    print!("creating default node directory at {nodes_dir:?}");
+                    println!("creating default node directory at {nodes_dir:?}");
                     fs::create_dir(&nodes_dir)
                         .unwrap_or_else(|_| panic!("couldn't create default folder{nodes_dir:?}"));
 
@@ -59,18 +55,34 @@ impl Config {
                     info!("{output:?}");
                 }
 
-                print!("Creating default config file");
+                println!("Creating default config file");
                 let config = Config {
                     venv_dir,
                     nodes_dir,
                 };
-                std::fs::write(config_dir, toml::to_string_pretty(&config).unwrap())
+                let _ = std::fs::create_dir(config_dir);
+                std::fs::write(config_file, toml::to_string_pretty(&config).unwrap())
                     .expect("Could not write config file");
                 config
             }
         }
     }
+}
+impl Config {
+    pub fn load_theme() -> AppTheme {
+        let user_dirs =
+            directories::UserDirs::new().expect("application configuration folder is accessible");
+        let theme_file = user_dirs.home_dir().join(".config/gpi/theme.ron");
 
+        match read_to_string(theme_file).map(|s| ron::from_str::<AppTheme>(&s)) {
+            Ok(Ok(network)) => network,
+            Ok(Err(e)) => {
+                error!("Could not parse theme file, using default {e}");
+                AppTheme::default()
+            }
+            Err(_e) => AppTheme::default(),
+        }
+    }
     pub fn setup_environment(&self) {
         self.setup_python();
     }

@@ -1,5 +1,6 @@
 use crate::{gui_node::PortDataReference, nodes::NodeError, StableMap};
 use ndarray::ArrayD;
+use numpy::IxDyn;
 
 use super::port::PortData;
 
@@ -13,6 +14,10 @@ pub fn binary_operation(
 
     let out = match (&**a, &**b) {
         (PortData::ArrayReal(a), PortData::ArrayReal(b)) => f(a, b),
+        (PortData::Real(a), PortData::Real(b)) => f(
+            &ArrayD::from_shape_simple_fn(IxDyn(&[1]), || *a),
+            &ArrayD::from_shape_simple_fn(IxDyn(&[1]), || *b),
+        ),
         _ => panic!("bad inputs!"),
     };
 
@@ -25,6 +30,7 @@ pub fn unary_operation(
 ) -> Result<StableMap<String, PortData>, NodeError> {
     let out = match &**inputs.get("a").ok_or(NodeError::input_error("a"))? {
         PortData::ArrayReal(a) => f(a),
+        PortData::Real(a) => f(&ArrayD::from_shape_simple_fn(IxDyn(&[1]), || *a)),
         _ => panic!("bad inputs!"),
     };
 

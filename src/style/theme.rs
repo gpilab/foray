@@ -22,13 +22,13 @@ pub struct AppTheme {
 impl Default for AppTheme {
     fn default() -> Self {
         AppTheme {
-            background: GuiColor::new(16, 15, 15, 0.1, 0.4),
-            text: GuiColor::new(206, 205, 195, 0.1, 0.4),
-            primary: GuiColor::new(139, 126, 200, 0.1, 0.4),
+            background: GuiColor::new(16, 32, 32, 0.03, 0.2),
+            text: GuiColor::new(240, 208, 192, 0.1, 0.4),
+            primary: GuiColor::new(128, 144, 80, 0.3, 0.1),
             //secondary: GuiColor::new(203, 97, 32, 0.1, 0.4),
-            secondary: GuiColor::new(206, 205, 195, 0.1, 0.4),
-            success: GuiColor::new(135, 154, 57, 0.1, 0.4),
-            danger: GuiColor::new(209, 77, 65, 0.1, 0.4),
+            secondary: GuiColor::new(176, 144, 112, 0.1, 0.2),
+            success: GuiColor::new(112, 128, 224, 0.1, 0.2),
+            danger: GuiColor::new(176, 64, 64, 0.1, 0.2),
         }
     }
 }

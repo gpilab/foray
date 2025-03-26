@@ -54,12 +54,12 @@ pub fn side_bar(app: &App) -> Element<'_, Message> {
 
     //// Config
     let config: Element<Message> = if let Some(selected_id) = app.selected_shapes.iter().next() {
-        let node = app.graph.get_node(*selected_id);
-        let input_data = app.graph.get_input_data(selected_id);
+        let node = app.network.graph.get_node(*selected_id);
+        let input_data = app.network.graph.get_input_data(selected_id);
         let out_port_display: Element<Message> = if app.debug {
             column![format_node_output(
                 node,
-                &app.graph.get_output_data(*selected_id)
+                &app.network.graph.get_output_data(*selected_id)
             )]
             .into()
         } else {

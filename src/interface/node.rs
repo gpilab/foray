@@ -29,7 +29,7 @@ pub fn default_node_size() -> iced::Size {
 
 impl App {
     pub fn node_content(&self, id: u32) -> Element<Message, Theme, Renderer> {
-        let node = self.graph.get_node(id);
+        let node = self.network.graph.get_node(id);
         let is_selected = self.selected_shapes.contains(&id);
 
         let node_style = move |node: &NodeData, t: &Theme| {
@@ -72,7 +72,7 @@ impl App {
         let port_buttons = port_view(id, node, &self.app_theme);
 
         //// Node
-        let input_data = self.graph.get_input_data(&id);
+        let input_data = self.network.graph.get_input_data(&id);
         let (node_size, node_view) = node.template.view(id, input_data);
 
         let node_inner: Element<Message, Theme, Renderer> = container(node_view)

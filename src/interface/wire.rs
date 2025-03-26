@@ -14,7 +14,7 @@ impl App {
         points: &StableMap<u32, Point>,
     ) -> Vec<(Path, Stroke)> {
         let port_position = |port: &PortRef| {
-            points[&port.node] + find_port_offset(port, self.graph.port_index(port)).into()
+            points[&port.node] + find_port_offset(port, self.network.graph.port_index(port)).into()
         };
 
         //// Handle currently active wire
@@ -27,7 +27,7 @@ impl App {
             Action::CreatingInputWire(input, None) => Some((
                 (
                     port_position(input),
-                    self.cursor_position + self.shapes.camera.position,
+                    self.cursor_position + self.network.shapes.camera.position,
                 ),
                 active_wire_stroke(&self.app_theme, false),
             )),
@@ -37,7 +37,7 @@ impl App {
             )),
             Action::CreatingOutputWire(output, None) => Some((
                 (
-                    self.cursor_position + self.shapes.camera.position,
+                    self.cursor_position + self.network.shapes.camera.position,
                     port_position(output),
                 ),
                 active_wire_stroke(&self.app_theme, false),
@@ -46,7 +46,7 @@ impl App {
         };
 
         //// Handle all wires
-        let incoming_wires = self.graph.incoming_edges(&wire_end_node);
+        let incoming_wires = self.network.graph.incoming_edges(&wire_end_node);
         incoming_wires
             .iter()
             .map(|(from, to)| {
