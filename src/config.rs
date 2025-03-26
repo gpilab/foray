@@ -51,7 +51,7 @@ impl Default for Config {
                         .arg("venv")
                         .arg(&venv_dir)
                         .output()
-                        .expect("failed to execute process");
+                        .unwrap_or_else(|e| panic!("failed to execute python process {e}"));
                     info!("{output:?}");
                 }
 
@@ -61,8 +61,13 @@ impl Default for Config {
                     nodes_dir,
                 };
                 let _ = std::fs::create_dir(config_dir);
-                std::fs::write(config_file, toml::to_string_pretty(&config).unwrap())
-                    .expect("Could not write config file");
+                std::fs::write(
+                    &config_file,
+                    toml::to_string_pretty(&config).unwrap_or_else(|e| {
+                        panic!("Could not parse config file {config_file:?}\n{e}")
+                    }),
+                )
+                .unwrap_or_else(|e| panic!("Could not write config file {config_file:?}\n{e}"));
                 config
             }
         }
@@ -74,10 +79,10 @@ impl Config {
             directories::UserDirs::new().expect("application configuration folder is accessible");
         let theme_file = user_dirs.home_dir().join(".config/gpi/theme.ron");
 
-        match read_to_string(theme_file).map(|s| ron::from_str::<AppTheme>(&s)) {
+        match read_to_string(&theme_file).map(|s| ron::from_str::<AppTheme>(&s)) {
             Ok(Ok(network)) => network,
             Ok(Err(e)) => {
-                error!("Could not parse theme file, using default {e}");
+                error!("Could not parse theme file: {theme_file:?}, using default.\n{e}");
                 AppTheme::default()
             }
             Err(_e) => AppTheme::default(),
@@ -103,7 +108,7 @@ impl Config {
                 self.venv_dir
                     .join("lib/python3*")
                     .to_str()
-                    .expect("valid python virtual environment directory"),
+                    .unwrap_or_else(|| panic!("Paths must be valid unicode {:?}", self.venv_dir)),
             ) {
                 let paths: Vec<_> = paths.filter_map(|p| p.ok()).collect();
                 if paths.len() > 1 {
@@ -115,7 +120,7 @@ impl Config {
                         prepend_env("PYTHONPATH", path.join("site-packages"))
                             .unwrap()
                             .to_str()
-                            .unwrap(),
+                            .unwrap_or_else(|| panic!("Paths must be valid unicode {:?}", path)),
                     );
                 });
             }
