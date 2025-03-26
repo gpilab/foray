@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::{Config, UserData};
 use crate::file_watch::file_watch_subscription;
 use crate::graph::{Graph, PortRef, IO};
 use crate::gui_node::GuiGraph;
@@ -29,11 +29,13 @@ use iced::{mouse, window, Subscription, Task};
 use indexmap::IndexMap;
 use itertools::Itertools;
 use log::{error, trace, warn};
+use rfd::FileDialog;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs::read_to_string;
 use std::iter::once;
 use std::mem::discriminant;
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 #[derive(Default, Clone, PartialEq)]
@@ -56,40 +58,50 @@ type UndoStash = Vec<(
 pub struct App {
     pub network: Network,
     pub selected_shapes: HashSet<ShapeId>,
+    pub queued_nodes: HashSet<u32>,
+    pub undo_stack: UndoStash,
+    pub redo_stack: UndoStash,
+    pub unsaved_changes: bool,
+
     pub cursor_position: Point,
     pub app_theme: AppTheme,
     pub config: Config,
     pub modifiers: Modifiers,
-    pub queued_nodes: HashSet<u32>,
     //#[serde(skip)]
     //pub compute_task_handles: HashMap<u32, iced::task::Handle>,
     pub debug: bool,
     pub show_palette_ui: bool,
     pub available_nodes: Vec<NodeData>,
     pub action: Action,
-    pub undo_stack: UndoStash,
-    pub redo_stack: UndoStash,
 }
 impl Default for App {
     fn default() -> Self {
-        let config = Config::default();
+        let config = Config::read_config();
         config.setup_environment();
         let app_theme = Config::load_theme();
+        let user_data = UserData::read_user_data();
 
-        let network =
-            match read_to_string("networks/network.ron").map(|s| ron::from_str::<Network>(&s)) {
-                Ok(Ok(network)) => network,
-                Ok(Err(e)) => {
-                    error!("Could not open file {e}");
-                    warn!("creating default file");
-                    Network::default()
+        let network = match user_data.last_network_file {
+            Some(recent_network) => {
+                match read_to_string(&recent_network).map(|s| ron::from_str::<Network>(&s)) {
+                    Ok(Ok(mut network)) => {
+                        network.file = Some(recent_network);
+                        network
+                    }
+                    Ok(Err(e)) => {
+                        error!("Could not open file {e}");
+                        warn!("creating default file");
+                        Network::default()
+                    }
+                    Err(e) => {
+                        error!("Could not parse file {e}");
+                        warn!("creating default file");
+                        Network::default()
+                    }
                 }
-                Err(e) => {
-                    error!("Could not parse file {e}");
-                    warn!("creating default file");
-                    Network::default()
-                }
-            };
+            }
+            None => Network::default(),
+        };
 
         let available_nodes = NodeData::available_nodes(config.nodes_dir());
         App {
@@ -108,6 +120,7 @@ impl Default for App {
             modifiers: Default::default(),
             undo_stack: vec![],
             redo_stack: vec![],
+            unsaved_changes: false,
         }
     }
 }
@@ -116,6 +129,8 @@ impl Default for App {
 pub struct Network {
     pub graph: GuiGraph,
     pub shapes: workspace::State,
+    #[serde(skip)]
+    pub file: Option<PathBuf>,
 }
 
 #[derive(Clone, derive_more::Debug)]
@@ -153,8 +168,9 @@ pub enum Message {
     ThemeValueChange(AppThemeMessage, GuiColorMessage),
     ToggleDebug,
     TogglePaletteUI,
-    Save,
+    New,
     Load,
+    Save,
     ReloadNodes,
     WindowOpen,
     ModifiersChanged(Modifiers),
@@ -396,24 +412,73 @@ impl App {
             Message::TogglePaletteUI => {
                 self.show_palette_ui = !self.show_palette_ui;
             }
-            Message::Save => {
-                std::fs::write(
-                    "networks/network.ron",
-                    ron::ser::to_string_pretty(
-                        &self.network,
-                        ron::ser::PrettyConfig::default().compact_arrays(true),
-                    )
-                    .unwrap(),
-                )
-                .expect("Could not save to file");
+            Message::New => {
+                if self.unsaved_changes {
+                    let result = rfd::MessageDialog::new()
+                        .set_description(
+                            "Network has unsaved changes, save before opening new network?",
+                        )
+                        .set_buttons(rfd::MessageButtons::YesNoCancel)
+                        .show();
+                    match result {
+                        rfd::MessageDialogResult::Yes => return Task::done(Message::Save),
+                        rfd::MessageDialogResult::Cancel => return Task::none(),
+                        _ => {}
+                    }
+                }
+                self.network = Network::default();
+                self.selected_shapes = Default::default();
+                self.queued_nodes = Default::default();
+                self.undo_stack = vec![];
+                self.redo_stack = vec![];
+                self.unsaved_changes = false;
+                self.reload_nodes();
             }
             Message::Load => {
-                self.network = ron::from_str(
-                    &read_to_string("networks/network.ron").expect("Could not read file"),
-                )
-                .expect("could not parse file");
-                self.reload_nodes();
-                return Task::done(Message::ComputeAll);
+                let file = FileDialog::new()
+                    .add_filter("network", &["ron"])
+                    .pick_file();
+
+                if let Some(file) = dbg!(file) {
+                    self.network = ron::from_str(
+                        &read_to_string(&file)
+                            .unwrap_or_else(|e| panic!("Could not read network {file:?}\n {e}")),
+                    )
+                    .unwrap_or_else(|e| panic!("Could not parse network {file:?}\n {e}"));
+                    self.network.file = Some(file);
+                    self.selected_shapes = Default::default();
+                    self.queued_nodes = Default::default();
+                    self.undo_stack = vec![];
+                    self.redo_stack = vec![];
+                    self.unsaved_changes = false;
+                    self.reload_nodes();
+                    return Task::done(Message::ComputeAll);
+                } else {
+                    error!("file not picked")
+                }
+            }
+            Message::Save => {
+                let file = match self.network.file.clone() {
+                    Some(file) => Some(file),
+                    None => FileDialog::new()
+                        .add_filter("network", &["ron"])
+                        .save_file(),
+                };
+                if let Some(file) = file {
+                    std::fs::write(
+                        &file,
+                        ron::ser::to_string_pretty(
+                            &self.network,
+                            ron::ser::PrettyConfig::default().compact_arrays(true),
+                        )
+                        .unwrap(),
+                    )
+                    .expect("Could not save to file");
+                    self.network.file = Some(file.clone());
+                    self.unsaved_changes = false;
+                } else {
+                    error!("No file selected")
+                }
             }
             Message::ReloadNodes => {
                 self.reload_nodes();
@@ -630,6 +695,7 @@ impl App {
 
     /// Stash current app state, and reset the redo stack
     fn stash_state(&mut self) {
+        self.unsaved_changes = true;
         let mut graph_snap_shot = self.network.graph.clone();
         // We don't want to stash any node.status "running" values
         let running_nodes: Vec<_> = graph_snap_shot
@@ -785,4 +851,18 @@ pub fn subscriptions(state: &App) -> Subscription<Message> {
             iced::time::every(Duration::from_micros(1_000_000 / 16)).map(|_| Message::AnimationTick)
         },
     ])
+}
+
+pub fn title(state: &App) -> String {
+    let pre_pend = match state.unsaved_changes {
+        true => "*",
+        false => "",
+    };
+    pre_pend.to_string()
+        + &state
+            .network
+            .file
+            .clone()
+            .map(|p| p.file_stem().unwrap().to_string_lossy().to_string())
+            .unwrap_or("*new".to_string())
 }

@@ -13,14 +13,45 @@ use serde::{Deserialize, Serialize};
 
 use crate::style::theme::AppTheme;
 
+/// User configuration data that is saved/loaded from a config.toml file
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     venv_dir: PathBuf,
     nodes_dir: PathBuf,
 }
 
-impl Default for Config {
-    fn default() -> Self {
+/// User data that should persist across sessions, but isn't explicitly configured by the user
+/// e.g. recent files, commonly used nodes, etc.
+#[derive(Serialize, Deserialize, Debug, Default)]
+pub struct UserData {
+    pub last_network_file: Option<PathBuf>,
+}
+impl UserData {
+    pub fn read_user_data() -> Self {
+        let binding = directories::ProjectDirs::from("", "", "gpi")
+            .expect("application configuration folder is accessible");
+        let user_data_dir = binding.cache_dir();
+        let user_data_file = user_data_dir.join("config.toml");
+
+        match read_to_string(&user_data_file).map(|s| ron::from_str::<UserData>(&s)) {
+            Ok(Ok(c)) => {
+                info!("Loaded UserData: {user_data_file:?}");
+                c
+            }
+            Ok(Err(e)) => {
+                error!("Error reading Userdata {user_data_file:?}, using defualt. \n{e}");
+                UserData::default()
+            }
+            Err(e) => {
+                error!("Error reading Userdata {user_data_file:?}, using defualt. \n{e}");
+                UserData::default()
+            }
+        }
+    }
+}
+
+impl Config {
+    pub fn read_config() -> Self {
         let user_dirs =
             directories::UserDirs::new().expect("application configuration folder is accessible");
         let config_dir = user_dirs.home_dir().join(".config/gpi");
@@ -73,6 +104,7 @@ impl Default for Config {
         }
     }
 }
+
 impl Config {
     pub fn load_theme() -> AppTheme {
         let user_dirs =

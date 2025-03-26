@@ -45,6 +45,7 @@ glam = "0.29.2"
 colorgrad = "0.7.0"
 directories = "6.0.0"
 toml = "0.8.20"
+rfd = "0.15.3"
 
 [profile.dev]
 debug = 0
