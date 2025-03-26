@@ -1,4 +1,4 @@
-use crate::config::{Config, UserData};
+use crate::config::Config;
 use crate::file_watch::file_watch_subscription;
 use crate::graph::{Graph, PortRef, IO};
 use crate::gui_node::GuiGraph;
@@ -13,6 +13,7 @@ use crate::nodes::status::{NodeError, NodeStatus};
 use crate::nodes::{NodeData, NodeTemplate, RustNode};
 use crate::python::py_node::PyNode;
 use crate::style::theme::AppTheme;
+use crate::user_data::UserData;
 use crate::widget::shapes::ShapeId;
 use crate::widget::workspace::{self, workspace};
 use crate::StableMap;
@@ -56,23 +57,33 @@ type UndoStash = Vec<(
 )>;
 
 pub struct App {
+    /// Node, Wire and Shape data that is executed, and saved to disk
     pub network: Network,
+
     pub selected_shapes: HashSet<ShapeId>,
+    /// Nodes that are waiting for dependencies before executing
+    /// TODO: make these cancleable
     pub queued_nodes: HashSet<u32>,
+    //#[serde(skip)]
+    //pub compute_task_handles: HashMap<u32, iced::task::Handle>,
     pub undo_stack: UndoStash,
     pub redo_stack: UndoStash,
     pub unsaved_changes: bool,
 
-    pub cursor_position: Point,
     pub app_theme: AppTheme,
     pub config: Config,
+    pub user_data: UserData,
+
+    pub cursor_position: Point,
+    /// Currently held keyboard modifiers, used for shortcuts
     pub modifiers: Modifiers,
-    //#[serde(skip)]
-    //pub compute_task_handles: HashMap<u32, iced::task::Handle>,
+    /// List of all known Node types, including system and user nodes
+    pub available_nodes: Vec<NodeData>,
+    /// current action
+    pub action: Action,
+
     pub debug: bool,
     pub show_palette_ui: bool,
-    pub available_nodes: Vec<NodeData>,
-    pub action: Action,
 }
 impl Default for App {
     fn default() -> Self {
@@ -81,11 +92,11 @@ impl Default for App {
         let app_theme = Config::load_theme();
         let user_data = UserData::read_user_data();
 
-        let network = match user_data.last_network_file {
+        let network = match user_data.get_recent_network_file() {
             Some(recent_network) => {
-                match read_to_string(&recent_network).map(|s| ron::from_str::<Network>(&s)) {
+                match read_to_string(recent_network).map(|s| ron::from_str::<Network>(&s)) {
                     Ok(Ok(mut network)) => {
-                        network.file = Some(recent_network);
+                        network.file = Some(recent_network.clone());
                         network
                     }
                     Ok(Err(e)) => {
@@ -120,6 +131,7 @@ impl Default for App {
             modifiers: Default::default(),
             undo_stack: vec![],
             redo_stack: vec![],
+            user_data,
             unsaved_changes: false,
         }
     }
@@ -445,12 +457,13 @@ impl App {
                             .unwrap_or_else(|e| panic!("Could not read network {file:?}\n {e}")),
                     )
                     .unwrap_or_else(|e| panic!("Could not parse network {file:?}\n {e}"));
-                    self.network.file = Some(file);
+                    self.network.file = Some(file.clone());
                     self.selected_shapes = Default::default();
                     self.queued_nodes = Default::default();
                     self.undo_stack = vec![];
                     self.redo_stack = vec![];
                     self.unsaved_changes = false;
+                    self.user_data.set_recent_network_file(file);
                     self.reload_nodes();
                     return Task::done(Message::ComputeAll);
                 } else {
@@ -476,6 +489,7 @@ impl App {
                     .expect("Could not save to file");
                     self.network.file = Some(file.clone());
                     self.unsaved_changes = false;
+                    self.user_data.set_recent_network_file(file);
                 } else {
                     error!("No file selected")
                 }

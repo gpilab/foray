@@ -17,4 +17,5 @@ pub mod math;
 pub mod nodes;
 pub mod python;
 pub mod style;
+pub mod user_data;
 pub mod widget;

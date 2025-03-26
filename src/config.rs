@@ -20,40 +20,10 @@ pub struct Config {
     nodes_dir: PathBuf,
 }
 
-/// User data that should persist across sessions, but isn't explicitly configured by the user
-/// e.g. recent files, commonly used nodes, etc.
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub struct UserData {
-    pub last_network_file: Option<PathBuf>,
-}
-impl UserData {
-    pub fn read_user_data() -> Self {
-        let binding = directories::ProjectDirs::from("", "", "gpi")
-            .expect("application configuration folder is accessible");
-        let user_data_dir = binding.cache_dir();
-        let user_data_file = user_data_dir.join("config.toml");
-
-        match read_to_string(&user_data_file).map(|s| ron::from_str::<UserData>(&s)) {
-            Ok(Ok(c)) => {
-                info!("Loaded UserData: {user_data_file:?}");
-                c
-            }
-            Ok(Err(e)) => {
-                error!("Error reading Userdata {user_data_file:?}, using defualt. \n{e}");
-                UserData::default()
-            }
-            Err(e) => {
-                error!("Error reading Userdata {user_data_file:?}, using defualt. \n{e}");
-                UserData::default()
-            }
-        }
-    }
-}
-
 impl Config {
     pub fn read_config() -> Self {
-        let user_dirs =
-            directories::UserDirs::new().expect("application configuration folder is accessible");
+        let user_dirs = directories::UserDirs::new()
+            .expect("Application configuration folder should be accessible");
         let config_dir = user_dirs.home_dir().join(".config/gpi");
         let config_file = config_dir.join("config.toml");
 
