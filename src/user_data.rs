@@ -11,11 +11,13 @@ pub struct UserData {
 }
 
 impl UserData {
-    fn user_data_file() -> PathBuf {
+    fn user_data_dir() -> PathBuf {
         let binding = directories::ProjectDirs::from("", "", "gpi")
             .expect("application configuration folder is accessible");
-        let user_data_dir = binding.cache_dir();
-        user_data_dir.join("user_data.ron")
+        binding.cache_dir().to_path_buf()
+    }
+    fn user_data_file() -> PathBuf {
+        Self::user_data_dir().join("user_data.ron")
     }
     pub fn read_user_data() -> Self {
         let user_data_file = Self::user_data_file();
@@ -42,9 +44,20 @@ impl UserData {
     pub fn get_recent_network_file(&self) -> &Option<PathBuf> {
         &self.most_recent_network_file
     }
+    pub fn network_search_dir(&self) -> PathBuf {
+        if let Some(file) = &self.most_recent_network_file {
+            if let Some(parent) = file.parent() {
+                return parent.to_path_buf();
+            }
+        }
+
+        let binding = directories::UserDirs::new().expect("user directory should be  accessible");
+        binding.home_dir().to_path_buf()
+    }
 
     fn write(&self) {
         let user_data_file = Self::user_data_file();
+        let _ = std::fs::create_dir_all(Self::user_data_dir());
         std::fs::write(
             &user_data_file,
             ron::to_string(&self)

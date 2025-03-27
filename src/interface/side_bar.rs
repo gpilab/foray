@@ -41,55 +41,56 @@ pub fn side_bar(app: &App) -> Element<'_, Message> {
     .spacing(3.0);
 
     let undo = undo_button(
-        debug_format(&app.debug, '', app.undo_stack.len()),
-        !app.undo_stack.is_empty(),
+        debug_format(&app.debug, '', app.network.undo_stack.len()),
+        !app.network.undo_stack.is_empty(),
         Message::Undo,
     );
     let redo = undo_button(
-        debug_format(&app.debug, '', app.redo_stack.len()),
-        !app.redo_stack.is_empty(),
+        debug_format(&app.debug, '', app.network.redo_stack.len()),
+        !app.network.redo_stack.is_empty(),
         Message::Redo,
     );
     let action_commands = row![horizontal_space(), undo, redo].spacing(4.0);
 
     //// Config
-    let config: Element<Message> = if let Some(selected_id) = app.selected_shapes.iter().next() {
-        let node = app.network.graph.get_node(*selected_id);
-        let input_data = app.network.graph.get_input_data(selected_id);
-        let out_port_display: Element<Message> = if app.debug {
-            column![format_node_output(
-                node,
-                &app.network.graph.get_output_data(*selected_id)
-            )]
+    let config: Element<Message> =
+        if let Some(selected_id) = app.network.selected_shapes.iter().next() {
+            let node = app.network.graph.get_node(*selected_id);
+            let input_data = app.network.graph.get_input_data(selected_id);
+            let out_port_display: Element<Message> = if app.debug {
+                column![format_node_output(
+                    node,
+                    &app.network.graph.get_output_data(*selected_id)
+                )]
+                .into()
+            } else {
+                text("").into()
+            };
+            column![
+                container(text(node.template.name().clone()).size(20.)).center_x(Fill),
+                horizontal_rule(0),
+                row![node.status.icon(), node.status.text_element().size(12.)]
+                    .align_y(Center)
+                    .spacing(4.0),
+                vertical_space().height(10.),
+                node.template
+                    .config_view(*selected_id, input_data)
+                    .unwrap_or(text("...").into()),
+                vertical_space(),
+                scrollable(out_port_display),
+                row![button(text("delete node"))
+                    .style(button::danger)
+                    .padding([1, 4])
+                    .on_press(Message::DeleteSelectedNodes)]
+            ]
+            .align_x(Center)
+            .height(Fill)
+            .spacing(5.)
+            .padding([10., 5.])
             .into()
         } else {
             text("").into()
         };
-        column![
-            container(text(node.template.name().clone()).size(20.)).center_x(Fill),
-            horizontal_rule(0),
-            row![node.status.icon(), node.status.text_element().size(12.)]
-                .align_y(Center)
-                .spacing(4.0),
-            vertical_space().height(10.),
-            node.template
-                .config_view(*selected_id, input_data)
-                .unwrap_or(text("...").into()),
-            vertical_space(),
-            scrollable(out_port_display),
-            row![button(text("delete node"))
-                .style(button::danger)
-                .padding([1, 4])
-                .on_press(Message::DeleteSelectedNodes)]
-        ]
-        .align_x(Center)
-        .height(Fill)
-        .spacing(5.)
-        .padding([10., 5.])
-        .into()
-    } else {
-        text("").into()
-    };
     container(
         column![
             row![

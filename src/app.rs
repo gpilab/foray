@@ -1,21 +1,20 @@
 use crate::config::Config;
 use crate::file_watch::file_watch_subscription;
 use crate::graph::{Graph, PortRef, IO};
-use crate::gui_node::GuiGraph;
 use crate::interface::add_node::add_node_panel;
 use crate::interface::node_config::NodeUIWidget;
 use crate::interface::theme_config::{AppThemeMessage, GuiColorMessage};
 use crate::interface::{side_bar::side_bar, SEPERATOR};
 use crate::math::{Point, Vector};
+use crate::network::Network;
 use crate::nodes::port::PortData;
-use crate::nodes::port::PortType;
 use crate::nodes::status::{NodeError, NodeStatus};
 use crate::nodes::{NodeData, NodeTemplate, RustNode};
 use crate::python::py_node::PyNode;
 use crate::style::theme::AppTheme;
 use crate::user_data::UserData;
 use crate::widget::shapes::ShapeId;
-use crate::widget::workspace::{self, workspace};
+use crate::widget::workspace::workspace;
 use crate::StableMap;
 
 use iced::advanced::graphics::core::Element;
@@ -27,16 +26,12 @@ use iced::widget::{column, *};
 use iced::Event::Keyboard;
 use iced::Length::Fill;
 use iced::{mouse, window, Subscription, Task};
-use indexmap::IndexMap;
 use itertools::Itertools;
-use log::{error, trace, warn};
+use log::{error, info, trace, warn};
 use rfd::FileDialog;
-use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use std::fs::read_to_string;
 use std::iter::once;
 use std::mem::discriminant;
-use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 #[derive(Default, Clone, PartialEq)]
@@ -51,24 +46,9 @@ pub enum Action {
     AddingNode,
 }
 
-type UndoStash = Vec<(
-    Graph<NodeData, PortType, PortData>,
-    IndexMap<ShapeId, Point>,
-)>;
-
 pub struct App {
     /// Node, Wire and Shape data that is executed, and saved to disk
     pub network: Network,
-
-    pub selected_shapes: HashSet<ShapeId>,
-    /// Nodes that are waiting for dependencies before executing
-    /// TODO: make these cancleable
-    pub queued_nodes: HashSet<u32>,
-    //#[serde(skip)]
-    //pub compute_task_handles: HashMap<u32, iced::task::Handle>,
-    pub undo_stack: UndoStash,
-    pub redo_stack: UndoStash,
-    pub unsaved_changes: bool,
 
     pub app_theme: AppTheme,
     pub config: Config,
@@ -122,27 +102,19 @@ impl Default for App {
             debug: false,
             show_palette_ui: false,
             available_nodes,
-            selected_shapes: Default::default(),
+            //selected_shapes: Default::default(),
             cursor_position: Default::default(),
             action: Default::default(),
-            queued_nodes: Default::default(),
+            //queued_nodes: Default::default(),
             //compute_task_handles: Default::default(),
             app_theme,
             modifiers: Default::default(),
-            undo_stack: vec![],
-            redo_stack: vec![],
+            //undo_stack: vec![],
+            //redo_stack: vec![],
             user_data,
-            unsaved_changes: false,
+            //unsaved_changes: false,
         }
     }
-}
-
-#[derive(Serialize, Deserialize, Default)]
-pub struct Network {
-    pub graph: GuiGraph,
-    pub shapes: workspace::State,
-    #[serde(skip)]
-    pub file: Option<PathBuf>,
 }
 
 #[derive(Clone, derive_more::Debug)]
@@ -265,9 +237,7 @@ impl App {
                 let task = match &self.action.clone() {
                     Action::CreatingInputWire(input, Some(output))
                     | Action::CreatingOutputWire(output, Some(input)) => {
-                        self.stash_state();
-                        self.network.graph.remove_edge(input);
-                        self.network.graph.add_edge_from_ref(output, input);
+                        self.network.add_edge(input, output);
                         Task::done(Message::QueueCompute(output.node))
                     }
                     _ => Task::none(),
@@ -276,8 +246,7 @@ impl App {
                 return task;
             }
             Message::PortDelete(port) => {
-                self.stash_state();
-                self.network.graph.remove_edge(&port)
+                self.network.remove_edge(port);
             }
 
             //// Node
@@ -285,74 +254,15 @@ impl App {
                 //TODO: break this logic down into pure functions
                 //// Clicked on a node
                 if let Some(nx) = clicked_id {
-                    self.selected_shapes = if self.modifiers.command() {
-                        //// Create new nodes on Command + Click
-                        self.stash_state();
-                        let selected_shapes = if self.selected_shapes.contains(&nx) {
-                            // If clicked node is already selected, copy all selected nodes,
-                            self.selected_shapes.clone()
-                        } else {
-                            // Otherwise, only copy the clicked node
-                            [nx].into()
-                        };
-                        selected_shapes
-                            .iter()
-                            .map(|id| {
-                                let pos = self.network.shapes.shape_positions[id] + [5., 5.].into();
-                                let new_node =
-                                    self.network.graph.get_node(*id).template.duplicate().into();
-                                // *Mutably* add new node to graph
-                                let new_id = self.network.graph.node(new_node);
-                                // *Mutably* add new position
-                                self.network.shapes.shape_positions.insert(new_id, pos);
-                                new_id
-                            })
-                            .collect()
-                    } else if self.modifiers.shift() {
-                        //// Select Multiple nodes if shift is held
-                        self.selected_shapes
-                            .clone()
-                            .into_iter()
-                            .chain(once(nx))
-                            .collect()
-                    } else if !self.selected_shapes.contains(&nx) {
-                        //// Select Single Node if an unselected node is clicked
-                        [nx].into()
-                    } else {
-                        //// Otherwise keep selection the same
-                        self.selected_shapes.clone()
-                    };
-
-                    let offsets = self
-                        .selected_shapes
-                        .iter()
-                        .map(|id| {
-                            (
-                                *id,
-                                (self.network.shapes.shape_positions[id]
-                                    - (self.cursor_position + self.network.shapes.camera.position)),
-                            )
-                        })
-                        .collect();
-
-                    //// Start Drag
-                    self.action = Action::DragNode(offsets);
-
-                    //// Move selected shape to the top
-                    self.network.shapes.shape_positions.move_index(
+                    self.action =
                         self.network
-                            .shapes
-                            .shape_positions
-                            .get_index_of(&nx)
-                            .expect("id exists"),
-                        0,
-                    );
+                            .select_node(nx, self.modifiers, self.cursor_position);
                     return Task::done(Message::QueueCompute(nx));
                 } else
                 //// Clicked on the canvas background
                 {
                     //// Clear selected shapes
-                    self.selected_shapes = Default::default();
+                    self.network.selected_shapes = Default::default();
 
                     //// Start Pan
                     self.action = Action::DragPan(
@@ -371,9 +281,10 @@ impl App {
             Message::OpenAddNodeUi => self.action = Action::AddingNode,
 
             Message::UpdateNodeTemplate(id, new_template) => {
+                //TODO: move into Network
                 let old_template = &self.network.graph.get_node(id).template;
                 if *old_template != new_template {
-                    self.stash_state();
+                    self.network.stash_state();
                     // Now we can aquire mutable reference
                     let old_template = &mut self.network.graph.get_mut_node(id).template;
                     *old_template = new_template;
@@ -381,7 +292,8 @@ impl App {
                 };
             }
             Message::UpdateNodeParameter(id, name, updated_widget) => {
-                self.stash_state();
+                //TODO: move into Network
+                self.network.stash_state();
                 let old_template = &mut self.network.graph.get_mut_node(id).template;
                 // TODO: support all node types, not just py_node
                 if let NodeTemplate::PyNode(node) = old_template {
@@ -393,9 +305,10 @@ impl App {
                 }
             }
             Message::AddNode(template) => {
-                self.stash_state();
+                //TODO: move into Network
+                self.network.stash_state();
                 let id = self.network.graph.node(template.into());
-                self.selected_shapes = [id].into();
+                self.network.selected_shapes = [id].into();
                 self.network.shapes.shape_positions.insert_before(
                     0,
                     id,
@@ -404,13 +317,14 @@ impl App {
                 self.action = Action::DragNode(vec![(id, [0.0, 0.0].into())])
             }
             Message::DeleteSelectedNodes => {
-                if !self.selected_shapes.is_empty() {
-                    self.stash_state();
-                    self.selected_shapes.iter().for_each(|id| {
+                //TODO: move into Network
+                if !self.network.selected_shapes.is_empty() {
+                    self.network.stash_state();
+                    self.network.selected_shapes.iter().for_each(|id| {
                         self.network.graph.delete_node(*id);
                         self.network.shapes.shape_positions.swap_remove(id);
                     });
-                    self.selected_shapes = [].into();
+                    self.network.selected_shapes = [].into();
                     //PERF: ideally, we should only execute affected nodes
                     return Task::done(Message::ComputeAll);
                 }
@@ -425,55 +339,69 @@ impl App {
                 self.show_palette_ui = !self.show_palette_ui;
             }
             Message::New => {
-                if self.unsaved_changes {
+                //TODO: move into Network
+                if self.network.unsaved_changes {
                     let result = rfd::MessageDialog::new()
+                        .set_title("Save Changes?")
                         .set_description(
                             "Network has unsaved changes, save before opening new network?",
                         )
                         .set_buttons(rfd::MessageButtons::YesNoCancel)
                         .show();
                     match result {
-                        rfd::MessageDialogResult::Yes => return Task::done(Message::Save),
+                        rfd::MessageDialogResult::Yes => {
+                            return Task::done(Message::Save).chain(Task::done(Message::New))
+                        }
                         rfd::MessageDialogResult::Cancel => return Task::none(),
                         _ => {}
                     }
                 }
                 self.network = Network::default();
-                self.selected_shapes = Default::default();
-                self.queued_nodes = Default::default();
-                self.undo_stack = vec![];
-                self.redo_stack = vec![];
-                self.unsaved_changes = false;
                 self.reload_nodes();
             }
             Message::Load => {
+                //TODO: move into Network
+                if self.network.unsaved_changes {
+                    let result = rfd::MessageDialog::new()
+                        .set_title("Save Changes?")
+                        .set_description(
+                            "Network has unsaved changes, save before opening new network?",
+                        )
+                        .set_buttons(rfd::MessageButtons::YesNoCancel)
+                        .show();
+                    match result {
+                        rfd::MessageDialogResult::Yes => {
+                            return Task::done(Message::Save).chain(Task::done(Message::Load))
+                        }
+                        rfd::MessageDialogResult::Cancel => return Task::none(),
+                        _ => {}
+                    }
+                }
                 let file = FileDialog::new()
+                    .set_directory(self.user_data.network_search_dir())
                     .add_filter("network", &["ron"])
                     .pick_file();
 
-                if let Some(file) = dbg!(file) {
+                if let Some(file) = file {
                     self.network = ron::from_str(
                         &read_to_string(&file)
                             .unwrap_or_else(|e| panic!("Could not read network {file:?}\n {e}")),
                     )
                     .unwrap_or_else(|e| panic!("Could not parse network {file:?}\n {e}"));
                     self.network.file = Some(file.clone());
-                    self.selected_shapes = Default::default();
-                    self.queued_nodes = Default::default();
-                    self.undo_stack = vec![];
-                    self.redo_stack = vec![];
-                    self.unsaved_changes = false;
                     self.user_data.set_recent_network_file(file);
                     self.reload_nodes();
                     return Task::done(Message::ComputeAll);
                 } else {
-                    error!("file not picked")
+                    info!("File not picked")
                 }
             }
             Message::Save => {
+                //TODO: move into Network
                 let file = match self.network.file.clone() {
                     Some(file) => Some(file),
                     None => FileDialog::new()
+                        .set_directory(self.user_data.network_search_dir())
                         .add_filter("network", &["ron"])
                         .save_file(),
                 };
@@ -487,11 +415,12 @@ impl App {
                         .unwrap(),
                     )
                     .expect("Could not save to file");
+                    info!("saved network {file:?}");
                     self.network.file = Some(file.clone());
-                    self.unsaved_changes = false;
+                    self.network.unsaved_changes = false;
                     self.user_data.set_recent_network_file(file);
                 } else {
-                    error!("No file selected")
+                    info!("File not picked")
                 }
             }
             Message::ReloadNodes => {
@@ -514,8 +443,9 @@ impl App {
 
             //// History
             Message::Undo => {
-                if let Some(prev) = self.undo_stack.pop() {
-                    self.redo_stack.push((
+                //TODO: move into Network
+                if let Some(prev) = self.network.undo_stack.pop() {
+                    self.network.redo_stack.push((
                         self.network.graph.clone(),
                         self.network.shapes.shape_positions.clone(),
                     ));
@@ -525,8 +455,9 @@ impl App {
                 }
             }
             Message::Redo => {
-                if let Some(next) = self.redo_stack.pop() {
-                    self.undo_stack.push((
+                //TODO: move into Network
+                if let Some(next) = self.network.redo_stack.pop() {
+                    self.network.undo_stack.push((
                         self.network.graph.clone(),
                         self.network.shapes.shape_positions.clone(),
                     ));
@@ -536,6 +467,7 @@ impl App {
                 }
             }
             Message::ComputeAll => {
+                //TODO: move into Network
                 let nodes = self.network.graph.get_roots();
                 trace!("Queuing root nodes: {nodes:?}");
                 return Task::batch(
@@ -545,6 +477,7 @@ impl App {
                 );
             }
             Message::QueueCompute(nx) => {
+                //TODO: move into Network
                 //// Modify node status
                 {
                     let node = self.network.graph.get_mut_node(nx);
@@ -552,7 +485,7 @@ impl App {
                     // Re-queue
                     if let NodeStatus::Running(..) = node.status {
                         trace!("Re-queue, {} #{nx}", node.template);
-                        self.queued_nodes.insert(nx);
+                        self.network.queued_nodes.insert(nx);
                         return Task::none();
                     };
 
@@ -568,6 +501,7 @@ impl App {
                 );
             }
             Message::ComputeComplete(nx, result) => {
+                //TODO: move into Network
                 match result {
                     Ok((output, node)) => {
                         // Assert that status is what is expected
@@ -617,7 +551,9 @@ impl App {
                             // TODO: instead of requeing after compute is done,
                             // potentially abort the running compute task, and restart
                             // immediately when new input data is received
-                            .chain(once(self.queued_nodes.remove(&nx).then_some(nx)).flatten()) // Re-execute node if it got queued up in the meantime
+                            .chain(
+                                once(self.network.queued_nodes.remove(&nx).then_some(nx)).flatten(),
+                            ) // Re-execute node if it got queued up in the meantime
                             .collect();
                         trace!("Queuing children for compute {to_queue:?}");
                         return Task::batch(
@@ -629,7 +565,7 @@ impl App {
                     Err(node_error) => {
                         //// Update Node
                         let node = self.network.graph.get_mut_node(nx);
-                        error!("Compute failed {node:?},{}", node_error);
+                        warn!("Compute failed {node:?},{}", node_error);
                         node.status = NodeStatus::Error(node_error);
                         node.run_time = None;
 
@@ -705,34 +641,6 @@ impl App {
         } else {
             output
         }
-    }
-
-    /// Stash current app state, and reset the redo stack
-    fn stash_state(&mut self) {
-        self.unsaved_changes = true;
-        let mut graph_snap_shot = self.network.graph.clone();
-        // We don't want to stash any node.status "running" values
-        let running_nodes: Vec<_> = graph_snap_shot
-            .nodes_ref()
-            .into_iter()
-            .filter(|nx| {
-                matches!(
-                    graph_snap_shot.get_node(*nx).status,
-                    NodeStatus::Running(..)
-                )
-            })
-            .collect();
-        for nx in running_nodes {
-            graph_snap_shot.get_mut_node(nx).status = NodeStatus::Idle;
-        }
-
-        self.undo_stack
-            .push((graph_snap_shot, self.network.shapes.shape_positions.clone()));
-
-        // Don't let the stack get too big
-        self.undo_stack.truncate(10);
-
-        self.redo_stack.clear();
     }
 
     /// Read node definitions from disk, and copies node configuration (parameters and port connections) forward.
@@ -868,7 +776,7 @@ pub fn subscriptions(state: &App) -> Subscription<Message> {
 }
 
 pub fn title(state: &App) -> String {
-    let pre_pend = match state.unsaved_changes {
+    let pre_pend = match state.network.unsaved_changes {
         true => "*",
         false => "",
     };

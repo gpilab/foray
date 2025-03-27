@@ -18,6 +18,9 @@ pub fn binary_operation(
             &ArrayD::from_shape_simple_fn(IxDyn(&[1]), || *a),
             &ArrayD::from_shape_simple_fn(IxDyn(&[1]), || *b),
         ),
+        (PortData::ArrayReal(a), PortData::Real(b)) => {
+            f(a, &ArrayD::from_shape_simple_fn(IxDyn(&[1]), || *b))
+        }
         _ => panic!("bad inputs!"),
     };
 

@@ -1,3 +1,4 @@
+cargo-features = ["codegen-backend"]
 # cargo-features = ["codegen-backend"]
 [package]
 name = "gpi"
@@ -45,8 +46,10 @@ glam = "0.29.2"
 colorgrad = "0.7.0"
 directories = "6.0.0"
 toml = "0.8.20"
+#rfd ={version =  "0.15.3", default-features = false, features = ["async-std","gtk3"]}
 rfd = "0.15.3"
 
 [profile.dev]
 debug = 0
+codegen-backend = "cranelift"
 # codegen-backend = "cranelift"

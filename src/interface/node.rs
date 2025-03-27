@@ -30,7 +30,7 @@ pub fn default_node_size() -> iced::Size {
 impl App {
     pub fn node_content(&self, id: u32) -> Element<Message, Theme, Renderer> {
         let node = self.network.graph.get_node(id);
-        let is_selected = self.selected_shapes.contains(&id);
+        let is_selected = self.network.selected_shapes.contains(&id);
 
         let node_style = move |node: &NodeData, t: &Theme| {
             let color = match &node.status {

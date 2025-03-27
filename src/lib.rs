@@ -14,6 +14,7 @@ pub mod graph;
 pub mod gui_node;
 pub mod interface;
 pub mod math;
+pub mod network;
 pub mod nodes;
 pub mod python;
 pub mod style;
