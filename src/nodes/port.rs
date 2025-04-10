@@ -7,7 +7,9 @@ use strum::{EnumDiscriminants, EnumString, VariantNames};
 
 use crate::StableMap;
 
-#[derive(Clone, Display, Debug, EnumString, VariantNames, PartialEq, Serialize, Deserialize)]
+#[derive(
+    Clone, Display, Debug, EnumString, VariantNames, PartialEq, Serialize, Deserialize, PartialOrd,
+)]
 pub enum PortType {
     Integer,
     Real,

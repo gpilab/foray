@@ -76,8 +76,8 @@ pub fn port_view<'a>(
                 io: IO::Out,
             };
 
-            Pin::new(tooltip(
-                mouse_area(
+            Pin::new(
+                mouse_area(tooltip(
                     custom_button::Button::new(vertical_space())
                         .on_press(Message::PortPress(out_port.clone()))
                         .on_drag(Message::OnMove)
@@ -87,12 +87,12 @@ pub fn port_view<'a>(
                         .width(PORT_RADIUS * 2.)
                         .height(PORT_RADIUS * 2.)
                         .padding(2.0),
-                )
+                    port_tooltip,
+                    tooltip::Position::Bottom,
+                ))
                 .on_enter(Message::PortStartHover(out_port.clone()))
                 .on_exit(Message::PortEndHover(out_port.clone())),
-                port_tooltip,
-                tooltip::Position::Bottom,
-            ))
+            )
             .position(point)
             .into()
         });

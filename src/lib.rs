@@ -16,6 +16,7 @@ pub mod interface;
 pub mod math;
 pub mod network;
 pub mod nodes;
+pub mod project;
 pub mod python;
 pub mod style;
 pub mod user_data;

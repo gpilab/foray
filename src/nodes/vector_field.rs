@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 
 // Rectanlge specified by center position, width and height
 // y is up
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, PartialOrd)]
 pub struct Rect {
     pub center: Vector,
     pub width: f32,
@@ -56,7 +56,7 @@ impl Default for Rect {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, PartialOrd)]
 pub struct VectorField {
     rect: Rect,
     z_index: usize,

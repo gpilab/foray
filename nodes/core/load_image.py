@@ -12,7 +12,7 @@ def config():
 
 
 def compute(input, _):
-    img = Image.open("nodes/data/slogan.png")
+    img = Image.open("nodes/core/data/slogan.png")
 
     # just take blue channel for simplicity
     np_img = np.array(img)[:, :, 0] / 255.0

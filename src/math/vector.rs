@@ -1,7 +1,7 @@
 use derive_more::derive::{Add, Mul, Neg, Sub};
 use serde::{Deserialize, Serialize};
 
-#[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize, Add, Mul, Sub, Neg)]
+#[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize, Add, Mul, Sub, Neg, PartialOrd)]
 pub struct Vector {
     pub x: f32,
     pub y: f32,

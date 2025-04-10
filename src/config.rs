@@ -11,13 +11,16 @@ use log::{error, info, warn};
 use pyo3::{py_run, types::PyAnyMethods, PyResult, Python};
 use serde::{Deserialize, Serialize};
 
-use crate::style::theme::AppTheme;
+use crate::{
+    project::{python_project, rust_project},
+    style::theme::AppTheme,
+};
 
 /// User configuration data that is saved/loaded from a config.toml file
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     venv_dir: PathBuf,
-    nodes_dir: PathBuf,
+    python_nodes_dir: Vec<PathBuf>,
 }
 
 impl Config {
@@ -59,7 +62,7 @@ impl Config {
                 println!("Creating default config file");
                 let config = Config {
                     venv_dir,
-                    nodes_dir,
+                    python_nodes_dir: vec![nodes_dir],
                 };
                 let _ = std::fs::create_dir(config_dir);
                 std::fs::write(
@@ -72,6 +75,14 @@ impl Config {
                 config
             }
         }
+    }
+
+    pub(crate) fn read_projects(&self) -> Vec<crate::project::Project> {
+        self.nodes_dir()
+            .iter()
+            .map(|dir| python_project(dir))
+            .chain([rust_project()])
+            .collect()
     }
 }
 
@@ -156,9 +167,8 @@ print("Using python virtual environment:",sys.path[0])
         });
     }
 
-    //TODO: support mulitiple nodes directories
-    pub fn nodes_dir(&self) -> &PathBuf {
-        &self.nodes_dir
+    pub fn nodes_dir(&self) -> &[PathBuf] {
+        &self.python_nodes_dir
     }
 }
 

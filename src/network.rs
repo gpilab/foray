@@ -1,7 +1,8 @@
-use std::{collections::HashSet, iter::once, path::PathBuf};
+use std::{collections::HashSet, fs::read_to_string, iter::once, path::PathBuf};
 
 use iced::keyboard::Modifiers;
 use indexmap::IndexMap;
+use log::{error, warn};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -12,8 +13,9 @@ use crate::{
     nodes::{
         port::{PortData, PortType},
         status::NodeStatus,
-        NodeData,
+        NodeData, NodeTemplate,
     },
+    project::Project,
     widget::{shapes::ShapeId, workspace},
 };
 
@@ -24,11 +26,12 @@ type UndoStash = Vec<(
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct Network {
+    //// Persistant data
     pub graph: GuiGraph,
     pub shapes: workspace::State,
+    //// Runtime data
     #[serde(skip)]
     pub file: Option<PathBuf>,
-
     #[serde(skip)]
     pub selected_shapes: HashSet<ShapeId>,
     /// Nodes that are waiting for dependencies before executing
@@ -45,6 +48,58 @@ pub struct Network {
     pub unsaved_changes: bool,
 }
 impl Network {
+    pub fn load_network(path: &PathBuf, projects: &[Project]) -> Self {
+        match read_to_string(path).map(|s| ron::from_str::<Network>(&s)) {
+            Ok(Ok(mut network)) => {
+                network.file = Some(path.clone());
+                let node_ids = network.graph.nodes_ref();
+                node_ids.into_iter().for_each(|nx| {
+                    match &mut network.graph.get_mut_node(nx).template {
+                        NodeTemplate::RustNode(ref _rust_node) => {}
+                        NodeTemplate::PyNode(ref mut py_node) => {
+                            // Resolve the absolute path, given the nodes we know are
+                            // accessible.
+                            // Currently We just take the first one found, but more complex
+                            // resolution could be added
+                            let found_path = projects
+                                .iter()
+                                // Calculate potential node source path
+                                .map(|project| {
+                                    py_node
+                                        .relative_path
+                                        .to_logical_path(project.absolute_path.clone())
+                                })
+                                // Pick the first path that exists
+                                .find_map(|path| {
+                                    if path.is_file() {
+                                        Some(path.clone())
+                                    } else {
+                                        None
+                                    }
+                                });
+                            if let Some(path) = found_path {
+                                py_node.absolute_path = path.to_path_buf();
+                            } else {
+                                error!("Could not find source file for node \n{py_node}");
+                            }
+                        }
+                    }
+                });
+                network
+            }
+            Ok(Err(e)) => {
+                error!("Could not open file {e}");
+                warn!("creating default file");
+                Network::default()
+            }
+            Err(e) => {
+                error!("Could not parse file {e}");
+                warn!("creating default file");
+                Network::default()
+            }
+        }
+    }
+
     /// Add an edge from input to output, removing existing connected input edge if present
     pub fn add_edge(&mut self, input: &PortRef, output: &PortRef) {
         self.stash_state();

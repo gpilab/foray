@@ -41,6 +41,11 @@ pub fn list(theme: &Theme, status: Status) -> Style {
 
     let base = Style {
         text_color: palette.background.base.text,
+        border: iced::Border {
+            color: Default::default(),
+            width: 0.0,
+            radius: 2.0.into(),
+        },
         ..Style::default()
     };
 

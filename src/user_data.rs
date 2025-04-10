@@ -7,9 +7,31 @@ use serde::{Deserialize, Serialize};
 /// e.g. recent files, recently used nodes, etc.
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct UserData {
+    /// Network file most recently used
     most_recent_network_file: Option<PathBuf>,
+    /// Expanded folder path when selecting new node
+    new_node_path: Vec<String>,
 }
 
+/// Getters and Setters, are used to serialize to
+/// disk on change
+impl UserData {
+    pub fn set_recent_network_file(&mut self, file: PathBuf) {
+        self.most_recent_network_file = Some(file);
+        self.write();
+    }
+    pub fn get_recent_network_file(&self) -> &Option<PathBuf> {
+        &self.most_recent_network_file
+    }
+
+    pub fn set_new_node_path(&mut self, new_node_path: &[String]) {
+        self.new_node_path = new_node_path.to_vec();
+        self.write();
+    }
+    pub fn get_new_node_path(&self) -> &[String] {
+        &self.new_node_path
+    }
+}
 impl UserData {
     fn user_data_dir() -> PathBuf {
         let binding = directories::ProjectDirs::from("", "", "gpi")
@@ -37,13 +59,6 @@ impl UserData {
         }
     }
 
-    pub fn set_recent_network_file(&mut self, file: PathBuf) {
-        self.most_recent_network_file = Some(file);
-        self.write();
-    }
-    pub fn get_recent_network_file(&self) -> &Option<PathBuf> {
-        &self.most_recent_network_file
-    }
     pub fn network_search_dir(&self) -> PathBuf {
         if let Some(file) = &self.most_recent_network_file {
             if let Some(parent) = file.parent() {

@@ -12,8 +12,8 @@ def config():
 
 
 def compute(input, _):
-    x = np.linspace(0, 10, 2048)
-    y = np.linspace(0, 10, 2048)
+    x = np.linspace(0, 10, 64)
+    y = np.linspace(0, 10, 64)
 
     radius = input["radius"]
 

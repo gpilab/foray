@@ -13,6 +13,7 @@ use pyo3::{
     types::{PyAnyMethods, PyComplex, PyDict, PyDictMethods, PyModule},
     Bound, FromPyObject, IntoPyObject, PyAny, PyErr, PyObject, PyResult, Python,
 };
+use relative_path::RelativePathBuf;
 use serde::{Deserialize, Serialize};
 use strum::VariantNames;
 
@@ -29,16 +30,18 @@ use crate::{
     },
 };
 
-#[derive(Clone, Debug, Display, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Display, Serialize, Deserialize, PartialEq, PartialOrd)]
 #[display("{}", self.name)]
 pub struct PyNode {
     pub name: String,
-    pub path: PathBuf,
+    #[serde(skip)]
+    pub absolute_path: PathBuf,
+    pub relative_path: RelativePathBuf,
     pub ports: Result<PortDef, NodeError>,
     pub parameters: Result<NodeUIParameters, NodeError>,
 }
 
-#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, FromPyObject)]
+#[derive(Clone, Default, Debug, Serialize, Deserialize, PartialEq, FromPyObject, PartialOrd)]
 pub struct PortDef {
     pub inputs: StableMap<String, PortType>,
     pub outputs: StableMap<String, PortType>,
@@ -83,8 +86,123 @@ impl PortData {
 }
 
 impl PyNode {
-    pub fn new(path: PathBuf) -> Self {
-        Self::gpipy_config(&path)
+    pub fn new(absolute_path: PathBuf, relative_path: RelativePathBuf) -> Self {
+        //// Get necessary info
+        let node_name = relative_path.file_stem().expect("node exists").to_string();
+
+        let node_src = match fs::read_to_string(&absolute_path)
+            .map_err(|e| NodeError::FileSys(e.to_string()))
+        {
+            Ok(src) => src,
+            Err(_) => {
+                let py_node = PyNode {
+                    name: node_name.to_string(),
+                    absolute_path,
+                    relative_path,
+                    ports: Err(NodeError::FileSys("Could not find src file".into())),
+                    parameters: Err(NodeError::FileSys("Could not find src file".into())),
+                };
+                log::error!("Failed to load node {node_name} {py_node:?}");
+                return py_node;
+            }
+        };
+        //// Call into python
+        Python::with_gil(|py| {
+            //TODO: install this into the environment once, rather than every time
+            let gpi_module = c_str!(include_str!("../../python/gpi.py"));
+            PyModule::from_code(py, gpi_module, c_str!("gpi.py"), c_str!("gpi")).unwrap();
+
+            trace!("Reading node config '{node_name}'");
+
+            let read_src = || -> Result<Bound<PyModule>, NodeError> {
+                PyModule::from_code(
+                    py,
+                    CString::new(node_src)
+                        .map_err(|e| {
+                            NodeError::Syntax(format!("Error parsing node '{node_name}'\n{e}"))
+                        })?
+                        .as_c_str(),
+                    CString::new(format!("{node_name}.py"))
+                        .map_err(|e| {
+                            NodeError::Syntax(format!("Error with node name {node_name}\n{e}"))
+                        })?
+                        .as_c_str(),
+                    CString::new(node_name.to_string())
+                        .map_err(|e| {
+                            NodeError::Syntax(format!("Error with node name {node_name}\n{e}"))
+                        })?
+                        .as_c_str(),
+                )
+                .map_err(|e| NodeError::Syntax(format!("Error in node '{node_name}' \n{e}")))
+            };
+
+            //TODO Clean up error handling
+            match read_src() {
+                Ok(module) => {
+                    let config: Result<Bound<PyAny>, NodeError> = module
+                        .getattr("config")
+                        .map_err(|_e| {
+                            NodeError::Config(format!(
+                                "Could not access 'config' function for {node_name}"
+                            ))
+                        })
+                        .and_then(|module| {
+                            module.call0().map_err(|e| {
+                                NodeError::Config(format!(
+                                    "could not determine '{node_name}' config: {}",
+                                    e
+                                ))
+                            })
+                        });
+
+                    let ports = config.clone().and_then(|c| {
+                        c.extract::<PortDef>()
+                            .map_err(|e| NodeError::Output(e.to_string()))
+                    });
+
+                    let parameters = config
+                            .and_then(|c| {
+                                c.getattr("parameters").map_err(|_e| {
+                                    NodeError::Config(
+                                        "'parameters' attribute not found, does it exist for the node?"
+                                            .to_string(),
+                                    )
+                                })
+                            })
+                            .and_then(|out_py| {
+                                out_py
+                                    .extract::<StableMap<String, String>>()
+                                    .map_err(|e| {
+                                        NodeError::Config(format!(
+                                        "Failed to interperet  {node_name}'s `config`: {e}, {out_py}"
+                                    ))
+                                    })?
+                                    .into_iter()
+                                    .map(|(k, v)| {
+                                        NodeUIWidget::from_str(&v)
+                                            .map(|v| (k, v))
+                                            .map_err(|_e| NodeError::Other)
+                                    })
+                                    .collect()
+                            });
+
+                    PyNode {
+                        name: node_name.to_string(),
+                        absolute_path,
+                        relative_path,
+                        ports,
+                        parameters,
+                    }
+                }
+                Err(e) => PyNode {
+                    name: node_name.to_string(),
+                    absolute_path,
+                    relative_path,
+                    ports: Err(e.clone()),
+                    parameters: Err(e),
+                },
+            }
+        })
     }
 
     pub fn compute(
@@ -101,7 +219,7 @@ impl PyNode {
                         .collect();
                     //TODO: refactor to not pass this data as params
                     self.gpipy_compute(
-                        &self.path,
+                        &self.absolute_path,
                         &py_inputs,
                         &self.parameters.clone().unwrap_or_default(),
                         py,
@@ -303,122 +421,6 @@ impl PyNode {
         } else {
             Some(text("").into())
         }
-    }
-
-    /// Get a python node's configuration information
-    pub fn gpipy_config(node_path: &PathBuf) -> PyNode {
-        //// Get necessary info
-        let binding = node_path.clone();
-        let node_name = binding.file_stem().expect("node exists").to_string_lossy();
-        let node_src =
-            match fs::read_to_string(node_path).map_err(|e| NodeError::FileSys(e.to_string())) {
-                Ok(src) => src,
-                Err(_) => {
-                    let py_node = PyNode {
-                        name: node_name.to_string(),
-                        path: node_path.clone(),
-                        ports: Err(NodeError::FileSys("Could not find src file".into())),
-                        parameters: Err(NodeError::FileSys("Could not find src file".into())),
-                    };
-                    log::error!("Failed to load node {node_name} {py_node:?}");
-                    return py_node;
-                }
-            };
-        //// Call into python
-        Python::with_gil(|py| {
-            trace!("Reading node config '{node_name}'");
-
-            let read_src = || -> Result<Bound<PyModule>, NodeError> {
-                PyModule::from_code(
-                    py,
-                    CString::new(node_src)
-                        .map_err(|e| {
-                            NodeError::Syntax(format!(
-                                "Error in node '{node_name}' source text {e}"
-                            ))
-                        })?
-                        .as_c_str(),
-                    CString::new(format!("{node_name}.py"))
-                        .map_err(|e| {
-                            NodeError::Syntax(format!("Error with node name {node_name}{e}"))
-                        })?
-                        .as_c_str(),
-                    CString::new(node_name.to_string())
-                        .map_err(|e| {
-                            NodeError::Syntax(format!("Error with node name {node_name}{e}"))
-                        })?
-                        .as_c_str(),
-                )
-                .map_err(|e| {
-                    NodeError::Syntax(format!("Error in node '{node_name}' source text {e}"))
-                })
-            };
-
-            //TODO Clean up error handling
-            match read_src() {
-                Ok(module) => {
-                    let config: Result<Bound<PyAny>, NodeError> = module
-                        .getattr("config")
-                        .map_err(|_e| {
-                            NodeError::Config(format!(
-                                "Could not access 'config' function for {node_name}"
-                            ))
-                        })
-                        .and_then(|module| {
-                            module.call0().map_err(|e| {
-                                NodeError::Config(format!(
-                                    "could not determine '{node_name}' config: {}",
-                                    e
-                                ))
-                            })
-                        });
-
-                    let ports = config.clone().and_then(|c| {
-                        c.extract::<PortDef>()
-                            .map_err(|e| NodeError::Output(e.to_string()))
-                    });
-
-                    let parameters = config
-                        .and_then(|c| {
-                            c.getattr("parameters").map_err(|_e| {
-                                NodeError::Config(
-                                    "'parameters' attribute not found, does it exist for the node?"
-                                        .to_string(),
-                                )
-                            })
-                        })
-                        .and_then(|out_py| {
-                            out_py
-                                .extract::<StableMap<String, String>>()
-                                .map_err(|e| {
-                                    NodeError::Config(format!(
-                                    "Failed to interperet  {node_name}'s `config`: {e}, {out_py}"
-                                ))
-                                })?
-                                .into_iter()
-                                .map(|(k, v)| {
-                                    NodeUIWidget::from_str(&v)
-                                        .map(|v| (k, v))
-                                        .map_err(|_e| NodeError::Other)
-                                })
-                                .collect()
-                        });
-
-                    PyNode {
-                        name: node_name.to_string(),
-                        path: node_path.clone(),
-                        ports,
-                        parameters,
-                    }
-                }
-                Err(e) => PyNode {
-                    name: node_name.to_string(),
-                    path: node_path.clone(),
-                    ports: Err(e.clone()),
-                    parameters: Err(e),
-                },
-            }
-        })
     }
 }
 

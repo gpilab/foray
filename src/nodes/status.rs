@@ -33,7 +33,7 @@ impl NodeStatus {
 }
 
 //TODO: Cleanup errors and make them more discrete where possible
-#[derive(Debug, Display, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Display, Clone, Serialize, Deserialize, Default, PartialEq, Eq, PartialOrd)]
 pub enum NodeError {
     Input(String),
     Output(String),

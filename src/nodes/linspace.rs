@@ -13,7 +13,7 @@ use ndarray::ArrayD;
 use numpy::IxDyn;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, PartialOrd)]
 pub struct LinspaceConfig {
     start: f64,
     stop: f64,

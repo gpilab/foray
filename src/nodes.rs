@@ -1,4 +1,3 @@
-use std::path::Path;
 use std::time::Duration;
 
 pub mod constant;
@@ -23,12 +22,10 @@ use crate::StableMap;
 use derive_more::derive::{Debug, Display};
 use iced::widget::text;
 use iced::{Font, Size};
-use itertools::Itertools;
-use log::trace;
 use port::{PortData, PortType};
 use serde::{Deserialize, Serialize};
 use status::{NodeError, NodeStatus};
-use strum::{EnumIter, IntoEnumIterator, VariantNames};
+use strum::{EnumIter, VariantNames};
 use vector_field::VectorField;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -40,7 +37,9 @@ pub struct NodeData {
     pub run_time: Option<Duration>,
 }
 
-#[derive(Clone, Debug, Display, EnumIter, VariantNames, Serialize, Deserialize, PartialEq)]
+#[derive(
+    Clone, Debug, Display, EnumIter, VariantNames, Serialize, Deserialize, PartialEq, PartialOrd,
+)]
 pub enum RustNode {
     Identity,
     Constant(f64),
@@ -61,7 +60,7 @@ pub enum RustNode {
     VectorField(VectorField),
 }
 
-#[derive(Clone, Debug, Display, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Display, Serialize, Deserialize, PartialEq, PartialOrd)]
 pub enum NodeTemplate {
     #[debug("{_0:?}")]
     RustNode(RustNode),
@@ -150,21 +149,6 @@ impl NodeData {
             self.clone(),
         ))
     }
-
-    pub fn available_nodes(nodes_dir: &Path) -> Vec<NodeData> {
-        let nodes = RustNode::iter()
-            .map(|template| template.template_variants())
-            .chain(PyNode::available_nodes(nodes_dir));
-
-        trace!(
-            "Loading available nodes:\n{}",
-            nodes
-                .clone()
-                .map(|n| format!("{:?}", n.template))
-                .join("\n")
-        );
-        nodes.collect()
-    }
 }
 impl RustNode {
     /// A node can produce any number of "templates" which will be used to populate the
@@ -173,17 +157,6 @@ impl RustNode {
     /// depending on what nodes are found in the filesystem at runtime.
     pub fn template_variants(&self) -> NodeData {
         NodeTemplate::RustNode(self.clone()).into()
-    }
-}
-impl PyNode {
-    pub fn available_nodes(nodes_dir: &Path) -> Vec<NodeData> {
-        use glob::glob;
-
-        glob(&(nodes_dir.to_string_lossy() + "/*.py"))
-            .expect("valid glob")
-            .filter_map(Result::ok)
-            .map(|path| NodeTemplate::PyNode(PyNode::new(path)).into())
-            .collect()
     }
 }
 
@@ -274,9 +247,12 @@ impl GUINode for NodeTemplate {
                 RustNode::Plot2D(_) => "Plot 2D".to_string(),
                 RustNode::VectorField(_) => "Plot Vector Field".to_string(),
             },
-            NodeTemplate::PyNode(py_node) => {
-                py_node.path.file_stem().unwrap().to_string_lossy().into()
-            }
+            NodeTemplate::PyNode(py_node) => py_node
+                .absolute_path
+                .file_stem()
+                .map(|s| s.to_string_lossy())
+                .unwrap_or(("NOT_FOUND").into())
+                .into(),
         }
     }
 

@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 // Rectanlge specified by center position, width and height
 // y is up
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, PartialOrd)]
 pub struct Rect {
     pub center: Vector,
     pub width: f32,
@@ -50,6 +50,15 @@ pub struct Plot2D {
     pub rect: Rect,
     #[serde(skip)]
     pub image_handle: Option<Handle>,
+}
+
+impl PartialOrd for Plot2D {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match self.rect.partial_cmp(&other.rect) {
+            Some(ord) => Some(ord),
+            ord => ord,
+        }
+    }
 }
 
 impl Plot2D {

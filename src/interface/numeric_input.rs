@@ -8,7 +8,7 @@ use iced::{
 
 use crate::app::Message;
 
-#[derive(Clone, PartialEq, Debug, Default)]
+#[derive(Clone, PartialEq, Debug, Default, PartialOrd)]
 pub enum PartialUIValue {
     #[default]
     Complete,

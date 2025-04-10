@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::file_watch::file_watch_subscription;
 use crate::graph::{Graph, PortRef, IO};
-use crate::interface::add_node::add_node_panel;
+use crate::interface::add_node::add_node_tree_panel;
 use crate::interface::node_config::NodeUIWidget;
 use crate::interface::theme_config::{AppThemeMessage, GuiColorMessage};
 use crate::interface::{side_bar::side_bar, SEPERATOR};
@@ -10,6 +10,7 @@ use crate::network::Network;
 use crate::nodes::port::PortData;
 use crate::nodes::status::{NodeError, NodeStatus};
 use crate::nodes::{NodeData, NodeTemplate, RustNode};
+use crate::project::Project;
 use crate::python::py_node::PyNode;
 use crate::style::theme::AppTheme;
 use crate::user_data::UserData;
@@ -50,17 +51,18 @@ pub struct App {
     /// Node, Wire and Shape data that is executed, and saved to disk
     pub network: Network,
 
+    /// Persitant user data
+    pub user_data: UserData,
+    /// List of all known Node types, including system and user nodes
+    pub python_projects: Vec<Project>,
     pub app_theme: AppTheme,
     pub config: Config,
-    pub user_data: UserData,
 
+    /// current editor action
+    pub action: Action,
     pub cursor_position: Point,
     /// Currently held keyboard modifiers, used for shortcuts
     pub modifiers: Modifiers,
-    /// List of all known Node types, including system and user nodes
-    pub available_nodes: Vec<NodeData>,
-    /// current action
-    pub action: Action,
 
     pub debug: bool,
     pub show_palette_ui: bool,
@@ -69,50 +71,28 @@ impl Default for App {
     fn default() -> Self {
         let config = Config::read_config();
         config.setup_environment();
+        let projects = config.read_projects();
+
         let app_theme = Config::load_theme();
         let user_data = UserData::read_user_data();
 
         let network = match user_data.get_recent_network_file() {
-            Some(recent_network) => {
-                match read_to_string(recent_network).map(|s| ron::from_str::<Network>(&s)) {
-                    Ok(Ok(mut network)) => {
-                        network.file = Some(recent_network.clone());
-                        network
-                    }
-                    Ok(Err(e)) => {
-                        error!("Could not open file {e}");
-                        warn!("creating default file");
-                        Network::default()
-                    }
-                    Err(e) => {
-                        error!("Could not parse file {e}");
-                        warn!("creating default file");
-                        Network::default()
-                    }
-                }
-            }
+            Some(recent_network) => Network::load_network(recent_network, &projects),
             None => Network::default(),
         };
 
-        let available_nodes = NodeData::available_nodes(config.nodes_dir());
         App {
             network,
             config,
 
             debug: false,
             show_palette_ui: false,
-            available_nodes,
-            //selected_shapes: Default::default(),
             cursor_position: Default::default(),
             action: Default::default(),
-            //queued_nodes: Default::default(),
-            //compute_task_handles: Default::default(),
             app_theme,
             modifiers: Default::default(),
-            //undo_stack: vec![],
-            //redo_stack: vec![],
+            python_projects: projects,
             user_data,
-            //unsaved_changes: false,
         }
     }
 }
@@ -135,6 +115,7 @@ pub enum Message {
     OnCanvasUp,
     OpenAddNodeUi,
     AddNode(NodeTemplate),
+    SelectNodeGroup(Vec<String>),
 
     UpdateNodeTemplate(u32, NodeTemplate),
     UpdateNodeParameter(u32, String, NodeUIWidget),
@@ -167,6 +148,9 @@ pub enum Message {
     //// History
     Undo,
     Redo,
+    //// Misc
+    /// Hacky way to have a message that does nothing
+    NOP,
 }
 
 impl App {
@@ -176,6 +160,7 @@ impl App {
             _ => trace!("---Message--- {:?}", message),
         }
         match message {
+            Message::NOP => {}
             Message::Cancel => self.action = Action::Idle,
             Message::OnMove(cursor_position) => {
                 self.cursor_position = cursor_position;
@@ -278,7 +263,6 @@ impl App {
                     _ => (),
                 }
             }
-            Message::OpenAddNodeUi => self.action = Action::AddingNode,
 
             Message::UpdateNodeTemplate(id, new_template) => {
                 //TODO: move into Network
@@ -304,6 +288,23 @@ impl App {
                     return Task::done(Message::QueueCompute(id));
                 }
             }
+            Message::OpenAddNodeUi => self.action = Action::AddingNode,
+            Message::SelectNodeGroup(selected_tree_path) => match &self.action {
+                Action::AddingNode => {
+                    let current_path = self.user_data.get_new_node_path();
+                    if current_path.starts_with(&selected_tree_path) {
+                        self.user_data.set_new_node_path(
+                            &selected_tree_path[0..selected_tree_path.len().saturating_sub(1)],
+                        );
+                    } else {
+                        self.user_data.set_new_node_path(&selected_tree_path);
+                        //self.action = Action::AddingNode(selected_tree_path)
+                    }
+                }
+                _ => error!(
+                    "should not be able to select a nope group while Add Node UI is not active"
+                ),
+            },
             Message::AddNode(template) => {
                 //TODO: move into Network
                 self.network.stash_state();
@@ -608,9 +609,7 @@ impl App {
             }
         ];
 
-        let modal = container(add_node_panel(&self.available_nodes)).center(Fill);
-        // Potentially add a modal
-        let output: Element<Message, Theme, Renderer> = match self.action {
+        let output: Element<Message, Theme, Renderer> = match &self.action {
             Action::AddingNode => stack![
                 content,
                 // Barrier to stop interaction
@@ -622,7 +621,16 @@ impl App {
                 // Stop any mouseover interactions from showing,
                 .interaction(mouse::Interaction::Idle)
                 .on_press(Message::Cancel),
-                modal
+                //// Add node modal
+                container(
+                    mouse_area(add_node_tree_panel(
+                        &self.python_projects,
+                        self.user_data.get_new_node_path()
+                    ))
+                    .interaction(mouse::Interaction::Idle)
+                    .on_press(Message::NOP)
+                )
+                .center(Fill)
             ]
             .into(),
             _ => content.into(),
@@ -652,12 +660,13 @@ impl App {
             if let NodeTemplate::PyNode(old_py_node) = node.template {
                 let PyNode {
                     name: _node_name,
-                    path,
+                    relative_path,
+                    absolute_path,
                     ports: old_ports,
                     parameters: old_parameters,
                 } = old_py_node;
                 //// Read new node from disk
-                let mut new_py_node = PyNode::new(path);
+                let mut new_py_node = PyNode::new(absolute_path, relative_path);
 
                 //// Update Parameters
                 new_py_node.parameters = {
@@ -731,7 +740,7 @@ impl App {
             }
         });
         // Update list of available nodes
-        self.available_nodes = NodeData::available_nodes(self.config.nodes_dir());
+        self.python_projects = self.config.read_projects();
     }
 }
 
@@ -740,39 +749,47 @@ pub fn theme(state: &App) -> Theme {
 }
 
 pub fn subscriptions(state: &App) -> Subscription<Message> {
-    Subscription::batch([
-        file_watch_subscription(state.config.nodes_dir().clone()),
-        window::open_events().map(|_| Message::WindowOpen),
-        listen_with(|event, _status, _id| match event {
-            Keyboard(keyboard::Event::ModifiersChanged(m)) => Some(Message::ModifiersChanged(m)),
-            Keyboard(KeyPressed { key, modifiers, .. }) => match key {
-                Key::Named(Named::Tab) => {
-                    if modifiers.contains(Modifiers::SHIFT) {
-                        Some(Message::FocusPrevious)
-                    } else {
-                        Some(Message::FocusNext)
+    Subscription::batch(
+        state
+            .python_projects
+            .iter()
+            .map(|p| file_watch_subscription(p.absolute_path.clone()))
+            .chain([
+                window::open_events().map(|_| Message::WindowOpen),
+                listen_with(|event, _status, _id| match event {
+                    Keyboard(keyboard::Event::ModifiersChanged(m)) => {
+                        Some(Message::ModifiersChanged(m))
                     }
-                }
-                Key::Named(Named::Delete) => Some(Message::DeleteSelectedNodes),
-                Key::Named(Named::Escape) => Some(Message::Cancel),
-                Key::Character(smol_str) => {
-                    if modifiers.control() && smol_str == "a" {
-                        Some(Message::OpenAddNodeUi)
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
-            },
-            _ => None,
-        }),
-        // Refresh for animation while nodes are actively running
-        if state.network.graph.running_nodes().is_empty() {
-            Subscription::none()
-        } else {
-            iced::time::every(Duration::from_micros(1_000_000 / 16)).map(|_| Message::AnimationTick)
-        },
-    ])
+                    Keyboard(KeyPressed { key, modifiers, .. }) => match key {
+                        Key::Named(Named::Tab) => {
+                            if modifiers.contains(Modifiers::SHIFT) {
+                                Some(Message::FocusPrevious)
+                            } else {
+                                Some(Message::FocusNext)
+                            }
+                        }
+                        Key::Named(Named::Delete) => Some(Message::DeleteSelectedNodes),
+                        Key::Named(Named::Escape) => Some(Message::Cancel),
+                        Key::Character(smol_str) => {
+                            if modifiers.control() && smol_str == "a" {
+                                Some(Message::OpenAddNodeUi)
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    },
+                    _ => None,
+                }),
+                // Refresh for animation while nodes are actively running
+                if state.network.graph.running_nodes().is_empty() {
+                    Subscription::none()
+                } else {
+                    iced::time::every(Duration::from_micros(1_000_000 / 16))
+                        .map(|_| Message::AnimationTick)
+                },
+            ]),
+    )
 }
 
 pub fn title(state: &App) -> String {

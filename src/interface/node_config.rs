@@ -11,7 +11,9 @@ use crate::{
 };
 pub type NodeUIParameters = StableMap<String, NodeUIWidget>;
 
-#[derive(Clone, Debug, Display, EnumString, VariantNames, Serialize, Deserialize, PartialEq)]
+#[derive(
+    Clone, Debug, Display, EnumString, VariantNames, Serialize, Deserialize, PartialEq, PartialOrd,
+)]
 pub enum NodeUIWidget {
     #[display("{_0}")]
     Slider(f32, #[serde(skip)] PartialUIValue),
