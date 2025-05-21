@@ -1343,6 +1343,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "foray"
+version = "0.1.0"
+dependencies = [
+ "colorgrad",
+ "derive_more",
+ "directories",
+ "env_logger",
+ "float-cmp",
+ "glam 0.29.2",
+ "glob",
+ "iced",
+ "indexmap",
+ "itertools",
+ "log",
+ "ndarray",
+ "notify",
+ "notify-debouncer-full",
+ "numpy",
+ "palette",
+ "pyo3",
+ "relative-path",
+ "rfd",
+ "ron",
+ "serde",
+ "strum",
+ "toml",
+]
+
+[[package]]
 name = "foreign-types"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1593,35 +1622,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c8098adac955faa2d31079b65dc48841251f69efd3ac25477903fc424362ead"
 dependencies = [
  "gl_generator",
-]
-
-[[package]]
-name = "gpi"
-version = "0.1.0"
-dependencies = [
- "colorgrad",
- "derive_more",
- "directories",
- "env_logger",
- "float-cmp",
- "glam 0.29.2",
- "glob",
- "iced",
- "indexmap",
- "itertools",
- "log",
- "ndarray",
- "notify",
- "notify-debouncer-full",
- "numpy",
- "palette",
- "pyo3",
- "relative-path",
- "rfd",
- "ron",
- "serde",
- "strum",
- "toml",
 ]
 
 [[package]]

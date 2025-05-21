@@ -1,4 +1,4 @@
-use gpi::app::{subscriptions, theme, title, App};
+use foray::app::{subscriptions, theme, title, App};
 use iced::{application, Font};
 
 pub fn main() -> iced::Result {
