@@ -3,6 +3,14 @@ name = "foray"
 version = "0.1.0"
 edition = "2021"
 
+[package.metadata.bundle]
+name = "Foray"
+identifier = "org.mrtud.foray"
+icon = ["resources/icon*.png"]
+version = "0.1.0"
+category = "Development"
+short_description = "An interactive signal processing toolkit"
+
 [dependencies]
 iced = { version = "0.13.1", default-features = false, features = [
 	"wgpu",
