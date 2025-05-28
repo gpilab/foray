@@ -16,8 +16,8 @@ pub struct UserData {
 /// Getters and Setters, are used to serialize to
 /// disk on change
 impl UserData {
-    pub fn set_recent_network_file(&mut self, file: PathBuf) {
-        self.most_recent_network_file = Some(file);
+    pub fn set_recent_network_file(&mut self, file: Option<PathBuf>) {
+        self.most_recent_network_file = file;
         self.write();
     }
     pub fn get_recent_network_file(&self) -> &Option<PathBuf> {
@@ -50,11 +50,15 @@ impl UserData {
             }
             Ok(Err(e)) => {
                 error!("Error reading user data {user_data_file:?}, using default. \n{e}");
-                UserData::default()
+                let new_data = UserData::default();
+                new_data.write();
+                new_data
             }
             Err(e) => {
                 warn!("Could not read user data file {user_data_file:?}, using default. \n{e}");
-                UserData::default()
+                let new_data = UserData::default();
+                new_data.write();
+                new_data
             }
         }
     }

@@ -93,7 +93,9 @@ where
         F: Fn(&DirEntry) -> bool + Copy,
     {
         let mut result = fs::read_dir(&path)
-            .expect("Directory should exist, and user should have permission")
+            .unwrap_or_else(|e| {
+                panic!("Directory should exist:{e:?}, and user should have permission")
+            })
             .filter_map(|e| e.ok())
             .filter(filter_entries)
             .fold(vec![], move |mut root, entry| {

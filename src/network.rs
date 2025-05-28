@@ -47,8 +47,13 @@ pub struct Network {
     #[serde(skip)]
     pub unsaved_changes: bool,
 }
+pub enum NetworkLoadError {
+    FileNotFound,
+    CouldNotParse,
+}
+
 impl Network {
-    pub fn load_network(path: &PathBuf, projects: &[Project]) -> Self {
+    pub fn load_network(path: &PathBuf, projects: &[Project]) -> Result<Self, NetworkLoadError> {
         match read_to_string(path).map(|s| ron::from_str::<Network>(&s)) {
             Ok(Ok(mut network)) => {
                 network.file = Some(path.clone());
@@ -85,17 +90,16 @@ impl Network {
                         }
                     }
                 });
-                network
+                Ok(network)
             }
             Ok(Err(e)) => {
-                error!("Could not open file {e}");
-                warn!("creating default file");
-                Network::default()
+                warn!("Could not open file {path:?}\n{e}\nusing default network");
+                Err(NetworkLoadError::FileNotFound)
             }
             Err(e) => {
-                error!("Could not parse file {e}");
+                warn!("Could not parse file {path:?}\n{e}\nusing default network");
                 warn!("creating default file");
-                Network::default()
+                Err(NetworkLoadError::CouldNotParse)
             }
         }
     }

@@ -74,10 +74,17 @@ impl Default for App {
         let projects = config.read_projects();
 
         let app_theme = Config::load_theme();
-        let user_data = UserData::read_user_data();
+        let mut user_data = UserData::read_user_data();
 
         let network = match user_data.get_recent_network_file() {
-            Some(recent_network) => Network::load_network(recent_network, &projects),
+            Some(recent_network) => match Network::load_network(recent_network, &projects) {
+                Ok(n) => n,
+                Err(_) => {
+                    user_data.set_recent_network_file(None); // Recent network failed to load,
+                                                             // remove it from user data
+                    Network::default()
+                }
+            },
             None => Network::default(),
         };
 
@@ -390,7 +397,7 @@ impl App {
                     )
                     .unwrap_or_else(|e| panic!("Could not parse network {file:?}\n {e}"));
                     self.network.file = Some(file.clone());
-                    self.user_data.set_recent_network_file(file);
+                    self.user_data.set_recent_network_file(Some(file));
                     self.reload_nodes();
                     return Task::done(Message::ComputeAll);
                 } else {
@@ -419,7 +426,7 @@ impl App {
                     info!("saved network {file:?}");
                     self.network.file = Some(file.clone());
                     self.network.unsaved_changes = false;
-                    self.user_data.set_recent_network_file(file);
+                    self.user_data.set_recent_network_file(Some(file));
                 } else {
                     info!("File not picked")
                 }
