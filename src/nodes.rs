@@ -138,8 +138,8 @@ impl NodeData {
                     RustNode::Linspace(linspace_config) => linspace_config.compute(inputs),
                     RustNode::Plot(_) => [].into(),
                     RustNode::Plot2D(plot_2d) => {
-                        plot_2d.input_changed(inputs);
-                        [].into()
+                        let out = plot_2d.input_changed(inputs);
+                        [("out".into(), out)].into()
                     }
                     RustNode::VectorField(_) => [].into(),
                 },
@@ -195,6 +195,7 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
 
     fn outputs(&self) -> StableMap<String, PortType> {
         let real_out = [("out".to_string(), PortType::Real)].into();
+        let array_out = [("out".to_string(), PortType::ArrayReal)].into();
         match &self.template {
             NodeTemplate::RustNode(rn) => match rn {
                 RustNode::Identity => real_out,
@@ -207,8 +208,8 @@ impl GraphNode<NodeData, PortType, PortData> for NodeData {
                 RustNode::Sin => real_out,
                 RustNode::Sinc => real_out,
                 RustNode::Linspace(_) => real_out,
-                RustNode::Plot(_) => [].into(),
-                RustNode::Plot2D(_) => [].into(),
+                RustNode::Plot(_) => array_out,
+                RustNode::Plot2D(_) => array_out,
                 RustNode::VectorField(_) => [].into(),
             },
             NodeTemplate::PyNode(py_node) => py_node.ports.clone().unwrap_or_default().outputs,
@@ -260,9 +261,7 @@ impl GUINode for NodeTemplate {
         &self,
         id: u32,
         input_data: StableMap<String, PortDataContainer>,
-    ) -> (iced::Size, iced::Element<Message>) {
-        let dft = default_node_size();
-
+    ) -> iced::Element<Message> {
         let operation = |s| {
             text(s)
                 .font(Font::with_name("DejaVu Math TeX Gyre"))
@@ -278,31 +277,35 @@ impl GUINode for NodeTemplate {
 
         match self {
             NodeTemplate::RustNode(rn) => match rn {
-                RustNode::Constant(value) => (dft, constant::view(id, *value)),
-                RustNode::Linspace(linspace_config) => (
-                    Size::new(dft.width * 2., dft.height),
-                    linspace_config.view(id),
-                ),
-                RustNode::Plot(plot) => (dft * 2., plot.view(id, input_data)),
-                RustNode::Plot2D(plot) => (
-                    (dft.width * 2., dft.width * 2.).into(),
-                    plot.view(id, input_data),
-                ),
-                RustNode::VectorField(vf) => (
-                    (dft.width * 2., dft.width * 2.).into(),
-                    vf.view(id, input_data),
-                ),
-                RustNode::Add => (dft, operation("+")),
-                RustNode::Subtract => (dft, operation("−")),
-                RustNode::Multiply => (dft, operation("×")),
-                RustNode::Divide => (dft, operation("÷")),
-                RustNode::Cos => (dft, trig("cos(α)")),
-                RustNode::Sin => (dft, trig("sin(α)")),
-                RustNode::Sinc => (dft, trig("sinc(α)")),
+                RustNode::Constant(value) => constant::view(id, *value),
+                RustNode::Linspace(linspace_config) => linspace_config.view(id),
+                RustNode::Plot(plot) => plot.view(id, input_data),
+                RustNode::Plot2D(plot) => plot.view(id, input_data),
+                RustNode::VectorField(vf) => vf.view(id, input_data),
+                RustNode::Add => operation("+"),
+                RustNode::Subtract => operation("−"),
+                RustNode::Multiply => operation("×"),
+                RustNode::Divide => operation("÷"),
+                RustNode::Cos => trig("cos(α)"),
+                RustNode::Sin => trig("sin(α)"),
+                RustNode::Sinc => trig("sinc(α)"),
 
-                _ => (dft, text(self.name()).into()),
+                _ => text(self.name()).into(),
             },
-            NodeTemplate::PyNode(_) => (dft, text(self.name()).into()),
+            NodeTemplate::PyNode(_) => text(self.name()).into(),
+        }
+    }
+    fn node_size(&self) -> iced::Size {
+        let dft = default_node_size();
+        match self {
+            NodeTemplate::RustNode(rn) => match rn {
+                RustNode::Linspace(_) => Size::new(dft.width * 2., dft.height),
+                RustNode::Plot(_) => dft * 2.,
+                RustNode::Plot2D(_) => (dft.width * 2., dft.width * 2.).into(),
+                RustNode::VectorField(_) => (dft.width * 2., dft.width * 2.).into(),
+                _ => dft,
+            },
+            NodeTemplate::PyNode(_) => dft,
         }
     }
 

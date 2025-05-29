@@ -178,24 +178,21 @@ impl Plot2D {
         trace!("Creating image handle for plot2d, {:?}", data.shape());
         let max = data.iter().fold(-f64::INFINITY, |a, &b| a.max(b));
         let min = data.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+        let brightness = |p: f64| {
+            let p = ((p - min) / (max - min)) as f32;
+            let p = if p.is_nan() { 0.0 } else { p };
+            (p * 255.0).round() as u8
+        };
         let img: Vec<u8> = data
             .outer_iter()
             .flat_map(|row| {
                 row.outer_iter()
                     .flat_map(|p| {
                         if p.len() == 1 {
-                            let p = p[0];
-                            let p = ((p - min) / (max - min)) as f32;
-                            let p = if p.is_nan() { 1.0 } else { p };
-                            let b = (p * 255.0).round() as u8;
+                            let b = brightness(p[0]);
                             [b, b, b, 255]
                         } else if p.len() == 3 {
-                            [
-                                ((p[0] + 1.0) * 0.5 * 255.0) as u8,
-                                ((p[1] + 1.0) * 0.5 * 255.0) as u8,
-                                ((p[2] + 1.0) * 0.5 * 255.0) as u8,
-                                255,
-                            ]
+                            [brightness(p[0]), brightness(p[1]), brightness(p[2]), 255]
                         } else {
                             panic!("unsupported array dimensions")
                         }
@@ -206,8 +203,11 @@ impl Plot2D {
         Handle::from_rgba(data.dim().0 as u32, data.dim().1 as u32, img)
     }
 
-    pub(crate) fn input_changed(&mut self, input_data: StableMap<String, PortDataReference>) {
-        self.image_handle = match input_data.get("a") {
+    pub(crate) fn input_changed(
+        &mut self,
+        input_data: StableMap<String, PortDataReference>,
+    ) -> PortData {
+        let (image_handle, port_data) = match input_data.get("a") {
             Some(port) => {
                 let data = match &**port {
                     PortData::ArrayReal(a) => &Array3::<f64>::from_shape_vec(
@@ -229,9 +229,11 @@ impl Plot2D {
                     .expect("square matrix"),
                     _ => panic!("unsuported plot types {:?}", port),
                 };
-                Some(Self::create_image_handle(data))
+                (Some(Self::create_image_handle(data)), (**port).clone())
             }
-            None => None,
+            None => (None, PortData::ArrayReal(Default::default())),
         };
+        self.image_handle = image_handle;
+        port_data
     }
 }

@@ -12,7 +12,7 @@ pub fn view<'a>(id: u32, value: f64) -> Element<'a, Message> {
     container(
         column![
             text(format!("{value:.1}")),
-            slider(-1.0..=1., value, move |value| {
+            slider(0.0..=2.0, value, move |value| {
                 Message::UpdateNodeTemplate(id, NodeTemplate::RustNode(RustNode::Constant(value)))
             })
             .step(0.05)

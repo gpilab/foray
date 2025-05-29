@@ -5,7 +5,6 @@ use iced::{widget::text, Element};
 use crate::{
     app::Message,
     graph::Graph,
-    interface::node::default_node_size,
     nodes::{
         port::{PortData, PortType},
         status::NodeStatus,
@@ -28,9 +27,10 @@ pub trait GUINode: derive_more::Debug {
         &self,
         _id: u32,
         _input_data: StableMap<String, PortDataContainer>,
-    ) -> (iced::Size, Element<Message>) {
-        (default_node_size(), text("default").into())
+    ) -> Element<Message> {
+        text("default").into()
     }
+    fn node_size(&self) -> iced::Size;
 
     fn config_view(
         &self,

@@ -1,11 +1,12 @@
 use std::iter::once;
 
 use crate::app::{Action, App};
+use crate::gui_node::GUINode;
 use crate::math::Point;
 use crate::style::theme::AppTheme;
 use crate::StableMap;
 use canvas::{Path, Stroke};
-use iced::widget::*;
+use iced::{widget::*, Size};
 
 impl App {
     pub fn wire_curve(
@@ -14,7 +15,9 @@ impl App {
         points: &StableMap<u32, Point>,
     ) -> Vec<(Path, Stroke)> {
         let port_position = |port: &PortRef| {
-            points[&port.node] + find_port_offset(port, self.network.graph.port_index(port)).into()
+            let node_size = &self.network.graph.get_node(port.node).template.node_size();
+            points[&port.node]
+                + find_port_offset(port, self.network.graph.port_index(port), *node_size).into()
         };
 
         //// Handle currently active wire
@@ -74,7 +77,7 @@ impl App {
     }
 }
 
-use super::node::{INNER_NODE_HEIGHT, INNER_NODE_WIDTH, NODE_RADIUS, PORT_RADIUS};
+use super::node::{NODE_RADIUS, PORT_RADIUS};
 use crate::{
     app,
     graph::{PortRef, IO},
@@ -82,12 +85,12 @@ use crate::{
 use iced::Vector;
 
 /// Determine where a port should be positioned relative to the origin of the node
-pub fn find_port_offset(port_ref: &PortRef, port_index: usize) -> Vector {
-    let port_x = |i: usize| i as f32 * (INNER_NODE_WIDTH / 4.) + NODE_RADIUS * 2.;
+pub fn find_port_offset(port_ref: &PortRef, port_index: usize, size: Size) -> Vector {
+    let port_x = |i: usize| i as f32 * (size.width / 4.) + NODE_RADIUS * 2.;
     match port_ref.io {
         IO::In => Vector::new(port_x(port_index), 0.) + Vector::new(PORT_RADIUS, -PORT_RADIUS / 2.),
         IO::Out => {
-            Vector::new(port_x(port_index), INNER_NODE_HEIGHT)
+            Vector::new(port_x(port_index), size.height)
                 + Vector::new(PORT_RADIUS, PORT_RADIUS / 2.)
         }
     }

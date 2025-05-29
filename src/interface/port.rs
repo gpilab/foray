@@ -5,7 +5,7 @@ use iced::{
         vertical_space, Row,
     },
     Alignment::Center,
-    Border, Element,
+    Border, Element, Size,
 };
 
 use crate::{
@@ -17,14 +17,15 @@ use crate::{
     widget::{custom_button, pin::Pin},
 };
 
-use super::node::{INNER_NODE_HEIGHT, INNER_NODE_WIDTH, NODE_RADIUS, PORT_RADIUS};
+use super::node::{NODE_RADIUS, PORT_RADIUS};
 
 pub fn port_view<'a>(
     node_id: u32,
     node_data: &NodeData,
+    node_size: Size,
     app_theme: &'a AppTheme,
 ) -> Vec<Element<'a, Message>> {
-    let port_x = |i: usize| i as f32 * (INNER_NODE_WIDTH / 4.) + NODE_RADIUS * 2.;
+    let port_x = |i: usize| i as f32 * (node_size.width / 4.) + NODE_RADIUS * 2.;
 
     //TODO: Unify in/out port view creation
     let in_port_buttons = node_data
@@ -65,7 +66,7 @@ pub fn port_view<'a>(
         .outputs()
         .into_iter()
         .enumerate()
-        .map(|(i, port)| (Point::new(port_x(i), INNER_NODE_HEIGHT - PORT_RADIUS), port))
+        .map(|(i, port)| (Point::new(port_x(i), node_size.height - PORT_RADIUS), port))
         .map(|(point, port)| {
             let (name, port_type) = port;
             let port_tooltip = port_tooltip(name.clone(), port_type.clone(), app_theme);
