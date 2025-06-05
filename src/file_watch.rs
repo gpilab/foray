@@ -6,17 +6,21 @@ use std::time::Duration;
 use iced::futures::sink::SinkExt;
 use iced::stream;
 use iced::Subscription;
+use log::trace;
 use notify::RecursiveMode;
 use notify_debouncer_full::new_debouncer;
 
 use crate::app::Message;
 
-pub fn file_watch_subscription(nodes_dir: PathBuf) -> Subscription<Message> {
+/// Sends Message::ReloadNodes on a python file change
+pub fn file_watch_subscription(id: usize, nodes_dir: PathBuf) -> Subscription<Message> {
     let stream = stream::channel(0, |mut output| async move {
-        let path = nodes_dir;
+        trace!("Starting file watch subscription stream: {nodes_dir:?}");
         let (sender, receiver) = std::sync::mpsc::channel();
         let mut debouncer = new_debouncer(Duration::from_millis(250), None, sender).unwrap();
-        debouncer.watch(path, RecursiveMode::Recursive).unwrap();
+        debouncer
+            .watch(nodes_dir, RecursiveMode::Recursive)
+            .unwrap();
 
         for res in receiver {
             match res {
@@ -43,5 +47,5 @@ pub fn file_watch_subscription(nodes_dir: PathBuf) -> Subscription<Message> {
             }
         }
     });
-    Subscription::run_with_id(1, stream)
+    Subscription::run_with_id(id, stream)
 }

@@ -46,6 +46,7 @@ impl<D> Default for NodeTree<D> {
     }
 }
 
+#[derive(Debug)]
 pub struct Project {
     pub absolute_path: PathBuf,
     pub node_tree: Vec<NodeTree<NodeTemplate>>,

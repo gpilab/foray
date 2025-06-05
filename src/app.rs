@@ -28,7 +28,7 @@ use iced::Event::Keyboard;
 use iced::Length::Fill;
 use iced::{mouse, window, Subscription, Task};
 use itertools::Itertools;
-use log::{error, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 use rfd::FileDialog;
 use std::fs::read_to_string;
 use std::iter::once;
@@ -72,6 +72,13 @@ impl Default for App {
         let config = Config::read_config();
         config.setup_environment();
         let projects = config.read_projects();
+        trace!(
+            "Configured Python Projects: {:?}",
+            projects
+                .iter()
+                .map(|p| p.absolute_path.clone())
+                .collect::<Vec<_>>()
+        );
 
         let app_theme = Config::load_theme();
         let mut user_data = UserData::read_user_data();
@@ -679,13 +686,13 @@ impl App {
                 new_py_node.parameters = {
                     // If Ok, copy old parameters to new parameters
                     if let (Ok(new_parameters), Ok(old_param)) =
-                        (new_py_node.parameters.clone(), old_parameters)
+                        (new_py_node.parameters.clone(), &old_parameters)
                     {
                         // Only keep old values that are still present in the new parameters list
                         Ok(new_parameters
                             .clone()
                             .into_iter()
-                            .chain(old_param.into_iter().filter(|(k, v)| {
+                            .chain(old_param.clone().into_iter().filter(|(k, v)| {
                                 if let Some(new_v) = new_parameters.get(k) {
                                     discriminant(v) == discriminant(new_v)
                                 } else {
@@ -694,6 +701,10 @@ impl App {
                             }))
                             .collect())
                     } else {
+                        warn!(
+                            "Paramaters not ok, not loading.\nNew: {:?}\nOld: {:?}",
+                            &new_py_node.parameters, &old_parameters
+                        );
                         new_py_node.parameters
                     }
                 };
@@ -760,7 +771,8 @@ pub fn subscriptions(state: &App) -> Subscription<Message> {
         state
             .python_projects
             .iter()
-            .map(|p| file_watch_subscription(p.absolute_path.clone()))
+            .enumerate()
+            .map(|(id, p)| file_watch_subscription(id, p.absolute_path.clone()))
             .chain([
                 window::open_events().map(|_| Message::WindowOpen),
                 listen_with(|event, _status, _id| match event {
