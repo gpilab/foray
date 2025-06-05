@@ -1,15 +1,15 @@
 [project]
 name = "foray"
-version = "0.0.1"
 authors = [{ name = "John Christensen", email = "jechristen3@wisc.edu" }]
+requires-python = ">=3.8"
+dynamic = ["version"]
 
+[tool.maturin]
+python-source = "python"
+module-name = "foray._rust_interface"
+features = ["pyo3/extension-module"]
 
-dependencies = ["numpy >= 2.0"]
-
-[tool.pyright]
-venv = ".venv"
-venvPath = "./"
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["maturin>=1.8,<2.0"]
+build-backend = "maturin"

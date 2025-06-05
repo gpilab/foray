@@ -108,11 +108,6 @@ impl PyNode {
         };
         //// Call into python
         Python::with_gil(|py| {
-            //TODO: install this into the environment once, rather than every time
-            //TODO: import a proper package, than this single file
-            let gpi_module = c_str!(include_str!("../../foray_python_lib/foray/__init__.py"));
-            PyModule::from_code(py, gpi_module, c_str!("foray.py"), c_str!("foray")).unwrap();
-
             trace!("Reading node config '{node_name}'");
 
             let read_src = || -> Result<Bound<PyModule>, NodeError> {

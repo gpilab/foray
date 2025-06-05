@@ -1,22 +1,22 @@
 import numpy as np
-from foray import port
+from foray import port, ui
 
 
 def config():
     class out:
-        inputs = {"radius": port.Real}
+        inputs = {}
         outputs = {"out": port.ArrayReal}
-        parameters = {}
+        parameters = {"radius": ui.Slider}
 
     return out
 
 
-def compute(input, _):
+def compute(_, p):
     N = 256
     x = np.linspace(0, 10, N)
     y = np.linspace(0, 10, N)
 
-    radius = input["radius"]
+    radius = round(float(p["radius"]) * 10)
 
     dist = (x[:, None] - 5) ** 2 + (y - 5) ** 2
     out = np.zeros_like(dist)

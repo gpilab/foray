@@ -2,6 +2,9 @@ from dataclasses import dataclass, astuple
 from enum import Enum
 from typing import Dict, Optional, TypeVar
 
+# re-export rust module, built from `maturin develop`
+from ._rust_interface import *
+
 
 class port(str, Enum):
     Integer = "Integer"
