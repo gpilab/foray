@@ -1,5 +1,5 @@
 import numpy as np
-from gpi import port
+from foray import port
 
 
 def config():

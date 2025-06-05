@@ -1,0 +1,15 @@
+[project]
+name = "foray"
+version = "0.0.1"
+authors = [{ name = "John Christensen", email = "jechristen3@wisc.edu" }]
+
+
+dependencies = ["numpy >= 2.0"]
+
+[tool.pyright]
+venv = ".venv"
+venvPath = "./"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

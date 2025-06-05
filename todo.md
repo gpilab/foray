@@ -15,15 +15,30 @@
 
 ## Python interop
  
-- [ ] create user configuration file
+- [x] create user configuration file
 
-- [ ] load nodes from user configured location
+- [x] load nodes from user configured location
 - [ ] Add nodes written from other users via pip install
 
 - [ ] solidfy how the user's python environment will work
- - [ ] make environments reporoducible by default. It should always be simple to share work with others
+ - [ ] make environments reproducible by default. It should always be simple to share work with others
  - [ ] understand how python package management works, well enough to do this properly
 
+- [ ] rename GPI to foray everywhere
+- [x] create `foray` python module
+- [ ] use foray python module from pyo3
+
+- [ ] print statements from a node are viewable from the ui 
+
+### Declarative UI
+- [x] define parameters/widgets from python
+  - [ ] get auto reloading working well
+
+  - [ ] pass data as the expected type (not as str)
+  - [ ] Make order of ports match declaration order
+
+  - [ ] specify default values
+  - [ ] customize widgets (start, stop,step for sliders, etc.)
 
 ## UI
  - [x] pan
@@ -38,7 +53,7 @@
  - [ ] toggle auto reload
  - [ ] visually notify node reloads
 
- - [ ] Add node UI with user defined hierarchy (assumed from file stucture?)
+ - [x] Add node UI with user defined hierarchy (assumed from file stucture?)
 
 - [x] render nodes
 
@@ -82,6 +97,10 @@
 
 ## On Canvas Ad-Hoc Visualization 
 - [x] efficient image display
+
+- [ ] resizable nodes
+- [ ] Plot node auto-detects what type of plot to use.
+
 - [ ] image display manipulation
   - [ ] floor window level contrast
   - [ ] complex phase vis
@@ -95,3 +114,4 @@
 
 # Bugs
 - [ ] Node running while it's deleted, results come back, but node is gone. crash on unwrapping node
+- [ ] Node's are selectable when behind left panel

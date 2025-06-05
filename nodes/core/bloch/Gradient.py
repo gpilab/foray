@@ -1,8 +1,7 @@
 # from gpy import PortType
 # import numpy as np
 import numpy as np
-from gpi import port, ui
-from Spin import N
+from foray import port, ui
 
 
 def config():
@@ -10,26 +9,26 @@ def config():
         inputs = {}
         outputs = {"out": port.ArrayReal}
         parameters = {
-            "X": ui.Slider,
-            "Y": ui.Slider,
-            "Z": ui.Slider,
+            "Nx": ui.NumberField,
+            "Ny": ui.NumberField,
+            "Gx": ui.Slider,
+            "Gy": ui.Slider,
         }
 
     return out
 
 
+# TODO: pass paramaters as their correct data type, not strings
 def compute(_, parameters):
-    gx = float(parameters["X"])
-    gy = float(parameters["Y"])
-    gz = float(parameters["Z"])
-    x = np.linspace(0, gx, N)
-    y = np.linspace(0, gy, N)
-    X, Y, Z = np.meshgrid(x, y, np.array([gz]))
+    gx = float(parameters["Gx"])
+    gy = float(parameters["Gy"])
+    x = np.linspace(0, gx, int(parameters["Nx"]))
+    y = np.linspace(0, gy, int(parameters["Ny"]))
+    X, Y = np.meshgrid(x, y)
 
     G = np.zeros_like(X)
 
     G += X
     G += Y
-    G += Z
 
     return {"out": G}

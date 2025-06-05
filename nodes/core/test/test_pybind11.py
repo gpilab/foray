@@ -1,5 +1,5 @@
 import numpy as np
-from gpi import port
+from foray import port
 import python_example
 
 python_example.add(1, 2)

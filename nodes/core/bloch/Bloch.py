@@ -1,7 +1,7 @@
 import numpy as np
-from gpi import port, ui
+from foray import port, ui
 
-from Spin import N
+# from Spins import N
 
 
 T1_ms = 40
@@ -12,33 +12,29 @@ M0 = 1.0
 def config():
     class out:
         inputs = {
-            "a": port.ArrayReal,
-            "b": port.ArrayReal,
-            "c": port.ArrayReal,
+            "spins": port.ArrayReal,
+            "gradient": port.ArrayReal,
+            "rf": port.ArrayReal,
         }
         outputs = {
             "out": port.ArrayReal,
         }
-        # inputs = {
-        #     "a": "VectorField3d",
-        #     "b": "Real3d",
-        #     "c": "VectorField3d",
-        # }
-        # outputs = {
-        #     "out": "VectorField3d",
-        # }
-        parameters = {"d": ui.Slider}
+        parameters = {"time steps": ui.Slider}
 
     return out
 
 
 def compute(input, parameters):
-    m = input["a"]
-    g = input.get("b", np.zeros((N, N, 1)))
-    rf = input.get("c", np.zeros((N, N, 1, 3)))
+    m = input["spins"]
+    nx, ny, _ = m.shape
+    print(nx, ny)
+
+    g = input.get("gradient", np.zeros((nx, ny)))
+    print(g)
+    rf = input.get("rf", np.zeros((nx, ny, 3)))
     rf = rf / np.sin(rf)
-    n = float(parameters["d"])
-    n = int((n + 1) * 100)
+    steps = float(parameters["time steps"])
+    steps = int((steps + 1) * 100)
 
     gamma = 42.577
     usec = 0.001
@@ -48,38 +44,38 @@ def compute(input, parameters):
     fq = 0.1
     db0 = fq / gamma
     mx, my, mz = (
-        m[:, :, :, 0],
-        m[:, :, :, 1],
-        m[:, :, :, 2],
+        m[:, :, 0],
+        m[:, :, 1],
+        m[:, :, 2],
     )
 
-    for i in range(0, n):
+    for i in range(0, steps):
         expt1 = np.exp(-(i * usec / T1_ms))
         # TODO: crusher here?
         expt2 = np.exp(-(i * usec / T2_ms))
         mz0 = M0 * (1.0 - expt1)
 
         phase = np.zeros_like(m)
-        phase[:, :, :, :] = -rf
-        phase[:, :, :, 2] = g + db0
+        phase[:, :, :] = -rf
+        phase[:, :, 2] = g + db0
         phase = phase * rads_per_mT
 
         mx, my, mz = rotate(
             mx,
             my,
             mz,
-            phase[:, :, :, 0],
-            phase[:, :, :, 1],
-            phase[:, :, :, 2],
+            phase[:, :, 0],
+            phase[:, :, 1],
+            phase[:, :, 2],
         )
         mx = mx * expt2
         my = my * expt2
         mz = mz0 + expt1 * mz
 
     m_out = np.zeros_like(m)
-    m_out[:, :, :, 0] = mx
-    m_out[:, :, :, 1] = my
-    m_out[:, :, :, 2] = mz
+    m_out[:, :, 0] = mx
+    m_out[:, :, 1] = my
+    m_out[:, :, 2] = mz
     return {"out": m_out}
 
 

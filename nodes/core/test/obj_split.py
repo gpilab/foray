@@ -1,4 +1,4 @@
-from gpi import port
+from foray import port
 
 
 def config():

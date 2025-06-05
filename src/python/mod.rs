@@ -1,4 +1,5 @@
 pub mod py_node;
+pub mod py_widget;
 
 //#[cfg(test)]
 //mod test {

@@ -20,7 +20,7 @@ use iced::{
 };
 use iced::{Rectangle, Renderer, Theme};
 use itertools::Itertools;
-use ndarray::Array4;
+use ndarray::Array3;
 use serde::{Deserialize, Serialize};
 
 // Rectanlge specified by center position, width and height
@@ -71,11 +71,10 @@ impl VectorField {
         match input_data.get("a") {
             Some(port) => {
                 let data = match (**port).read().unwrap().clone() {
-                    PortData::ArrayComplex(a) => Array4::<f64>::from_shape_vec(
+                    PortData::ArrayComplex(a) => Array3::<f64>::from_shape_vec(
                         [
                             (a.len() as f32).sqrt() as usize,
                             (a.len() as f32).sqrt() as usize,
-                            1,
                             3,
                         ],
                         a.iter()
@@ -88,7 +87,8 @@ impl VectorField {
                     .expect("square matrix"),
                     PortData::ArrayReal(a) => {
                         let xy_len = (a.len() as f32 / 3.0).sqrt() as usize;
-                        a.into_shape_with_order([xy_len, xy_len, 1, 3]).unwrap()
+                        a.into_shape_with_order([xy_len, xy_len, 3])
+                            .unwrap_or_else(|e| panic!("Unexpected shape{e}"))
                     }
                     _ => panic!("unsuported plot types {:?}", port),
                 };
@@ -177,7 +177,7 @@ impl VectorField {
 
 #[derive(Debug)]
 struct VectorFieldCanvas {
-    data: Array4<f64>,
+    data: Array3<f64>,
     config: VectorField,
 }
 
@@ -261,10 +261,10 @@ impl<Message> canvas::Program<Message> for VectorFieldCanvas {
             .chunks(3)
             .into_iter()
             .map(|chunk| {
-                let [((x, y, z, _), vx), ((_, _, _, _), vy), ((_, _, _, _), vz)] =
+                let [((x, y, _), vx), ((_, _, _), vy), ((_, _, _), vz)] =
                     chunk.collect::<Vec<_>>()[..]
                 else {
-                    panic!("array4 is in an unexpected format")
+                    panic!("array3 is in an unexpected format")
                 };
 
                 let v = Vec3::from([
@@ -277,7 +277,7 @@ impl<Message> canvas::Program<Message> for VectorFieldCanvas {
                 let arrow_left = Mat3::from_rotation_z(arrow_angle) * (v * 0.8);
                 let arrow_right = Mat3::from_rotation_z(-arrow_angle) * (v * 0.8);
 
-                let v_tail = Vec3::from([x as f32 - 5.0, y as f32 - 5.0, z as f32]);
+                let v_tail = Vec3::from([x as f32 - 5.0, y as f32 - 5.0, 0.0]);
                 let v_tip = v_tail + v;
                 let tip_left = v_tail + arrow_left;
                 let tip_right = v_tail + arrow_right;

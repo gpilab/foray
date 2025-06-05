@@ -1,7 +1,7 @@
 import numpy as np
 from PIL import Image
 
-from gpi import node, port
+from foray import node, port
 
 
 def config():

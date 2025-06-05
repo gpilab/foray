@@ -1,11 +1,12 @@
 [project]
-name = "gpi_nodes"
+name = "foray_nodes"
 version = "0.0.1"
 
-dependencies = [
-    "numpy >= 2.0",
-]
+dependencies = ["foray", "numpy >= 2.0"]
 
 [tool.pyright]
 venv = ".venv"
 venvPath = "./"
+
+[tool.uv.sources]
+foray = { path = "../foray_python_lib/" }

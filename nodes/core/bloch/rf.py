@@ -1,6 +1,5 @@
 import numpy as np
-from gpi import port, ui
-from Spin import N
+from foray import port, ui
 
 
 def config():
@@ -8,16 +7,18 @@ def config():
         inputs = {}
         outputs = {"out": port.ArrayReal}  # //3d
         parameters = {
-            "x": ui.Slider,
-            "y": ui.Slider,
+            "Nx": ui.NumberField,
+            "Ny": ui.NumberField,
+            "RFx": ui.Slider,
+            "RFy": ui.Slider,
         }
 
     return out
 
 
-def compute(input, parameters):
+def compute(_, parameters):
     b = np.tile(
-        np.array([parameters["x"], parameters["y"], 0], dtype=np.float64),
-        (N, N, 1, 1),
+        np.array([parameters["RFx"], parameters["RFy"]], dtype=np.float64),
+        (parameters["Nx"], parameters["Ny"], 1),
     )
     return {"out": b}
