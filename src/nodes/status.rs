@@ -15,7 +15,7 @@ pub enum NodeStatus {
 }
 
 impl NodeStatus {
-    pub fn icon(&self) -> Text {
+    pub fn icon(&'_ self) -> Text<'_> {
         match self {
             NodeStatus::Idle => icon(""),
             NodeStatus::Running(_) => icon(""), //icon(""),
@@ -23,7 +23,7 @@ impl NodeStatus {
         }
     }
 
-    pub fn text_element(&self) -> Text {
+    pub fn text_element(&'_ self) -> Text<'_> {
         match self {
             NodeStatus::Idle => text(""),
             NodeStatus::Running(_) => text(""),

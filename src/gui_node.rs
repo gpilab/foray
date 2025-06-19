@@ -24,10 +24,10 @@ pub trait GUINode: derive_more::Debug {
     fn name(&self) -> String;
 
     fn view(
-        &self,
+        &'_ self,
         _id: u32,
         _input_data: StableMap<String, PortDataContainer>,
-    ) -> Element<Message> {
+    ) -> Element<'_, Message> {
         text("default").into()
     }
     fn node_size(&self) -> iced::Size;

@@ -9,34 +9,32 @@ use serde::{Deserialize, Serialize};
 use crate::{nodes::status::NodeError, StableMap};
 
 type WireDataContainer<T> = Arc<RwLock<T>>;
+type PortName = String;
+type NodeIndex = u32;
 
 pub trait GraphNode<NodeData, PortType, WireData>
 where
     PortType: Clone,
 {
-    fn inputs(&self) -> StableMap<String, PortType>;
-    fn outputs(&self) -> StableMap<String, PortType>;
+    fn inputs(&self) -> StableMap<PortName, PortType>;
+    fn outputs(&self) -> StableMap<PortName, PortType>;
     fn compute(
         self,
-        inputs: StableMap<String, WireDataContainer<WireData>>,
-    ) -> Result<(StableMap<String, WireData>, NodeData), NodeError>;
+        inputs: StableMap<PortName, WireDataContainer<WireData>>,
+    ) -> Result<(StableMap<PortName, WireData>, NodeData), NodeError>;
 }
 
-type PortName = String;
-
-type NodeIndex = u32;
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub struct PortRef {
+    pub node: NodeIndex,
+    pub name: PortName,
+    pub io: IO,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum IO {
     In,
     Out,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
-pub struct PortRef {
-    pub node: u32,
-    pub name: PortName,
-    pub io: IO,
 }
 
 type Edge = (PortRef, PortRef);
@@ -48,7 +46,7 @@ where
     PortType: Clone,
     WireData: std::fmt::Debug,
 {
-    nodes: crate::StableMap<NodeIndex, NodeData>,
+    nodes: StableMap<NodeIndex, NodeData>,
     edges: Vec<Edge>,
     #[serde(skip, default = "default_wire_data")]
     wire_data: HashMap<(NodeIndex, PortName), WireDataContainer<WireData>>,
@@ -107,19 +105,20 @@ where
         self.edges
             .retain(|(from, to)| from.node != id && to.node != id)
     }
-    ///Get the node value at a given index
-    ///panics if index is not valid!
-    ///Use the index returned from `add_node` to ensure it exists
+    /// Get the node value at a given index
+    /// panics if index is not valid!
+    /// Use the index returned from `add_node` to ensure it exists
     pub fn get_node(&self, nx: NodeIndex) -> &NodeData {
         &self.nodes[&nx]
     }
 
-    ///Get a mutable reference  to a node value at a given index
-    ///panics if index is not valid
-    ///Use the index returned from `add_node` to ensure it exists
+    /// Get a mutable reference  to a node value at a given index
+    /// panics if index is not valid
+    /// Use the index returned from `add_node` to ensure it exists
     pub fn get_mut_node(&mut self, nx: NodeIndex) -> &mut NodeData {
         self.nodes.get_mut(&nx).unwrap()
     }
+
     pub fn get_output_data(
         &self,
         nx: NodeIndex,
@@ -136,6 +135,7 @@ where
             })
             .collect()
     }
+
     pub fn get_input_data(&self, nx: &NodeIndex) -> StableMap<String, WireDataContainer<WireData>> {
         self.get_node(*nx)
             .inputs()
@@ -150,6 +150,7 @@ where
             .collect::<Option<StableMap<_, _>>>()
             .unwrap_or([].into())
     }
+
     pub fn get_input_data_mapped(
         &self,
         nx: &NodeIndex,
@@ -196,17 +197,14 @@ where
 
         (port_matches, data)
     }
-    /// get a list of node indices
+
+    /// Get a list of node indices
     pub fn nodes_ref(&self) -> Vec<NodeIndex> {
         self.nodes.keys().copied().collect()
     }
 
-    ///Set the node value of an existing node
-    pub fn set_node_data(
-        &mut self,
-        nx: NodeIndex,
-        value: NodeData, //GenGraphNode<NodeData, PortType, WireData>,
-    ) {
+    /// Set the node value of an existing node
+    pub fn set_node_data(&mut self, nx: NodeIndex, value: NodeData) {
         *self.nodes.get_mut(&nx).unwrap() = value;
     }
 
@@ -225,13 +223,13 @@ where
         self.wire_data.get(&(*nx, port_name.into()))
     }
 
-    /// create a connection between two port references
+    /// Create a connection between two port references
     pub fn add_edge_from_ref(&mut self, from: &PortRef, to: &PortRef) {
         assert!(from.io == IO::Out);
         assert!(to.io == IO::In);
         self.connect((from.node, from.name.clone()), (to.node, to.name.clone()));
     }
-    /// create a connection between two ports
+    /// Create a connection between two ports
     pub fn connect(
         &mut self,
         from: (NodeIndex, impl Into<PortName>),
@@ -253,7 +251,7 @@ where
         self.edges.push((from, to));
     }
 
-    // remove any edges associated with the given port
+    /// Remove any edges associated with the given port
     pub fn remove_edge(&mut self, port: &PortRef) {
         self.edges.retain(|(from, to)| port != from && port != to)
     }
@@ -265,7 +263,7 @@ where
             .map(|(from, _to)| from.clone())
     }
 
-    /// find the index of the port based on the order defined in the `GraphNode`
+    /// Find the index of the port based on the order defined in the `GraphNode`
     /// panics if `port` is not valid
     pub fn port_index(&self, port: &PortRef) -> usize {
         match port.io {
@@ -345,70 +343,6 @@ where
         }
     }
 
-    ///// Execute network using topological sort, starting from `start`
-    ///// and only processing decendents
-    ///// Caller is responsible for handling errors that occur during computation
-    //pub fn exectute_sub_network(&mut self, start: NodeIndex) {
-    //    let nodes: Vec<_> = self
-    //        .topological_sort()
-    //        .into_iter()
-    //        .filter(|&nx| self.is_self_or_dependent(start, nx))
-    //        .collect();
-    //    nodes.iter().for_each(|nx| self.compute_node(nx))
-    //}
-    //
-    ///// Execute network using topological sort
-    ///// Caller is responsible for handling errors that occur during computation
-    //pub fn execute_network(&mut self) {
-    //    self.wire_data.clear();
-    //    let mut ordered = self.topological_sort();
-    //    ordered.iter_mut().for_each(|nx| self.compute_node(nx))
-    //}
-
-    // async compute
-
-    //pub async fn execute_network_async(&mut self) {
-    //    self.wire_data.clear();
-    //    let mut ordered = self.topological_sort();
-    //    ordered.iter_mut().for_each(|nx| self.compute_node(nx))
-    //}
-
-    // perform computation by supplying inputs
-    //pub async fn clone_compute(
-    //    &self,
-    //    nx: NodeIndex,
-    //) -> Option<(OrderMap<String, WireData>, NodeData)> {
-    //    let node = self.get_node(nx).clone();
-    //    let inputs = self.get_input_data(&nx);
-    //    if inputs.len() == node.inputs().len() {
-    //        Some(node.compute(inputs.into_iter().map(|(k, v)| (k, v.clone())).collect()))
-    //    } else {
-    //        None
-    //    }
-    //}
-    //
-    // perform computation by supplying inputs
-    //pub fn compute_node(&mut self, nx: &NodeIndex) {
-    //    let node = self.get_mut_node(*nx).clone();
-    //    let inputs = self.get_input_data(nx);
-    //    if inputs.len() == node.inputs().len() {
-    //        let (outputs, node) =
-    //            node.compute(inputs.into_iter().map(|(k, v)| (k, v.clone())).collect());
-    //        self.set_node_data(*nx, node);
-    //        self.update_wire_data(*nx, outputs);
-    //    }
-    //}
-
-    //fn is_self_or_dependent(&self, root: NodeIndex, to_check: NodeIndex) -> bool {
-    //    if root == to_check {
-    //        true
-    //    } else {
-    //        self.incoming_edges(&to_check)
-    //            .into_iter()
-    //            .any(|(from, _to)| self.is_self_or_dependent(root, from.node))
-    //    }
-    //}
-
     /// Determine if a node has any incoming connections
     fn has_incoming(nx: &NodeIndex, edges: &[Edge]) -> bool {
         edges.iter().any(|(_from, to)| to.node == *nx)
@@ -420,23 +354,6 @@ where
         edges.iter().position(|(from, _to)| from.node == *nx)
     }
 
-    //pub(crate) fn get_compute(
-    //    &self,
-    //    nx: u32,
-    //) -> Option<impl AsyncFn() -> > {
-    //    let node = self.get_node(nx).clone();
-    //    let inputs = self.get_input_data(&nx);
-    //    let inputs: OrderMap<String, Arc<Mutex<WireData>>> =
-    //        inputs.into_iter().map(|(a, b)| (a, b.clone())).collect();
-    //    if inputs.len() == node.inputs().len() {
-    //        Some(async move || {
-    //            let (new_node, output) = node.compute(inputs);
-    //            (new_node, output)
-    //        })
-    //    } else {
-    //        None
-    //    }
-    //}
     pub fn get_compute(
         &self,
         nx: NodeIndex,
@@ -445,13 +362,14 @@ where
         let wire_data = self.get_input_data(&nx);
         (node.clone(), wire_data)
     }
+
     #[allow(clippy::type_complexity)]
     pub fn compute_node(
         nx: NodeIndex,
         node: NodeData,
         input_guarded: StableMap<String, WireDataContainer<WireData>>,
     ) -> (
-        u32,
+        NodeIndex,
         Result<(StableMap<String, WireData>, NodeData), NodeError>,
     ) {
         let output = { node.compute(input_guarded) };
@@ -463,7 +381,7 @@ where
         node: NodeData,
         input_guarded: StableMap<String, WireDataContainer<WireData>>,
     ) -> (
-        u32,
+        NodeIndex,
         Result<(StableMap<String, WireData>, NodeData), NodeError>,
     ) {
         Self::compute_node(nx, node, input_guarded)

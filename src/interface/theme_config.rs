@@ -50,7 +50,7 @@ impl AppTheme {
     }
 
     /// Debug view for editing themes, not intended to be end user facing
-    pub fn view(&self) -> Element<Message> {
+    pub fn view(&'_ self) -> Element<'_, Message> {
         let color_element = move |color: Color| {
             custom_button::Button::new("")
                 .style(move |_t, _s| {

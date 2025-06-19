@@ -258,10 +258,10 @@ impl GUINode for NodeTemplate {
     }
 
     fn view(
-        &self,
+        &'_ self,
         id: u32,
         input_data: StableMap<String, PortDataContainer>,
-    ) -> iced::Element<Message> {
+    ) -> iced::Element<'_, Message> {
         let operation = |s| {
             text(s)
                 .font(Font::with_name("DejaVu Math TeX Gyre"))
@@ -310,10 +310,10 @@ impl GUINode for NodeTemplate {
     }
 
     fn config_view(
-        &self,
+        &'_ self,
         id: u32,
         input_data: StableMap<String, PortDataContainer>,
-    ) -> Option<iced::Element<Message>> {
+    ) -> Option<iced::Element<'_, Message>> {
         match &self {
             NodeTemplate::RustNode(rn) => match rn {
                 RustNode::Plot(plot) => plot.config_view(id, input_data),

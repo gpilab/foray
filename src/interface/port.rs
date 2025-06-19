@@ -145,16 +145,20 @@ fn port_text<'a>(
 }
 
 /// Display summary of port information
-fn port_tooltip(port_name: String, port_type: PortType, app_theme: &AppTheme) -> Element<Message> {
+fn port_tooltip(
+    port_name: String,
+    port_type: PortType,
+    app_theme: &'_ AppTheme,
+) -> Element<'_, Message> {
     port_tooltip_recurse(port_name, port_type, app_theme, true)
 }
 
 fn port_tooltip_recurse(
     port_name: String,
     port_type: PortType,
-    app_theme: &AppTheme,
+    app_theme: &'_ AppTheme,
     even: bool, // Switch between 2 background colors as objects are nested
-) -> Element<Message> {
+) -> Element<'_, Message> {
     let port_type_display = match port_type {
         // Recursive case
         PortType::Object(fields) => row![

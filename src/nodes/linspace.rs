@@ -59,7 +59,7 @@ impl LinspaceConfig {
         .into()
     }
 
-    pub fn view(&self, id: u32) -> Element<Message> {
+    pub fn view(&'_ self, id: u32) -> Element<'_, Message> {
         fn numeric_input(input: TextInput<Message>) -> Element<Message> {
             column![
                 input

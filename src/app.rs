@@ -596,7 +596,7 @@ impl App {
     }
 
     /// App View
-    pub fn view(&self) -> Element<Message, Theme, Renderer> {
+    pub fn view(&'_ self) -> Element<'_, Message, Theme, Renderer> {
         let content = column![
             row![
                 side_bar(self),

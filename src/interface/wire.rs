@@ -10,10 +10,10 @@ use iced::{widget::*, Size};
 
 impl App {
     pub fn wire_curve(
-        &self,
+        &'_ self,
         wire_end_node: u32,
         points: &StableMap<u32, Point>,
-    ) -> Vec<(Path, Stroke)> {
+    ) -> Vec<(Path, Stroke<'_>)> {
         let port_position = |port: &PortRef| {
             let node_size = &self.network.graph.get_node(port.node).template.node_size();
             points[&port.node]
@@ -144,7 +144,7 @@ pub fn wire_status<'a>(
 }
 
 /// active wire color
-pub fn active_wire_stroke(t: &AppTheme, is_tentative_connection: bool) -> Stroke {
+pub fn active_wire_stroke(t: &'_ AppTheme, is_tentative_connection: bool) -> Stroke<'_> {
     let stroke = default_wire_stroke(t).with_color(t.secondary.strong_color().into());
     if !is_tentative_connection {
         with_dashed_stroke(stroke)
@@ -163,7 +163,7 @@ fn with_dashed_stroke(stroke: Stroke) -> Stroke {
     }
 }
 
-pub fn default_wire_stroke(theme: &AppTheme) -> Stroke {
+pub fn default_wire_stroke(theme: &'_ AppTheme) -> Stroke<'_> {
     Stroke::default()
         .with_width(3.0)
         .with_color(theme.secondary.base_color.into())
